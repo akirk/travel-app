@@ -64,6 +64,13 @@ usort( $current_trips, $sort_asc );
 usort( $upcoming_trips, $sort_asc );
 usort( $past_trips, $sort_desc );
 
+$past_trips_by_year = [];
+foreach ( $past_trips as $trip_data ) {
+    $year = substr( (string) ( ( $trip_data['ends_at'] ?? '' ) ?: ( $trip_data['starts_at'] ?? '' ) ), 0, 4 );
+    $year = preg_match( '/^\d{4}$/', $year ) ? $year : __( 'Earlier', 'travel-app' );
+    $past_trips_by_year[ $year ][] = $trip_data;
+}
+
 $featured_trip = $current_trips[0] ?? ( $demo_mode_enabled ? ( $upcoming_trips[0] ?? $past_trips[0] ?? null ) : null );
 
 $get_trip_url = static function( array $trip_data ): string {
@@ -417,13 +424,13 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                     </section>
                 <?php endif; ?>
 
-                <?php if ( ! empty( $past_trips ) ) : ?>
-                    <section class="panel" aria-labelledby="past-heading">
+                <?php foreach ( $past_trips_by_year as $year => $year_trips ) : ?>
+                    <section class="panel" aria-labelledby="past-<?php echo esc_attr( sanitize_key( (string) $year ) ); ?>-heading">
                         <div class="section-title">
-                            <h2 id="past-heading"><?php esc_html_e( 'Past Trips', 'travel-app' ); ?></h2>
+                            <h2 id="past-<?php echo esc_attr( sanitize_key( (string) $year ) ); ?>-heading"><?php echo esc_html( $year ); ?></h2>
                         </div>
                         <div class="trip-list">
-                            <?php foreach ( $past_trips as $trip_data ) : ?>
+                            <?php foreach ( $year_trips as $trip_data ) : ?>
                                 <a class="trip-card" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><?php echo esc_html( $trip_data['title'] ); ?></h3>
                                     <div class="trip-meta">
@@ -435,7 +442,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                             <?php endforeach; ?>
                         </div>
                     </section>
-                <?php endif; ?>
+                <?php endforeach; ?>
             </div>
 
             <aside class="panel import-panel" aria-labelledby="import-trip-heading">

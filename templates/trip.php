@@ -8,6 +8,7 @@ $demo_mode_enabled = $travel_app->is_demo_mode_enabled();
 $trip_id    = isset( $wp_app_route['params']['id'] ) ? absint( $wp_app_route['params']['id'] ) : absint( get_query_var( 'id' ) );
 $trip       = $travel_app->get_user_trip( $trip_id );
 $updated    = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
+$trip_updated = isset( $_GET['trip_updated'] ) ? absint( $_GET['trip_updated'] ) : null;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
 
 if ( ! $trip ) {
@@ -102,6 +103,15 @@ $demo_start_time = $demo_start . 'T12:00';
             cursor: pointer;
         }
         .topbar { margin-bottom: 24px; }
+        .trip-title-form {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 10px;
+        }
+        .trip-title-form label { margin: 0; }
+        .trip-title-form input { font-size: 1.35rem; font-weight: 750; }
         .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
         .panel {
             background: var(--wp-app-color-surface);
@@ -310,6 +320,7 @@ $demo_start_time = $demo_start . 'T12:00';
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
             .timeline-item, .summary-grid, .edit-form { grid-template-columns: 1fr; }
+            .trip-title-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
             .demo-controls label { min-width: 100%; }
         }
@@ -323,7 +334,9 @@ $demo_start_time = $demo_start . 'T12:00';
             <a href="<?php echo esc_url( home_url( '/travel-app/' ) ); ?>"><?php esc_html_e( 'Back to Travel App', 'travel-app' ); ?></a>
         </div>
 
-        <?php if ( null !== $updated ) : ?>
+        <?php if ( null !== $trip_updated ) : ?>
+            <div class="notice" role="status"><?php esc_html_e( 'Travel plan updated.', 'travel-app' ); ?></div>
+        <?php elseif ( null !== $updated ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Itinerary item updated.', 'travel-app' ); ?></div>
         <?php elseif ( $error ) : ?>
             <div class="notice error" role="alert"><?php esc_html_e( 'The requested change could not be saved.', 'travel-app' ); ?></div>
@@ -336,7 +349,17 @@ $demo_start_time = $demo_start . 'T12:00';
             </section>
         <?php else : ?>
             <header>
-                <h1><?php echo esc_html( $trip_data['title'] ); ?></h1>
+                <h1 class="screen-reader-text"><?php echo esc_html( $trip_data['title'] ); ?></h1>
+                <form class="trip-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                    <input type="hidden" name="action" value="travel_app_update_trip">
+                    <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                    <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
+                    <label for="trip_title">
+                        <span class="screen-reader-text"><?php esc_html_e( 'Travel plan title', 'travel-app' ); ?></span>
+                        <input type="text" id="trip_title" name="trip_title" value="<?php echo esc_attr( $trip_data['title'] ); ?>" required>
+                    </label>
+                    <button type="submit"><?php esc_html_e( 'Save', 'travel-app' ); ?></button>
+                </form>
                 <div class="meta">
                     <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data ) as $summary_part ) : ?>
                         <span><?php echo esc_html( $summary_part ); ?></span>

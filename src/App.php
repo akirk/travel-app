@@ -45,6 +45,7 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_travel_app_import', [ $this, 'handle_import' ] );
+        add_action( 'admin_post_travel_app_update_trip', [ $this, 'handle_update_trip' ] );
         add_action( 'admin_post_travel_app_delete', [ $this, 'handle_delete' ] );
         add_action( 'admin_post_travel_app_update_segment', [ $this, 'handle_update_segment' ] );
         add_action( 'admin_post_travel_app_add_segment', [ $this, 'handle_add_segment' ] );
@@ -435,6 +436,28 @@ class App extends BaseApp {
         exit;
     }
 
+    public function handle_update_trip(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_die( esc_html__( 'You must be logged in to edit travel plans.', 'travel-app' ), 403 );
+        }
+
+        $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        check_admin_referer( 'travel_app_update_trip_' . $trip_id );
+
+        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
+        $title = isset( $_POST['trip_title'] ) ? sanitize_text_field( wp_unslash( $_POST['trip_title'] ) ) : '';
+        $updated = $this->update_user_trip_title( $trip_id, $title );
+
+        if ( is_wp_error( $updated ) ) {
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $updated->get_error_code() ), $redirect );
+        } else {
+            $redirect = add_query_arg( 'trip_updated', rawurlencode( (string) $trip_id ), $redirect );
+        }
+
+        wp_safe_redirect( $redirect );
+        exit;
+    }
+
     public function handle_update_segment(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
             wp_die( esc_html__( 'You must be logged in to edit itinerary items.', 'travel-app' ), 403 );
@@ -526,6 +549,26 @@ class App extends BaseApp {
         $deleted = wp_delete_term( $trip_id, 'travel_app_trip' );
         if ( ! $deleted || is_wp_error( $deleted ) ) {
             return new \WP_Error( 'delete_failed', __( 'The travel plan could not be deleted.', 'travel-app' ) );
+        }
+
+        return true;
+    }
+
+    private function update_user_trip_title( int $trip_id, string $title ) {
+        if ( '' === trim( $title ) ) {
+            return new \WP_Error( 'empty_title', __( 'Travel plan title cannot be empty.', 'travel-app' ) );
+        }
+
+        if ( ! $this->get_user_trip( $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
+        }
+
+        $updated = wp_update_term( $trip_id, 'travel_app_trip', [
+            'name' => $title,
+        ] );
+
+        if ( is_wp_error( $updated ) ) {
+            return $updated;
         }
 
         return true;

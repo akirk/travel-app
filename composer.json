@@ -12,6 +12,9 @@
             "TravelApp\\": "src/"
         }
     },
+    "scripts": {
+        "test": "php tests/ics-parser.php"
+    },
     "version": "0.1.0",
     "authors": [
         {

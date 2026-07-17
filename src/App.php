@@ -68,12 +68,18 @@ class App extends BaseApp {
 
     public function enqueue_assets(): void {
         wp_enqueue_script(
-            'travel-app-demo-time',
-            plugins_url( 'assets/js/demo-time.js', dirname( __DIR__ ) . '/travel-app.php' ),
+            'travel-app-timeline-time',
+            plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/travel-app.php' ),
             [],
             '1.0.0',
             true
         );
+    }
+
+    public function is_demo_mode_enabled(): bool {
+        $enabled = defined( 'TRAVEL_APP_DEMO_MODE' ) && TRAVEL_APP_DEMO_MODE;
+
+        return (bool) apply_filters( 'travel_app_demo_mode_enabled', $enabled );
     }
 
     protected function setup_storage(): void {
@@ -762,7 +768,7 @@ class App extends BaseApp {
             return $date;
         }
 
-        return wp_date( $include_year ? get_option( 'date_format' ) : 'D, j. F', $timestamp );
+        return wp_date( $include_year ? 'D, j. F Y' : 'D, j. F', $timestamp );
     }
 
     public function format_date_range_label( string $starts, string $ends = '' ): string {
@@ -928,6 +934,9 @@ class App extends BaseApp {
             'end_date' => (string) get_post_meta( $post->ID, '_travel_app_end_date', true ),
             'time'     => (string) get_post_meta( $post->ID, '_travel_app_time', true ),
             'end_time' => (string) get_post_meta( $post->ID, '_travel_app_end_time', true ),
+            'starts_at_utc' => (string) get_post_meta( $post->ID, '_travel_app_starts_at_utc', true ),
+            'ends_at_utc' => (string) get_post_meta( $post->ID, '_travel_app_ends_at_utc', true ),
+            'timezone' => (string) get_post_meta( $post->ID, '_travel_app_timezone', true ),
             'location' => (string) get_post_meta( $post->ID, '_travel_app_location', true ),
             'end_location' => (string) get_post_meta( $post->ID, '_travel_app_end_location', true ),
             'details'  => (string) $post->post_content,
@@ -970,6 +979,9 @@ class App extends BaseApp {
             'end_date' => sanitize_text_field( (string) ( $segment['end_date'] ?? '' ) ),
             'time'     => sanitize_text_field( (string) ( $segment['time'] ?? '' ) ),
             'end_time' => sanitize_text_field( (string) ( $segment['end_time'] ?? '' ) ),
+            'starts_at_utc' => sanitize_text_field( (string) ( $segment['starts_at_utc'] ?? '' ) ),
+            'ends_at_utc' => sanitize_text_field( (string) ( $segment['ends_at_utc'] ?? '' ) ),
+            'timezone' => sanitize_text_field( (string) ( $segment['timezone'] ?? '' ) ),
             'location' => sanitize_text_field( (string) ( $segment['location'] ?? '' ) ),
             'end_location' => sanitize_text_field( (string) ( $segment['end_location'] ?? '' ) ),
             'details'  => sanitize_textarea_field( (string) ( $segment['details'] ?? '' ) ),
@@ -1008,9 +1020,12 @@ class App extends BaseApp {
         update_post_meta( $item_id, '_travel_app_end_date', $segment['end_date'] );
         update_post_meta( $item_id, '_travel_app_time', $segment['time'] );
         update_post_meta( $item_id, '_travel_app_end_time', $segment['end_time'] );
+        update_post_meta( $item_id, '_travel_app_starts_at_utc', $segment['starts_at_utc'] );
+        update_post_meta( $item_id, '_travel_app_ends_at_utc', $segment['ends_at_utc'] );
+        update_post_meta( $item_id, '_travel_app_timezone', $segment['timezone'] );
         update_post_meta( $item_id, '_travel_app_location', $segment['location'] );
         update_post_meta( $item_id, '_travel_app_end_location', $segment['end_location'] );
-        update_post_meta( $item_id, '_travel_app_sort', trim( $segment['date'] . ' ' . $segment['time'] ) );
+        update_post_meta( $item_id, '_travel_app_sort', $segment['starts_at_utc'] ?: trim( $segment['date'] . ' ' . $segment['time'] ) );
     }
 
     private function save_trip( array $parsed, string $source_text ) {

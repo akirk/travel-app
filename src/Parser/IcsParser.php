@@ -26,18 +26,24 @@ class IcsParser {
             $details = $this->clean_description( $description, $summary, $location );
             $start = $this->parse_datetime( $event['_DTSTART_RAW'] ?? '' );
             $end = $this->parse_datetime( $event['_DTEND_RAW'] ?? '' );
-            $local_time = $this->extract_tripit_local_time( $description );
-            if ( '' !== $local_time ) {
-                $start['time'] = $local_time;
+            $local_times = $this->extract_tripit_local_times( $description );
+            if ( '' !== $local_times['start_time'] ) {
+                $start['time'] = $local_times['start_time'];
+            }
+            if ( '' !== $local_times['end_time'] ) {
+                $end['time'] = $local_times['end_time'];
             }
 
             $segments[] = [
                 'type'      => $this->infer_segment_type( $summary . ' ' . $description . ' ' . $location ),
                 'title'     => $summary,
                 'date'      => $start['date'],
-                'end_date'  => $end['date'] && $end['date'] !== $start['date'] ? $end['date'] : '',
+                'end_date'  => $end['date'],
                 'time'      => $start['time'],
                 'end_time'  => $end['time'],
+                'starts_at_utc' => $start['utc'],
+                'ends_at_utc' => $end['utc'],
+                'timezone'  => $local_times['timezone'],
                 'location'  => $locations['location'] ?: $location,
                 'end_location' => $locations['end_location'],
                 'details'   => $details,
@@ -203,6 +209,9 @@ class IcsParser {
             if ( preg_match( '/^\d{1,2}:\d{2}\s+[A-Z]{2,5}$/', $line ) ) {
                 return false;
             }
+            if ( preg_match( '/^\d{1,2}:\d{2}\s+to\s+\d{1,2}:\d{2}$/i', $line ) ) {
+                return false;
+            }
             if ( preg_match( '/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat),\s+/i', $line ) ) {
                 return false;
             }
@@ -247,28 +256,52 @@ class IcsParser {
         return $locations;
     }
 
-    private function extract_tripit_local_time( string $description ): string {
+    private function extract_tripit_local_times( string $description ): array {
+        $times = [
+            'start_time' => '',
+            'end_time'   => '',
+            'timezone'   => '',
+        ];
+
         foreach ( preg_split( '/\R/', $description ) as $line ) {
             $line = trim( (string) $line );
+            if ( preg_match( '/^(\d{1,2}):(\d{2})\s+to\s+(\d{1,2}):(\d{2})$/i', $line, $match ) ) {
+                $times['start_time'] = str_pad( $match[1], 2, '0', STR_PAD_LEFT ) . ':' . $match[2];
+                $times['end_time'] = str_pad( $match[3], 2, '0', STR_PAD_LEFT ) . ':' . $match[4];
+                continue;
+            }
             if ( preg_match( '/^(\d{1,2}):(\d{2})\s+[A-Z]{2,5}$/', $line, $match ) ) {
-                return str_pad( $match[1], 2, '0', STR_PAD_LEFT ) . ':' . $match[2];
+                $time = str_pad( $match[1], 2, '0', STR_PAD_LEFT ) . ':' . $match[2];
+                if ( preg_match( '/\s+([A-Z]{2,5})$/', $line, $timezone_match ) ) {
+                    $times['timezone'] = $timezone_match[1];
+                }
+                if ( '' === $times['start_time'] ) {
+                    $times['start_time'] = $time;
+                } elseif ( '' === $times['end_time'] ) {
+                    $times['end_time'] = $time;
+                }
             }
         }
 
-        return '';
+        return $times;
     }
 
     private function parse_datetime( string $value ): array {
         $value = trim( $value );
+        $is_utc = 'Z' === substr( $value, -1 );
         $value = rtrim( $value, 'Z' );
         $date = '';
         $time = '';
         $sort_key = $value;
+        $utc = '';
 
         if ( preg_match( '/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?)?$/', $value, $match ) ) {
             $date = $match[1] . '-' . $match[2] . '-' . $match[3];
             if ( ! empty( $match[4] ) ) {
                 $time = $match[4] . ':' . $match[5];
+                if ( $is_utc ) {
+                    $utc = $date . 'T' . $time . ':' . ( $match[6] ?? '00' ) . 'Z';
+                }
             }
             $sort_key = $date . ' ' . $time;
         }
@@ -276,6 +309,7 @@ class IcsParser {
         return [
             'date'     => $date,
             'time'     => $time,
+            'utc'      => $utc,
             'sort_key' => $sort_key,
         ];
     }
@@ -316,6 +350,8 @@ class IcsParser {
 
                 $checkin['end_date'] = (string) ( $segment['date'] ?? '' );
                 $checkin['end_time'] = (string) ( $segment['time'] ?? '' );
+                $checkin['ends_at_utc'] = (string) ( $segment['starts_at_utc'] ?? ( $segment['ends_at_utc'] ?? '' ) );
+                $checkin['timezone'] = (string) ( $segment['timezone'] ?? ( $checkin['timezone'] ?? '' ) );
                 $checkin['_ends_at'] = (string) ( $segment['date'] ?? ( $checkin['_ends_at'] ?? '' ) );
 
                 $merged[] = $checkin;
@@ -365,6 +401,9 @@ class IcsParser {
         }
         if ( preg_match( '/\b(train|rail)\b/i', $text ) ) {
             return 'train';
+        }
+        if ( preg_match( '/\b(activity|tour|museum|attraction|event)\b/i', $text ) ) {
+            return 'activity';
         }
         return 'other';
     }

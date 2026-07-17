@@ -8,7 +8,31 @@ $deleted    = isset( $_GET['deleted'] ) ? absint( $_GET['deleted'] ) : 0;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
 $has_ai     = function_exists( 'wp_ai_client_prompt' );
 $has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\AI_Assistant' );
+$demo_mode_enabled = $travel_app->is_demo_mode_enabled();
 $today      = current_time( 'Y-m-d' );
+$front_demo_control_id = 'front-page-demo';
+$demo_seed_trip = null;
+
+if ( $demo_mode_enabled && ! empty( $trips ) ) {
+    $demo_candidates = $trips;
+    usort( $demo_candidates, static function( array $a, array $b ): int {
+        return strcmp( (string) ( $a['starts_at'] ?? '' ), (string) ( $b['starts_at'] ?? '' ) );
+    } );
+
+    foreach ( $demo_candidates as $trip_data ) {
+        if ( ! empty( $trip_data['starts_at'] ) && $trip_data['starts_at'] >= $today ) {
+            $demo_seed_trip = $trip_data;
+            break;
+        }
+    }
+
+    $demo_seed_trip = $demo_seed_trip ?: $demo_candidates[0];
+}
+
+$front_demo_control_value = $demo_seed_trip ? ( ( $demo_seed_trip['starts_at'] ?: $today ) . 'T12:00' ) : ( $today . 'T12:00' );
+if ( $demo_mode_enabled ) {
+    $today = substr( $front_demo_control_value, 0, 10 );
+}
 
 $current_trips = [];
 $upcoming_trips = [];
@@ -39,6 +63,8 @@ $sort_desc = static function( array $a, array $b ): int {
 usort( $current_trips, $sort_asc );
 usort( $upcoming_trips, $sort_asc );
 usort( $past_trips, $sort_desc );
+
+$featured_trip = $current_trips[0] ?? ( $demo_mode_enabled ? ( $upcoming_trips[0] ?? $past_trips[0] ?? null ) : null );
 
 $get_trip_url = static function( array $trip_data ): string {
     return home_url( '/travel-app/trip/' . absint( $trip_data['id'] ?? 0 ) . '/' );
@@ -232,13 +258,41 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             margin: 14px 0;
         }
         .mini-step {
+            display: block;
             border-left: 3px solid var(--wp-app-color-border);
             padding-left: 12px;
+            color: inherit;
+            text-decoration: none;
+        }
+        .mini-step:hover,
+        .mini-step:focus,
+        .mini-step:focus-visible,
+        .mini-step:hover *,
+        .mini-step:focus *,
+        .mini-step:focus-visible * {
+            text-decoration: none;
+        }
+        .mini-step:hover { border-left-color: var(--wp-app-color-link); }
+        .mini-step:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 3px;
         }
         .mini-step.current { border-left-color: var(--wp-app-color-link); }
         .mini-label { color: var(--wp-app-color-muted); font-size: 0.78rem; text-transform: uppercase; }
         .mini-title { font-weight: 750; overflow-wrap: anywhere; }
-        .mini-location { color: var(--wp-app-color-muted); overflow-wrap: anywhere; }
+        .mini-location {
+            color: var(--wp-app-color-muted);
+            overflow-wrap: anywhere;
+            font-size: 0.88rem;
+            line-height: 1.42;
+        }
+        .mini-countdown {
+            color: var(--wp-app-color-muted);
+            font-size: 0.82rem;
+            font-weight: 650;
+            margin-top: 2px;
+        }
+        .mini-step[hidden] { display: none; }
         .section-title { display: flex; align-items: baseline; gap: 12px; }
         .empty {
             min-height: 130px;
@@ -284,6 +338,14 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             <div class="notice error" role="alert"><?php esc_html_e( 'The itinerary could not be imported.', 'travel-app' ); ?></div>
         <?php endif; ?>
 
+        <?php if ( $demo_mode_enabled && ! empty( $trips ) ) : ?>
+            <?php
+            $demo_control_id = $front_demo_control_id;
+            $demo_control_value = $front_demo_control_value;
+            require __DIR__ . '/partials/demo-controls.php';
+            ?>
+        <?php endif; ?>
+
         <div class="dashboard">
             <div>
                 <?php if ( empty( $trips ) ) : ?>
@@ -292,13 +354,12 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                     </section>
                 <?php endif; ?>
 
-                <?php if ( ! empty( $current_trips ) ) : ?>
+                <?php if ( $featured_trip ) : ?>
                     <section class="panel" aria-labelledby="current-trip-heading" data-ai-assistant-important>
                         <div class="section-title">
-                            <h2 id="current-trip-heading"><?php esc_html_e( 'Current Trip', 'travel-app' ); ?></h2>
-                            <span><?php echo esc_html( $today ); ?></span>
+                            <h2 id="current-trip-heading"><?php echo esc_html( ! empty( $current_trips ) ? __( 'Current Trip', 'travel-app' ) : __( 'Trip Preview', 'travel-app' ) ); ?></h2>
                         </div>
-                        <?php $current_trip = $current_trips[0]; ?>
+                        <?php $current_trip = $featured_trip; ?>
                         <article class="current-card">
                             <h3><?php echo esc_html( $current_trip['title'] ); ?></h3>
                             <div class="trip-meta">
@@ -306,24 +367,29 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     <span><?php echo esc_html( $summary_part ); ?></span>
                                 <?php endforeach; ?>
                             </div>
-                            <?php
-                            $demo_control_id = 'front-current-' . (string) $current_trip['id'];
-                            $demo_control_value = ( $current_trip['starts_at'] ?: $today ) . 'T12:00';
-                            require __DIR__ . '/partials/demo-controls.php';
-                            ?>
-                            <div class="mini-timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>" data-demo-preview>
+                            <div class="mini-timeline" data-demo-target="<?php echo esc_attr( $front_demo_control_id ); ?>" data-demo-preview>
                                 <?php foreach ( $current_trip['segments'] as $step ) : ?>
                                     <?php
                                     $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['time'] ?? '' ) ?: '00:00' ) );
+                                    $step_time_label = ( ! empty( $step['end_date'] ) && $step['end_date'] === ( $step['date'] ?? '' ) && ! empty( $step['end_time'] ) )
+                                        ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), (string) $step['end_time'] )
+                                        : (string) ( $step['time'] ?? '' );
+                                    $step_start_label = trim( $travel_app->format_date_label( (string) ( $step['date'] ?? '' ) ) . ' ' . (string) ( $step['time'] ?? '' ) );
+                                    $step_end_label = ! empty( $step['end_date'] ) && $step['end_date'] !== ( $step['date'] ?? '' )
+                                        ? trim( $travel_app->format_date_label( (string) $step['end_date'] ) . ' ' . (string) ( $step['end_time'] ?? '' ) )
+                                        : '';
                                     ?>
-                                    <span hidden data-preview-item data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-date="<?php echo esc_attr( (string) ( $step['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $step['time'] ?? '' ) ); ?>" data-location="<?php echo esc_attr( (string) ( $step['location'] ?? '' ) ); ?>" data-end-location="<?php echo esc_attr( (string) ( $step['end_location'] ?? '' ) ); ?>" data-title="<?php echo esc_attr( (string) ( $step['title'] ?? '' ) ); ?>"></span>
+                                    <span hidden data-preview-item data-url="<?php echo esc_url( home_url( '/travel-app/trip/' . $current_trip['id'] . '/item/' . absint( $step['id'] ?? 0 ) . '/' ) ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( (string) ( $step['date'] ?? '' ) ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( (string) ( $step['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $step['end_time'] ?? '' ) ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( (string) ( $step['location'] ?? '' ) ); ?>" data-end-location="<?php echo esc_attr( (string) ( $step['end_location'] ?? '' ) ); ?>" data-title="<?php echo esc_attr( (string) ( $step['title'] ?? '' ) ); ?>"></span>
                                 <?php endforeach; ?>
                                 <?php foreach ( [ 'current' => __( 'Current', 'travel-app' ), 'next' => __( 'Next', 'travel-app' ) ] as $key => $label ) : ?>
-                                    <div class="mini-step <?php echo esc_attr( $key ); ?>" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">
+                                    <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">
                                         <div class="mini-label"><?php echo esc_html( $label ); ?></div>
                                         <div class="mini-title" data-preview-title><?php esc_html_e( 'No item', 'travel-app' ); ?></div>
+                                        <div class="mini-countdown" data-preview-countdown></div>
                                         <div class="mini-location" data-preview-meta></div>
-                                    </div>
+                                        <div class="mini-location" data-preview-location></div>
+                                        <div class="mini-location" data-preview-end></div>
+                                    </a>
                                 <?php endforeach; ?>
                             </div>
                             <a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><?php esc_html_e( 'Open Timeline', 'travel-app' ); ?></a>

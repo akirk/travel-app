@@ -4,6 +4,7 @@ use TravelApp\App;
 global $wp_app_route;
 
 $travel_app = App::get_instance();
+$demo_mode_enabled = $travel_app->is_demo_mode_enabled();
 $trip_id    = isset( $wp_app_route['params']['id'] ) ? absint( $wp_app_route['params']['id'] ) : absint( get_query_var( 'id' ) );
 $trip       = $travel_app->get_user_trip( $trip_id );
 $updated    = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
@@ -216,6 +217,11 @@ $demo_start_time = $demo_start . 'T12:00';
         .type { color: var(--wp-app-color-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0; }
         .title { font-weight: 750; overflow-wrap: anywhere; }
         .detail { color: var(--wp-app-color-muted); overflow-wrap: anywhere; }
+        .timeline-item .detail,
+        .summary-grid .detail {
+            font-size: 0.88rem;
+            line-height: 1.42;
+        }
         details.timeline-details,
         details.item {
             border: 1px solid var(--wp-app-color-border);
@@ -344,7 +350,9 @@ $demo_start_time = $demo_start . 'T12:00';
                 <?php
                 $demo_control_id = 'trip-' . (string) $trip_data['id'];
                 $demo_control_value = $demo_start_time;
-                require __DIR__ . '/partials/demo-controls.php';
+                if ( $demo_mode_enabled ) {
+                    require __DIR__ . '/partials/demo-controls.php';
+                }
                 ?>
 
                 <details class="item add-item">

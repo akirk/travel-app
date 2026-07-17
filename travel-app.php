@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Travel App
- * Description: A private itinerary app with pasted confirmation import.
+ * Description: A private travel organizer for WordPress.
  * Version: 1.0.0
  * Author: Alex Kirk
  * Text Domain: travel-app

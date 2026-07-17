@@ -295,7 +295,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
         <header class="app-header">
             <div>
                 <h1><?php esc_html_e( 'Travel App', 'travel-app' ); ?></h1>
-                <p class="lede"><?php esc_html_e( 'Keep pasted confirmations and calendar files as private travel plans.', 'travel-app' ); ?></p>
+                <p class="lede"><?php esc_html_e( 'A private travel organizer for WordPress.', 'travel-app' ); ?></p>
             </div>
             <div class="status-stack" aria-label="<?php esc_attr_e( 'Integration status', 'travel-app' ); ?>">
                 <span class="status <?php echo $has_ai ? 'available' : 'unavailable'; ?>">

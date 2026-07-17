@@ -1,8 +1,8 @@
 # Travel App
 
-A private itinerary app powered by [WpApp](https://github.com/akirk/wp-app).
+A private travel organizer for WordPress.
 
-Paste or upload flight, hotel, train, rental car, calendar, or activity confirmations to save them as structured travel plans.
+Paste or upload booking confirmations, TripIt calendar exports, and itinerary notes to turn them into structured trip timelines. Each trip has editable itinerary items for flights, lodging, trains, rental cars, activities, and other travel details.
 
 ICS calendar files use a dedicated calendar parser. Other text uses the WordPress AI Client (`wp_ai_client_prompt()`) when an AI connector is configured, with a basic local parser as fallback. Saved travel plans have detail pages and can be deleted from the app. When AI Assistant is active, the app also exposes WordPress Abilities for listing, importing, and deleting travel plans.
 

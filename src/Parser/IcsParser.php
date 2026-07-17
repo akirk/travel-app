@@ -22,6 +22,7 @@ class IcsParser {
                 continue;
             }
 
+            $locations = $this->extract_tripit_locations( $description );
             $details = $this->clean_description( $description, $summary, $location );
             $start = $this->parse_datetime( $event['_DTSTART_RAW'] ?? '' );
             $end = $this->parse_datetime( $event['_DTEND_RAW'] ?? '' );
@@ -34,8 +35,11 @@ class IcsParser {
                 'type'      => $this->infer_segment_type( $summary . ' ' . $description . ' ' . $location ),
                 'title'     => $summary,
                 'date'      => $start['date'],
+                'end_date'  => $end['date'] && $end['date'] !== $start['date'] ? $end['date'] : '',
                 'time'      => $start['time'],
-                'location'  => $location,
+                'end_time'  => $end['time'],
+                'location'  => $locations['location'] ?: $location,
+                'end_location' => $locations['end_location'],
                 'details'   => $details,
                 '_sort_key' => $start['sort_key'],
                 '_ends_at'  => $end['date'] ?: $start['date'],
@@ -45,6 +49,8 @@ class IcsParser {
         usort( $segments, static function( array $a, array $b ): int {
             return strcmp( (string) ( $a['_sort_key'] ?? '' ), (string) ( $b['_sort_key'] ?? '' ) );
         } );
+
+        $segments = $this->merge_lodging_check_events( $segments );
 
         $starts_at = '';
         $ends_at = '';
@@ -66,7 +72,6 @@ class IcsParser {
 
         return [
             'title'       => $trip_title,
-            'destination' => $calendar_title ?: $overview_title ?: $this->first_non_empty_segment_value( $segments, 'location' ),
             'starts_at'   => $starts_at,
             'ends_at'     => $ends_at,
             'segments'    => $segments,
@@ -204,11 +209,42 @@ class IcsParser {
             if ( preg_match( '/^Until\s+/i', $line ) ) {
                 return false;
             }
+            if ( preg_match( '/^\[(?:Lodging|Hotel)\]\s+(?:Arrive|Depart)\b/i', $line ) ) {
+                return false;
+            }
+            if ( preg_match( '/^Check-?(?:In|Out)\s*:\s*\d{1,2}:\d{2}\b/i', $line ) ) {
+                return false;
+            }
+            if ( preg_match( '/^(?:Depart|Arrive)\s+/i', $line ) ) {
+                return false;
+            }
 
             return true;
         } ) );
 
         return implode( "\n", $lines );
+    }
+
+    private function extract_tripit_locations( string $description ): array {
+        $locations = [
+            'location'     => '',
+            'end_location' => '',
+        ];
+
+        foreach ( preg_split( '/\R/', $description ) as $line ) {
+            $line = trim( (string) $line );
+
+            if ( '' === $locations['location'] && preg_match( '/^Depart\s+(.+)$/i', $line, $match ) ) {
+                $locations['location'] = trim( $match[1] );
+                continue;
+            }
+
+            if ( '' === $locations['end_location'] && preg_match( '/^Arrive\s+(.+)$/i', $line, $match ) ) {
+                $locations['end_location'] = trim( $match[1] );
+            }
+        }
+
+        return $locations;
     }
 
     private function extract_tripit_local_time( string $description ): string {
@@ -255,6 +291,58 @@ class IcsParser {
         return __( 'Imported Calendar Itinerary', 'travel-app' );
     }
 
+    private function merge_lodging_check_events( array $segments ): array {
+        $merged = [];
+        $pending_checkins = [];
+
+        foreach ( $segments as $segment ) {
+            if ( 'lodging' !== ( $segment['type'] ?? '' ) ) {
+                $merged[] = $segment;
+                continue;
+            }
+
+            $title = (string) ( $segment['title'] ?? '' );
+            $lodging_name = $this->normalize_lodging_name( $title );
+
+            if ( preg_match( '/^check-in\s*:/i', $title ) ) {
+                $segment['title'] = $lodging_name;
+                $pending_checkins[ $lodging_name ] = $segment;
+                continue;
+            }
+
+            if ( preg_match( '/^check-out\s*:/i', $title ) && isset( $pending_checkins[ $lodging_name ] ) ) {
+                $checkin = $pending_checkins[ $lodging_name ];
+                unset( $pending_checkins[ $lodging_name ] );
+
+                $checkin['end_date'] = (string) ( $segment['date'] ?? '' );
+                $checkin['end_time'] = (string) ( $segment['time'] ?? '' );
+                $checkin['_ends_at'] = (string) ( $segment['date'] ?? ( $checkin['_ends_at'] ?? '' ) );
+
+                $merged[] = $checkin;
+                continue;
+            }
+
+            $merged[] = $segment;
+        }
+
+        foreach ( $pending_checkins as $checkin ) {
+            $merged[] = $checkin;
+        }
+
+        usort( $merged, static function( array $a, array $b ): int {
+            return strcmp( (string) ( $a['_sort_key'] ?? '' ), (string) ( $b['_sort_key'] ?? '' ) );
+        } );
+
+        return $merged;
+    }
+
+    private function normalize_lodging_name( string $title ): string {
+        $title = preg_replace( '/^check-(?:in|out)\s*:\s*/i', '', $title );
+        $title = trim( (string) $title );
+
+        return '' !== $title ? $title : __( 'Lodging', 'travel-app' );
+    }
+
     private function first_non_empty_segment_value( array $segments, string $key ): string {
         foreach ( $segments as $segment ) {
             if ( ! empty( $segment[ $key ] ) ) {
@@ -267,7 +355,7 @@ class IcsParser {
 
     private function infer_segment_type( string $text ): string {
         if ( preg_match( '/\b(lodging|hotel|check-in|checkout|check-out|airbnb|boardinghouse)\b/i', $text ) ) {
-            return 'hotel';
+            return 'lodging';
         }
         if ( preg_match( '/\b(car|rental|mietwagen|alamo|hertz|avis|sixt)\b/i', $text ) ) {
             return 'car';

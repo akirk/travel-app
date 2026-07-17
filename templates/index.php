@@ -44,52 +44,6 @@ $get_trip_url = static function( array $trip_data ): string {
     return home_url( '/travel-app/trip/' . absint( $trip_data['id'] ?? 0 ) . '/' );
 };
 
-$get_days_label = static function( array $trip_data ) use ( $today ): string {
-    $starts = (string) ( $trip_data['starts_at'] ?? '' );
-    $ends = (string) ( $trip_data['ends_at'] ?? '' );
-
-    if ( '' === $starts ) {
-        return '';
-    }
-
-    $today_date = date_create_immutable( $today );
-    $start_date = date_create_immutable( $starts );
-    $end_date = '' !== $ends ? date_create_immutable( $ends ) : null;
-
-    if ( ! $today_date || ! $start_date ) {
-        return '';
-    }
-
-    if ( $start_date > $today_date ) {
-        $days = (int) $today_date->diff( $start_date )->format( '%a' );
-        return sprintf( _n( 'Starts tomorrow', 'Starts in %d days', $days, 'travel-app' ), $days );
-    }
-
-    if ( $end_date && $end_date < $today_date ) {
-        $days = (int) $end_date->diff( $today_date )->format( '%a' );
-        return sprintf( _n( 'Ended yesterday', 'Ended %d days ago', $days, 'travel-app' ), $days );
-    }
-
-    return __( 'Active now', 'travel-app' );
-};
-
-$get_duration_label = static function( array $trip_data ): string {
-    $starts = (string) ( $trip_data['starts_at'] ?? '' );
-    $ends = (string) ( $trip_data['ends_at'] ?? '' );
-    if ( '' === $starts || '' === $ends ) {
-        return '';
-    }
-
-    $start_date = date_create_immutable( $starts );
-    $end_date = date_create_immutable( $ends );
-    if ( ! $start_date || ! $end_date || $end_date < $start_date ) {
-        return '';
-    }
-
-    $days = (int) $start_date->diff( $end_date )->format( '%a' ) + 1;
-    return sprintf( _n( '1 day', '%d days', $days, 'travel-app' ), $days );
-};
-
 $get_timeline_preview = static function( array $trip_data ) use ( $today ): array {
     $segments = isset( $trip_data['segments'] ) && is_array( $trip_data['segments'] ) ? $trip_data['segments'] : [];
     usort( $segments, static function( array $a, array $b ): int {
@@ -247,7 +201,22 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             color: inherit;
             text-decoration: none;
         }
-        .trip-card:hover { border-color: var(--wp-app-color-link); }
+        .trip-card:hover,
+        .trip-card:focus,
+        .trip-card:focus-visible,
+        .trip-card:hover *,
+        .trip-card:focus *,
+        .trip-card:focus-visible * {
+            text-decoration: none;
+        }
+        .trip-card:hover {
+            border-color: var(--wp-app-color-link);
+            background: var(--wp-app-color-surface);
+        }
+        .trip-card:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
         .trip-card.highlight { outline: 2px solid var(--wp-app-color-link); outline-offset: 2px; }
         .trip-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); font-size: 0.88rem; }
         .current-card {
@@ -333,12 +302,9 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <article class="current-card">
                             <h3><?php echo esc_html( $current_trip['title'] ); ?></h3>
                             <div class="trip-meta">
-                                <?php if ( $current_trip['destination'] ) : ?>
-                                    <span><?php echo esc_html( $current_trip['destination'] ); ?></span>
-                                <?php endif; ?>
-                                <span><?php echo esc_html( trim( $current_trip['starts_at'] . ' - ' . $current_trip['ends_at'], ' -' ) ); ?></span>
-                                <?php if ( $get_days_label( $current_trip ) ) : ?><span><?php echo esc_html( $get_days_label( $current_trip ) ); ?></span><?php endif; ?>
-                                <?php if ( $get_duration_label( $current_trip ) ) : ?><span><?php echo esc_html( $get_duration_label( $current_trip ) ); ?></span><?php endif; ?>
+                                <?php foreach ( $travel_app->get_trip_summary_parts( $current_trip, $today ) as $summary_part ) : ?>
+                                    <span><?php echo esc_html( $summary_part ); ?></span>
+                                <?php endforeach; ?>
                             </div>
                             <?php
                             $demo_control_id = 'front-current-' . (string) $current_trip['id'];
@@ -350,7 +316,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     <?php
                                     $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['time'] ?? '' ) ?: '00:00' ) );
                                     ?>
-                                    <span hidden data-preview-item data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-date="<?php echo esc_attr( (string) ( $step['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $step['time'] ?? '' ) ); ?>" data-location="<?php echo esc_attr( (string) ( $step['location'] ?? '' ) ); ?>" data-title="<?php echo esc_attr( (string) ( $step['title'] ?? '' ) ); ?>"></span>
+                                    <span hidden data-preview-item data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-date="<?php echo esc_attr( (string) ( $step['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $step['time'] ?? '' ) ); ?>" data-location="<?php echo esc_attr( (string) ( $step['location'] ?? '' ) ); ?>" data-end-location="<?php echo esc_attr( (string) ( $step['end_location'] ?? '' ) ); ?>" data-title="<?php echo esc_attr( (string) ( $step['title'] ?? '' ) ); ?>"></span>
                                 <?php endforeach; ?>
                                 <?php foreach ( [ 'current' => __( 'Current', 'travel-app' ), 'next' => __( 'Next', 'travel-app' ) ] as $key => $label ) : ?>
                                     <div class="mini-step <?php echo esc_attr( $key ); ?>" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">
@@ -375,10 +341,9 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                 <a class="trip-card <?php echo (int) $trip_data['id'] === $imported ? 'highlight' : ''; ?>" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><?php echo esc_html( $trip_data['title'] ); ?></h3>
                                     <div class="trip-meta">
-                                        <?php if ( $trip_data['destination'] ) : ?><span><?php echo esc_html( $trip_data['destination'] ); ?></span><?php endif; ?>
-                                        <span><?php echo esc_html( trim( $trip_data['starts_at'] . ' - ' . $trip_data['ends_at'], ' -' ) ); ?></span>
-                                        <?php if ( $get_days_label( $trip_data ) ) : ?><span><?php echo esc_html( $get_days_label( $trip_data ) ); ?></span><?php endif; ?>
-                                        <?php if ( $get_duration_label( $trip_data ) ) : ?><span><?php echo esc_html( $get_duration_label( $trip_data ) ); ?></span><?php endif; ?>
+                                        <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
+                                            <span><?php echo esc_html( $summary_part ); ?></span>
+                                        <?php endforeach; ?>
                                     </div>
                                 </a>
                             <?php endforeach; ?>
@@ -396,10 +361,9 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                 <a class="trip-card" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><?php echo esc_html( $trip_data['title'] ); ?></h3>
                                     <div class="trip-meta">
-                                        <?php if ( $trip_data['destination'] ) : ?><span><?php echo esc_html( $trip_data['destination'] ); ?></span><?php endif; ?>
-                                        <span><?php echo esc_html( trim( $trip_data['starts_at'] . ' - ' . $trip_data['ends_at'], ' -' ) ); ?></span>
-                                        <?php if ( $get_days_label( $trip_data ) ) : ?><span><?php echo esc_html( $get_days_label( $trip_data ) ); ?></span><?php endif; ?>
-                                        <?php if ( $get_duration_label( $trip_data ) ) : ?><span><?php echo esc_html( $get_duration_label( $trip_data ) ); ?></span><?php endif; ?>
+                                        <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
+                                            <span><?php echo esc_html( $summary_part ); ?></span>
+                                        <?php endforeach; ?>
                                     </div>
                                 </a>
                             <?php endforeach; ?>

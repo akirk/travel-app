@@ -21,6 +21,17 @@ foreach ( $segments as $segment ) {
     $segment['_index'] = (int) ( $segment['id'] ?? 0 );
     $segment['_sort']  = trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) );
     $timeline_segments[] = $segment;
+
+    if ( 'lodging' === ( $segment['type'] ?? '' ) && ! empty( $segment['end_date'] ) ) {
+        $checkout_segment = $segment;
+        $checkout_segment['date'] = (string) $segment['end_date'];
+        $checkout_segment['time'] = (string) ( $segment['end_time'] ?? '' );
+        $checkout_segment['title'] = (string) ( $segment['title'] ?: __( 'Lodging', 'travel-app' ) );
+        $checkout_segment['end_date'] = '';
+        $checkout_segment['_timeline_kind'] = 'checkout';
+        $checkout_segment['_sort'] = trim( $checkout_segment['date'] . ' ' . $checkout_segment['time'] );
+        $timeline_segments[] = $checkout_segment;
+    }
 }
 
 usort( $timeline_segments, static function( array $a, array $b ): int {
@@ -181,6 +192,22 @@ $demo_start_time = $demo_start . 'T12:00';
             text-decoration: none;
             cursor: pointer;
         }
+        .timeline-item:hover,
+        .timeline-item:focus,
+        .timeline-item:focus-visible,
+        .timeline-item:hover *,
+        .timeline-item:focus *,
+        .timeline-item:focus-visible * {
+            text-decoration: none;
+        }
+        .timeline-item:hover {
+            border-color: var(--wp-app-color-link);
+            background: var(--wp-app-color-surface);
+        }
+        .timeline-item:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
         .timeline-item.current {
             outline: 2px solid var(--wp-app-color-link);
             outline-offset: 1px;
@@ -249,6 +276,12 @@ $demo_start_time = $demo_start . 'T12:00';
             border-top: 1px solid var(--wp-app-color-border);
         }
         .field-wide { grid-column: 1 / -1; }
+        .date-time-group {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
         .form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
         .item-actions {
             grid-column: 1 / -1;
@@ -271,6 +304,7 @@ $demo_start_time = $demo_start . 'T12:00';
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
             .timeline-item, .summary-grid, .edit-form { grid-template-columns: 1fr; }
+            .date-time-group { grid-template-columns: 1fr; }
             .demo-controls label { min-width: 100%; }
         }
     </style>
@@ -298,12 +332,9 @@ $demo_start_time = $demo_start . 'T12:00';
             <header>
                 <h1><?php echo esc_html( $trip_data['title'] ); ?></h1>
                 <div class="meta">
-                    <?php if ( $trip_data['destination'] ) : ?>
-                        <span><?php echo esc_html( $trip_data['destination'] ); ?></span>
-                    <?php endif; ?>
-                    <?php if ( $trip_data['starts_at'] || $trip_data['ends_at'] ) : ?>
-                        <span><?php echo esc_html( trim( $trip_data['starts_at'] . ' - ' . $trip_data['ends_at'], ' -' ) ); ?></span>
-                    <?php endif; ?>
+                    <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data ) as $summary_part ) : ?>
+                        <span><?php echo esc_html( $summary_part ); ?></span>
+                    <?php endforeach; ?>
                     <span><?php echo esc_html( sprintf( _n( '%d item', '%d items', count( $segments ), 'travel-app' ), count( $segments ) ) ); ?></span>
                 </div>
             </header>
@@ -328,26 +359,42 @@ $demo_start_time = $demo_start . 'T12:00';
                             <?php esc_html_e( 'Title', 'travel-app' ); ?>
                             <input name="segment_title">
                         </label>
-                        <label>
+                        <label class="field-wide">
                             <?php esc_html_e( 'Type', 'travel-app' ); ?>
                             <select name="segment_type">
-                                <?php foreach ( [ 'flight', 'hotel', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
+                                <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
                                     <option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </label>
                         <label>
-                            <?php esc_html_e( 'Date', 'travel-app' ); ?>
-                            <input type="date" name="segment_date">
-                        </label>
-                        <label>
-                            <?php esc_html_e( 'Time', 'travel-app' ); ?>
-                            <input type="time" name="segment_time">
-                        </label>
-                        <label>
                             <?php esc_html_e( 'Location', 'travel-app' ); ?>
                             <input name="segment_location">
                         </label>
+                        <label>
+                            <?php esc_html_e( 'End Location', 'travel-app' ); ?>
+                            <input name="segment_end_location">
+                        </label>
+                        <div class="date-time-group">
+                            <label>
+                                <?php esc_html_e( 'Start Date', 'travel-app' ); ?>
+                                <input type="date" name="segment_date">
+                            </label>
+                            <label>
+                                <?php esc_html_e( 'Start Time', 'travel-app' ); ?>
+                                <input type="time" name="segment_time">
+                            </label>
+                        </div>
+                        <div class="date-time-group">
+                            <label>
+                                <?php esc_html_e( 'End Date', 'travel-app' ); ?>
+                                <input type="date" name="segment_end_date">
+                            </label>
+                            <label>
+                                <?php esc_html_e( 'End Time', 'travel-app' ); ?>
+                                <input type="time" name="segment_end_time">
+                            </label>
+                        </div>
                         <label class="field-wide">
                             <?php esc_html_e( 'Details', 'travel-app' ); ?>
                             <textarea name="segment_details"></textarea>
@@ -368,14 +415,22 @@ $demo_start_time = $demo_start . 'T12:00';
                                 <h3 class="day-heading"><?php echo esc_html( $day ); ?></h3>
                                 <?php foreach ( $day_segments as $segment ) : ?>
                                     <?php $index = (int) $segment['_index']; ?>
+                                    <?php $timeline_kind = (string) ( $segment['_timeline_kind'] ?? 'start' ); ?>
+                                    <?php $segment_anchor = 'segment-' . $index . ( 'checkout' === $timeline_kind ? '-checkout' : '' ); ?>
                                     <?php $segment_datetime = trim( (string) ( $segment['date'] ?? '' ) . 'T' . ( (string) ( $segment['time'] ?? '' ) ?: '00:00' ) ); ?>
-                                    <a class="timeline-item" id="segment-<?php echo esc_attr( (string) $index ); ?>" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>" data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
+                                    <a class="timeline-item" id="<?php echo esc_attr( $segment_anchor ); ?>" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>" data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
                                             <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
                                             <div>
-                                                <div class="type"><?php echo esc_html( $segment['type'] ?: __( 'Other', 'travel-app' ) ); ?></div>
+                                                <div class="type"><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></div>
                                                 <div class="title"><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></div>
+                                                <?php if ( ! empty( $segment['end_date'] ) ) : ?>
+                                                    <div class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></div>
+                                                <?php endif; ?>
                                                 <?php if ( ! empty( $segment['location'] ) ) : ?>
                                                     <div class="detail"><?php echo esc_html( $segment['location'] ); ?></div>
+                                                <?php endif; ?>
+                                                <?php if ( ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                                                    <div class="detail"><?php echo esc_html( sprintf( __( 'To: %s', 'travel-app' ), $segment['end_location'] ) ); ?></div>
                                                 <?php endif; ?>
                                                 <?php if ( ! empty( $segment['details'] ) ) : ?>
                                                     <div class="detail"><?php echo esc_html( $segment['details'] ); ?></div>
@@ -399,10 +454,16 @@ $demo_start_time = $demo_start . 'T12:00';
                                     <div class="summary-grid">
                                         <span class="time"><?php echo esc_html( trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) ) ); ?></span>
                                         <span>
-                                            <span class="type"><?php echo esc_html( $segment['type'] ?: __( 'Other', 'travel-app' ) ); ?></span><br>
+                                            <span class="type"><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span><br>
                                             <span class="title"><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
+                                            <?php if ( ! empty( $segment['end_date'] ) ) : ?>
+                                                <br><span class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></span>
+                                            <?php endif; ?>
                                             <?php if ( ! empty( $segment['location'] ) ) : ?>
                                                 <br><span class="detail"><?php echo esc_html( $segment['location'] ); ?></span>
+                                            <?php endif; ?>
+                                            <?php if ( ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                                                <br><span class="detail"><?php echo esc_html( sprintf( __( 'To: %s', 'travel-app' ), $segment['end_location'] ) ); ?></span>
                                             <?php endif; ?>
                                         </span>
                                         <span class="detail"><?php esc_html_e( 'Open', 'travel-app' ); ?></span>

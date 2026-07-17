@@ -18,7 +18,7 @@ class GenericParser {
             return new \WP_Error( 'ai_client_unavailable', __( 'WordPress AI Client is unavailable.', 'travel-app' ) );
         }
 
-        $prompt = 'Extract this travel itinerary into strict JSON only. Use this shape: {"title":"","destination":"","starts_at":"","ends_at":"","segments":[{"type":"flight|hotel|train|car|activity|other","title":"","date":"","time":"","location":"","details":""}]}.' . "\n\n" . $text;
+        $prompt = 'Extract this travel itinerary into strict JSON only. Use this shape: {"title":"","starts_at":"","ends_at":"","segments":[{"type":"flight|lodging|train|car|activity|other","title":"","date":"","end_date":"","time":"","end_time":"","location":"","end_location":"","details":""}]}.' . "\n\n" . $text;
         $builder = wp_ai_client_prompt( $prompt );
 
         if ( is_wp_error( $builder ) ) {
@@ -138,7 +138,6 @@ class GenericParser {
 
         return [
             'title'       => $title,
-            'destination' => '',
             'starts_at'   => $dates[0] ?? '',
             'ends_at'     => $dates ? end( $dates ) : '',
             'segments'    => $segments,
@@ -176,7 +175,7 @@ class GenericParser {
 
     private function infer_segment_type( string $text ): string {
         if ( preg_match( '/\b(lodging|hotel|check-in|checkout|check-out|airbnb|boardinghouse)\b/i', $text ) ) {
-            return 'hotel';
+            return 'lodging';
         }
         if ( preg_match( '/\b(flight|airport|airline|boarding pass)\b/i', $text ) ) {
             return 'flight';

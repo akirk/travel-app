@@ -84,6 +84,12 @@ if ( ! $trip || ! $segment ) {
             gap: 12px;
         }
         .field-wide { grid-column: 1 / -1; }
+        .date-time-group {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
         .form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
         .danger-zone {
             margin-top: 28px;
@@ -99,6 +105,7 @@ if ( ! $trip || ! $segment ) {
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
             .edit-form { grid-template-columns: 1fr; }
+            .date-time-group { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -126,12 +133,15 @@ if ( ! $trip || ! $segment ) {
                 <h1><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></h1>
                 <div class="meta">
                     <span><?php echo esc_html( $trip_data['title'] ); ?></span>
-                    <span><?php echo esc_html( $segment['type'] ?: __( 'Other', 'travel-app' ) ); ?></span>
-                    <?php if ( $segment['date'] || $segment['time'] ) : ?>
-                        <span><?php echo esc_html( trim( $segment['date'] . ' ' . $segment['time'] ) ); ?></span>
+                    <span><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span>
+                    <?php if ( $segment['date'] || $segment['end_date'] || $segment['time'] || $segment['end_time'] ) : ?>
+                        <span><?php echo esc_html( $travel_app->get_segment_date_time_range_label( $segment ) ); ?></span>
                     <?php endif; ?>
                     <?php if ( $segment['location'] ) : ?>
                         <span><?php echo esc_html( $segment['location'] ); ?></span>
+                    <?php endif; ?>
+                    <?php if ( ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                        <span><?php echo esc_html( sprintf( __( 'To: %s', 'travel-app' ), $segment['end_location'] ) ); ?></span>
                     <?php endif; ?>
                 </div>
             </header>

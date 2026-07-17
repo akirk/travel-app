@@ -118,10 +118,16 @@
             title.textContent = source.getAttribute('data-title') || 'Untitled item';
         }
         if (meta) {
+            var location = source.getAttribute('data-location') || '';
+            var endLocation = source.getAttribute('data-end-location') || '';
+            var locationLabel = location && endLocation && location !== endLocation
+                ? location + ' -> ' + endLocation
+                : (location || endLocation);
+
             meta.textContent = [
                 (source.getAttribute('data-date') || ''),
                 (source.getAttribute('data-time') || ''),
-                (source.getAttribute('data-location') || '')
+                locationLabel
             ].filter(Boolean).join(' ');
         }
     }

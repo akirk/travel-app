@@ -192,7 +192,7 @@ class App extends BaseApp {
 
         wp_register_ability( 'travel-app/list-trips', [
             'label'               => __( 'List Travel Plans', 'travel-app' ),
-            'description'         => 'Returns the current user\'s saved travel plans with IDs, dates, destinations, and segment counts.',
+            'description'         => 'Returns the current user\'s saved travel plans with IDs, dates, and segment counts.',
             'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
@@ -209,7 +209,6 @@ class App extends BaseApp {
                             'properties' => [
                                 'id'           => [ 'type' => 'integer', 'description' => 'Use with travel-app/get-trip.' ],
                                 'title'        => [ 'type' => 'string' ],
-                                'destination'  => [ 'type' => 'string' ],
                                 'starts_at'    => [ 'type' => 'string' ],
                                 'ends_at'      => [ 'type' => 'string' ],
                                 'segment_count'=> [ 'type' => 'integer' ],
@@ -252,7 +251,6 @@ class App extends BaseApp {
                 'properties' => [
                     'id'          => [ 'type' => 'integer' ],
                     'title'       => [ 'type' => 'string' ],
-                    'destination' => [ 'type' => 'string' ],
                     'starts_at'   => [ 'type' => 'string' ],
                     'ends_at'     => [ 'type' => 'string' ],
                     'segments'    => [ 'type' => 'array' ],
@@ -318,13 +316,13 @@ class App extends BaseApp {
     }
 
     public function register_ai_assistant_ability_domains( array $domains ): array {
-        $domains['travel-app'] = 'Travel App, itinerary, travel plans, flights, hotels, booking confirmations, reservations, travel organizer';
+        $domains['travel-app'] = 'Travel App, itinerary, travel plans, flights, lodging, booking confirmations, reservations, travel organizer';
         return $domains;
     }
 
     public function get_ai_assistant_ability_instructions( string $instructions, string $ability_id, $args, $result ): string {
         if ( 'travel-app/import-itinerary' === $ability_id && ! empty( $result['id'] ) ) {
-            $instructions = 'Tell the user the travel plan was saved. Summarize destination, dates, and travel segments, then link to the Travel App URL if present.';
+            $instructions = 'Tell the user the travel plan was saved. Summarize title, dates, and travel segments, then link to the Travel App URL if present.';
         }
 
         return $instructions;
@@ -445,8 +443,11 @@ class App extends BaseApp {
             'type'     => isset( $_POST['segment_type'] ) ? sanitize_key( wp_unslash( $_POST['segment_type'] ) ) : 'other',
             'title'    => isset( $_POST['segment_title'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_title'] ) ) : '',
             'date'     => isset( $_POST['segment_date'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_date'] ) ) : '',
+            'end_date' => isset( $_POST['segment_end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_date'] ) ) : '',
             'time'     => isset( $_POST['segment_time'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_time'] ) ) : '',
+            'end_time' => isset( $_POST['segment_end_time'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_time'] ) ) : '',
             'location' => isset( $_POST['segment_location'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_location'] ) ) : '',
+            'end_location' => isset( $_POST['segment_end_location'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_location'] ) ) : '',
             'details'  => isset( $_POST['segment_details'] ) ? sanitize_textarea_field( wp_unslash( $_POST['segment_details'] ) ) : '',
         ];
 
@@ -591,8 +592,11 @@ class App extends BaseApp {
             'type'     => isset( $_POST['segment_type'] ) ? sanitize_key( wp_unslash( $_POST['segment_type'] ) ) : 'other',
             'title'    => isset( $_POST['segment_title'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_title'] ) ) : '',
             'date'     => isset( $_POST['segment_date'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_date'] ) ) : '',
+            'end_date' => isset( $_POST['segment_end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_date'] ) ) : '',
             'time'     => isset( $_POST['segment_time'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_time'] ) ) : '',
+            'end_time' => isset( $_POST['segment_end_time'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_time'] ) ) : '',
             'location' => isset( $_POST['segment_location'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_location'] ) ) : '',
+            'end_location' => isset( $_POST['segment_end_location'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_location'] ) ) : '',
             'details'  => isset( $_POST['segment_details'] ) ? sanitize_textarea_field( wp_unslash( $_POST['segment_details'] ) ) : '',
         ];
     }
@@ -602,6 +606,9 @@ class App extends BaseApp {
         foreach ( $this->get_trip_segments( $trip_id ) as $segment ) {
             if ( ! empty( $segment['date'] ) ) {
                 $dates[] = (string) $segment['date'];
+            }
+            if ( ! empty( $segment['end_date'] ) ) {
+                $dates[] = (string) $segment['end_date'];
             }
         }
 
@@ -712,13 +719,164 @@ class App extends BaseApp {
         return [
             'id'            => (int) $term->term_id,
             'title'         => (string) $term->name,
-            'destination'   => (string) get_term_meta( $term->term_id, '_travel_app_destination', true ),
             'starts_at'     => (string) get_term_meta( $term->term_id, '_travel_app_starts_at', true ),
             'ends_at'       => (string) get_term_meta( $term->term_id, '_travel_app_ends_at', true ),
             'segments'      => $segments,
             'segment_count' => count( $segments ),
             'parser'        => (string) get_term_meta( $term->term_id, '_travel_app_parser', true ),
         ];
+    }
+
+    public function get_trip_summary_parts( array $trip_data, ?string $today = null ): array {
+        $today = $today ?: current_time( 'Y-m-d' );
+        $parts = [];
+
+        $date_range = $this->get_trip_date_range_label( $trip_data );
+        if ( '' !== $date_range ) {
+            $parts[] = $date_range;
+        }
+
+        $relative_label = $this->get_trip_relative_label( $trip_data, $today );
+        if ( '' !== $relative_label ) {
+            $parts[] = $relative_label;
+        }
+
+        $duration_label = $this->get_trip_duration_label( $trip_data );
+        if ( '' !== $duration_label ) {
+            $parts[] = $duration_label;
+        }
+
+        return $parts;
+    }
+
+    public function get_trip_date_range_label( array $trip_data ): string {
+        $starts = (string) ( $trip_data['starts_at'] ?? '' );
+        $ends = (string) ( $trip_data['ends_at'] ?? '' );
+
+        return $this->format_date_range_label( $starts, $ends );
+    }
+
+    public function format_date_label( string $date, bool $include_year = true ): string {
+        $timestamp = strtotime( $date . ' 12:00:00' );
+        if ( false === $timestamp ) {
+            return $date;
+        }
+
+        return wp_date( $include_year ? get_option( 'date_format' ) : 'D, j. F', $timestamp );
+    }
+
+    public function format_date_range_label( string $starts, string $ends = '' ): string {
+        $same_year = '' !== $starts && '' !== $ends && substr( $starts, 0, 4 ) === substr( $ends, 0, 4 );
+        $start_label = '' !== $starts ? $this->format_date_label( $starts, ! $same_year ) : '';
+        $end_label = '' !== $ends ? $this->format_date_label( $ends ) : '';
+
+        if ( '' !== $start_label && '' !== $end_label && $start_label !== $end_label ) {
+            return $start_label . ' - ' . $end_label;
+        }
+
+        return $start_label ?: $end_label;
+    }
+
+    public function get_segment_duration_label( array $segment ): string {
+        $starts = (string) ( $segment['date'] ?? '' );
+        $ends = (string) ( $segment['end_date'] ?? '' );
+
+        if ( '' === $starts || '' === $ends ) {
+            return '';
+        }
+
+        $start_date = date_create_immutable( $starts );
+        $end_date = date_create_immutable( $ends );
+        if ( ! $start_date || ! $end_date || $end_date <= $start_date ) {
+            return '';
+        }
+
+        $date_diff = (int) $start_date->diff( $end_date )->format( '%a' );
+        if ( 'lodging' === ( $segment['type'] ?? '' ) ) {
+            return sprintf( _n( '1 night', '%d nights', $date_diff, 'travel-app' ), $date_diff );
+        }
+
+        $days = $date_diff + 1;
+        return sprintf( _n( '1 day', '%d days', $days, 'travel-app' ), $days );
+    }
+
+    public function get_segment_date_range_label( array $segment, bool $include_duration = true ): string {
+        $date_range = $this->format_date_range_label(
+            (string) ( $segment['date'] ?? '' ),
+            (string) ( $segment['end_date'] ?? '' )
+        );
+
+        if ( '' === $date_range || ! $include_duration ) {
+            return $date_range;
+        }
+
+        $duration_label = $this->get_segment_duration_label( $segment );
+        return trim( $date_range . ( $duration_label ? ' · ' . $duration_label : '' ) );
+    }
+
+    public function get_segment_date_time_range_label( array $segment, bool $include_duration = true ): string {
+        $date_range = $this->get_segment_date_range_label( $segment, $include_duration );
+        $time_range = $this->format_time_range_label(
+            (string) ( $segment['time'] ?? '' ),
+            (string) ( $segment['end_time'] ?? '' )
+        );
+
+        return trim( $date_range . ( $time_range ? ' ' . $time_range : '' ) );
+    }
+
+    public function format_time_range_label( string $starts, string $ends = '' ): string {
+        if ( '' !== $starts && '' !== $ends && $starts !== $ends ) {
+            return $starts . ' - ' . $ends;
+        }
+
+        return $starts ?: $ends;
+    }
+
+    private function get_trip_relative_label( array $trip_data, string $today ): string {
+        $starts = (string) ( $trip_data['starts_at'] ?? '' );
+        $ends = (string) ( $trip_data['ends_at'] ?? '' );
+
+        if ( '' === $starts ) {
+            return '';
+        }
+
+        $today_date = date_create_immutable( $today );
+        $start_date = date_create_immutable( $starts );
+        $end_date = '' !== $ends ? date_create_immutable( $ends ) : null;
+
+        if ( ! $today_date || ! $start_date ) {
+            return '';
+        }
+
+        if ( $start_date > $today_date ) {
+            $days = (int) $today_date->diff( $start_date )->format( '%a' );
+            return sprintf( _n( 'Starts tomorrow', 'Starts in %d days', $days, 'travel-app' ), $days );
+        }
+
+        if ( $end_date && $end_date < $today_date ) {
+            $days = (int) $end_date->diff( $today_date )->format( '%a' );
+            return sprintf( _n( 'Ended yesterday', 'Ended %d days ago', $days, 'travel-app' ), $days );
+        }
+
+        return __( 'Active now', 'travel-app' );
+    }
+
+    private function get_trip_duration_label( array $trip_data ): string {
+        $starts = (string) ( $trip_data['starts_at'] ?? '' );
+        $ends = (string) ( $trip_data['ends_at'] ?? '' );
+
+        if ( '' === $starts || '' === $ends ) {
+            return '';
+        }
+
+        $start_date = date_create_immutable( $starts );
+        $end_date = date_create_immutable( $ends );
+        if ( ! $start_date || ! $end_date || $end_date < $start_date ) {
+            return '';
+        }
+
+        $days = (int) $start_date->diff( $end_date )->format( '%a' ) + 1;
+        return sprintf( _n( '1 day', '%d days', $days, 'travel-app' ), $days );
     }
 
     private function get_user_trip_item_post( int $trip_id, int $item_id ) {
@@ -767,8 +925,11 @@ class App extends BaseApp {
             'type'     => (string) get_post_meta( $post->ID, '_travel_app_type', true ),
             'title'    => (string) $post->post_title,
             'date'     => (string) get_post_meta( $post->ID, '_travel_app_date', true ),
+            'end_date' => (string) get_post_meta( $post->ID, '_travel_app_end_date', true ),
             'time'     => (string) get_post_meta( $post->ID, '_travel_app_time', true ),
+            'end_time' => (string) get_post_meta( $post->ID, '_travel_app_end_time', true ),
             'location' => (string) get_post_meta( $post->ID, '_travel_app_location', true ),
+            'end_location' => (string) get_post_meta( $post->ID, '_travel_app_end_location', true ),
             'details'  => (string) $post->post_content,
         ];
     }
@@ -787,7 +948,6 @@ class App extends BaseApp {
 
         return [
             'title'       => sanitize_text_field( (string) ( $data['title'] ?? __( 'Imported Travel Plan', 'travel-app' ) ) ),
-            'destination' => sanitize_text_field( (string) ( $data['destination'] ?? '' ) ),
             'starts_at'   => sanitize_text_field( (string) ( $data['starts_at'] ?? '' ) ),
             'ends_at'     => sanitize_text_field( (string) ( $data['ends_at'] ?? '' ) ),
             'segments'    => array_values( array_map( [ $this, 'normalize_segment' ], $segments ) ),
@@ -798,14 +958,20 @@ class App extends BaseApp {
     private function normalize_segment( $segment ): array {
         $segment = is_array( $segment ) ? $segment : [];
         $type = sanitize_key( (string) ( $segment['type'] ?? 'other' ) );
-        $allowed_types = [ 'flight', 'hotel', 'train', 'car', 'activity', 'other' ];
+        if ( 'hotel' === $type ) {
+            $type = 'lodging';
+        }
+        $allowed_types = [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ];
 
         return [
             'type'     => in_array( $type, $allowed_types, true ) ? $type : 'other',
             'title'    => sanitize_text_field( (string) ( $segment['title'] ?? '' ) ),
             'date'     => sanitize_text_field( (string) ( $segment['date'] ?? '' ) ),
+            'end_date' => sanitize_text_field( (string) ( $segment['end_date'] ?? '' ) ),
             'time'     => sanitize_text_field( (string) ( $segment['time'] ?? '' ) ),
+            'end_time' => sanitize_text_field( (string) ( $segment['end_time'] ?? '' ) ),
             'location' => sanitize_text_field( (string) ( $segment['location'] ?? '' ) ),
+            'end_location' => sanitize_text_field( (string) ( $segment['end_location'] ?? '' ) ),
             'details'  => sanitize_textarea_field( (string) ( $segment['details'] ?? '' ) ),
         ];
     }
@@ -839,8 +1005,11 @@ class App extends BaseApp {
     private function update_item_meta( int $item_id, array $segment ): void {
         update_post_meta( $item_id, '_travel_app_type', $segment['type'] );
         update_post_meta( $item_id, '_travel_app_date', $segment['date'] );
+        update_post_meta( $item_id, '_travel_app_end_date', $segment['end_date'] );
         update_post_meta( $item_id, '_travel_app_time', $segment['time'] );
+        update_post_meta( $item_id, '_travel_app_end_time', $segment['end_time'] );
         update_post_meta( $item_id, '_travel_app_location', $segment['location'] );
+        update_post_meta( $item_id, '_travel_app_end_location', $segment['end_location'] );
         update_post_meta( $item_id, '_travel_app_sort', trim( $segment['date'] . ' ' . $segment['time'] ) );
     }
 
@@ -857,7 +1026,6 @@ class App extends BaseApp {
 
         $trip_id = (int) $trip['term_id'];
         update_term_meta( $trip_id, '_travel_app_user_id', get_current_user_id() );
-        update_term_meta( $trip_id, '_travel_app_destination', $parsed['destination'] );
         update_term_meta( $trip_id, '_travel_app_starts_at', $parsed['starts_at'] );
         update_term_meta( $trip_id, '_travel_app_ends_at', $parsed['ends_at'] );
         update_term_meta( $trip_id, '_travel_app_parser', $parsed['parser'] );

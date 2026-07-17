@@ -103,6 +103,29 @@ $demo_start_time = $demo_start . 'T12:00';
             cursor: pointer;
         }
         .topbar { margin-bottom: 24px; }
+        .trip-title-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .trip-title-header h1 {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        .trip-title-edit-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            min-height: 38px;
+            padding: 0;
+            border-radius: 6px;
+            border: 1px solid var(--wp-app-color-border);
+            background: transparent;
+            color: var(--wp-app-color-link);
+        }
         .trip-title-form {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -110,6 +133,7 @@ $demo_start_time = $demo_start . 'T12:00';
             align-items: end;
             margin-bottom: 10px;
         }
+        .trip-title-form[hidden] { display: none; }
         .trip-title-form label { margin: 0; }
         .trip-title-form input { font-size: 1.35rem; font-weight: 750; }
         .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
@@ -232,6 +256,20 @@ $demo_start_time = $demo_start . 'T12:00';
             font-size: 0.88rem;
             line-height: 1.42;
         }
+        .timeline-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .timeline-header h2 { margin: 0; }
+        .add-item-button {
+            margin-left: auto;
+            min-height: 32px;
+            padding: 5px 9px;
+            font-size: 0.88rem;
+            line-height: 1.2;
+        }
         details.timeline-details,
         details.item {
             border: 1px solid var(--wp-app-color-border);
@@ -256,28 +294,6 @@ $demo_start_time = $demo_start . 'T12:00';
         }
         details.timeline-details summary::-webkit-details-marker,
         details.item summary::-webkit-details-marker { display: none; }
-        .add-item {
-            display: inline-block;
-            margin-bottom: 14px;
-            max-width: 100%;
-        }
-        .add-item summary {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            width: auto;
-            padding: 8px 12px;
-            border: 1px solid var(--wp-app-color-border);
-            border-radius: 6px;
-            background: var(--wp-app-color-background);
-            font-weight: 750;
-            white-space: nowrap;
-        }
-        .add-item summary::before {
-            content: "+";
-            font-size: 1.15rem;
-            line-height: 1;
-        }
         .summary-grid {
             display: grid;
             grid-template-columns: 74px minmax(0, 1fr) auto;
@@ -291,6 +307,14 @@ $demo_start_time = $demo_start . 'T12:00';
             padding: 0 14px 14px;
             border-top: 1px solid var(--wp-app-color-border);
         }
+        .add-item-form {
+            margin-bottom: 18px;
+            padding-top: 14px;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            background: var(--wp-app-color-surface);
+        }
+        .add-item-form[hidden] { display: none; }
         .field-wide { grid-column: 1 / -1; }
         .date-time-group {
             grid-column: 1 / -1;
@@ -320,6 +344,7 @@ $demo_start_time = $demo_start . 'T12:00';
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
             .timeline-item, .summary-grid, .edit-form { grid-template-columns: 1fr; }
+            .trip-title-header { align-items: flex-start; }
             .trip-title-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
             .demo-controls label { min-width: 100%; }
@@ -349,8 +374,14 @@ $demo_start_time = $demo_start . 'T12:00';
             </section>
         <?php else : ?>
             <header>
-                <h1 class="screen-reader-text"><?php echo esc_html( $trip_data['title'] ); ?></h1>
-                <form class="trip-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <div class="trip-title-header">
+                    <h1><?php echo esc_html( $trip_data['title'] ); ?></h1>
+                    <button class="trip-title-edit-button" type="button" data-trip-title-edit aria-controls="trip-title-form" aria-expanded="false" title="<?php esc_attr_e( 'Edit travel plan title', 'travel-app' ); ?>">
+                        <span aria-hidden="true">✎</span>
+                        <span class="screen-reader-text"><?php esc_html_e( 'Edit travel plan title', 'travel-app' ); ?></span>
+                    </button>
+                </div>
+                <form class="trip-title-form" id="trip-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
                     <input type="hidden" name="action" value="travel_app_update_trip">
                     <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
                     <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
@@ -369,7 +400,12 @@ $demo_start_time = $demo_start . 'T12:00';
             </header>
 
             <section class="panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
-                <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
+                <div class="timeline-header">
+                    <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
+                    <button class="add-item-button" type="button" data-add-item-toggle aria-controls="add-item-form" aria-expanded="false">
+                        <?php esc_html_e( '+ Add Item', 'travel-app' ); ?>
+                    </button>
+                </div>
                 <?php
                 $demo_control_id = 'trip-' . (string) $trip_data['id'];
                 $demo_control_value = $demo_start_time;
@@ -378,63 +414,58 @@ $demo_start_time = $demo_start . 'T12:00';
                 }
                 ?>
 
-                <details class="item add-item">
-                    <summary>
-                        <?php esc_html_e( 'Add Item', 'travel-app' ); ?>
-                    </summary>
-                    <form class="edit-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                        <input type="hidden" name="action" value="travel_app_add_segment">
-                        <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
-                        <?php wp_nonce_field( 'travel_app_add_segment_' . $trip_data['id'] ); ?>
-                        <label class="field-wide">
-                            <?php esc_html_e( 'Title', 'travel-app' ); ?>
-                            <input name="segment_title">
-                        </label>
-                        <label class="field-wide">
-                            <?php esc_html_e( 'Type', 'travel-app' ); ?>
-                            <select name="segment_type">
-                                <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
-                                    <option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                <form class="edit-form add-item-form" id="add-item-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
+                    <input type="hidden" name="action" value="travel_app_add_segment">
+                    <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                    <?php wp_nonce_field( 'travel_app_add_segment_' . $trip_data['id'] ); ?>
+                    <label class="field-wide">
+                        <?php esc_html_e( 'Title', 'travel-app' ); ?>
+                        <input name="segment_title">
+                    </label>
+                    <label class="field-wide">
+                        <?php esc_html_e( 'Type', 'travel-app' ); ?>
+                        <select name="segment_type">
+                            <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
+                                <option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <label>
+                        <?php esc_html_e( 'Location', 'travel-app' ); ?>
+                        <input name="segment_location">
+                    </label>
+                    <label>
+                        <?php esc_html_e( 'End Location', 'travel-app' ); ?>
+                        <input name="segment_end_location">
+                    </label>
+                    <div class="date-time-group">
+                        <label>
+                            <?php esc_html_e( 'Start Date', 'travel-app' ); ?>
+                            <input type="date" name="segment_date">
                         </label>
                         <label>
-                            <?php esc_html_e( 'Location', 'travel-app' ); ?>
-                            <input name="segment_location">
+                            <?php esc_html_e( 'Start Time', 'travel-app' ); ?>
+                            <input type="time" name="segment_time">
+                        </label>
+                    </div>
+                    <div class="date-time-group">
+                        <label>
+                            <?php esc_html_e( 'End Date', 'travel-app' ); ?>
+                            <input type="date" name="segment_end_date">
                         </label>
                         <label>
-                            <?php esc_html_e( 'End Location', 'travel-app' ); ?>
-                            <input name="segment_end_location">
+                            <?php esc_html_e( 'End Time', 'travel-app' ); ?>
+                            <input type="time" name="segment_end_time">
                         </label>
-                        <div class="date-time-group">
-                            <label>
-                                <?php esc_html_e( 'Start Date', 'travel-app' ); ?>
-                                <input type="date" name="segment_date">
-                            </label>
-                            <label>
-                                <?php esc_html_e( 'Start Time', 'travel-app' ); ?>
-                                <input type="time" name="segment_time">
-                            </label>
-                        </div>
-                        <div class="date-time-group">
-                            <label>
-                                <?php esc_html_e( 'End Date', 'travel-app' ); ?>
-                                <input type="date" name="segment_end_date">
-                            </label>
-                            <label>
-                                <?php esc_html_e( 'End Time', 'travel-app' ); ?>
-                                <input type="time" name="segment_end_time">
-                            </label>
-                        </div>
-                        <label class="field-wide">
-                            <?php esc_html_e( 'Details', 'travel-app' ); ?>
-                            <textarea name="segment_details"></textarea>
-                        </label>
-                        <div class="form-actions">
-                            <button type="submit"><?php esc_html_e( 'Add Item', 'travel-app' ); ?></button>
-                        </div>
-                    </form>
-                </details>
+                    </div>
+                    <label class="field-wide">
+                        <?php esc_html_e( 'Details', 'travel-app' ); ?>
+                        <textarea name="segment_details"></textarea>
+                    </label>
+                    <div class="form-actions">
+                        <button type="submit"><?php esc_html_e( 'Add Item', 'travel-app' ); ?></button>
+                    </div>
+                </form>
 
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'travel-app' ); ?></p>
@@ -517,6 +548,65 @@ $demo_start_time = $demo_start . 'T12:00';
             </section>
         <?php endif; ?>
     </main>
+
+    <script>
+        (function() {
+            var button = document.querySelector('[data-trip-title-edit]');
+            var form = document.getElementById('trip-title-form');
+
+            if (!button || !form) {
+                return;
+            }
+
+            button.addEventListener('click', function() {
+                var titleInput = form.querySelector('input[name="trip_title"]');
+                var isHidden = form.hasAttribute('hidden');
+
+                if (isHidden) {
+                    form.removeAttribute('hidden');
+                    button.setAttribute('aria-expanded', 'true');
+
+                    if (titleInput) {
+                        titleInput.focus();
+                        titleInput.select();
+                    }
+
+                    return;
+                }
+
+                form.setAttribute('hidden', '');
+                button.setAttribute('aria-expanded', 'false');
+            });
+        })();
+
+        (function() {
+            var button = document.querySelector('[data-add-item-toggle]');
+            var form = document.getElementById('add-item-form');
+
+            if (!button || !form) {
+                return;
+            }
+
+            button.addEventListener('click', function() {
+                var titleInput = form.querySelector('input[name="segment_title"]');
+                var isHidden = form.hasAttribute('hidden');
+
+                if (isHidden) {
+                    form.removeAttribute('hidden');
+                    button.setAttribute('aria-expanded', 'true');
+
+                    if (titleInput) {
+                        titleInput.focus();
+                    }
+
+                    return;
+                }
+
+                form.setAttribute('hidden', '');
+                button.setAttribute('aria-expanded', 'false');
+            });
+        })();
+    </script>
 
     <?php wp_app_body_close(); ?>
 </body>

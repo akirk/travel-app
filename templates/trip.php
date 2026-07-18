@@ -523,11 +523,13 @@ $get_google_maps_url = static function( string $address ): string {
         .danger-zone h2 {
             color: var(--wp-app-color-text);
         }
+        .sharing-zone details summary,
         .danger-zone details summary {
             cursor: pointer;
             color: var(--wp-app-color-text);
             font-weight: 700;
         }
+        .sharing-zone details summary h2,
         .danger-zone details summary h2 {
             display: inline;
             margin: 0;
@@ -861,28 +863,30 @@ $get_google_maps_url = static function( string $address ): string {
 
             <?php if ( ! $is_shared_timeline ) : ?>
                 <section class="sharing-zone" aria-labelledby="sharing-heading" data-share-control data-trip-id="<?php echo esc_attr( (string) $trip_data['id'] ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'travel_app_share_link_' . $trip_data['id'] ) ); ?>" data-ajax-url="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
-                    <h2 id="sharing-heading"><?php esc_html_e( 'Sharing', 'travel-app' ); ?></h2>
-                    <div class="share-link">
-                        <div class="share-option">
-                            <span>
-                                <strong><?php esc_html_e( 'Fellow travellers', 'travel-app' ); ?></strong><br>
-                                <span class="empty"><?php esc_html_e( 'Includes addresses and attachments.', 'travel-app' ); ?></span>
-                            </span>
-                            <button class="ghost-button" type="button" data-share-copy data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                    <details>
+                        <summary><h2 id="sharing-heading"><?php esc_html_e( 'Sharing', 'travel-app' ); ?></h2></summary>
+                        <div class="share-link">
+                            <div class="share-option">
+                                <span>
+                                    <strong><?php esc_html_e( 'Fellow travellers', 'travel-app' ); ?></strong><br>
+                                    <span class="empty"><?php esc_html_e( 'Includes addresses and attachments.', 'travel-app' ); ?></span>
+                                </span>
+                                <button class="ghost-button" type="button" data-share-copy data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                            </div>
+                            <div class="share-option">
+                                <span>
+                                    <strong><?php esc_html_e( 'Others', 'travel-app' ); ?></strong><br>
+                                    <span class="empty"><?php esc_html_e( 'Hides addresses and attachments.', 'travel-app' ); ?></span>
+                                </span>
+                                <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                            </div>
+                            <div class="share-actions">
+                                <button class="ghost-button" type="button" data-share-refresh><?php esc_html_e( 'Refresh', 'travel-app' ); ?></button>
+                                <button class="ghost-button" type="button" data-share-remove <?php echo '' === $fellow_share_url && '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                            </div>
                         </div>
-                        <div class="share-option">
-                            <span>
-                                <strong><?php esc_html_e( 'Others', 'travel-app' ); ?></strong><br>
-                                <span class="empty"><?php esc_html_e( 'Hides addresses and attachments.', 'travel-app' ); ?></span>
-                            </span>
-                            <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
-                        </div>
-                        <div class="share-actions">
-                            <button class="ghost-button" type="button" data-share-refresh><?php esc_html_e( 'Refresh', 'travel-app' ); ?></button>
-                            <button class="ghost-button" type="button" data-share-remove <?php echo '' === $fellow_share_url && '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
-                        </div>
-                    </div>
-                    <p class="empty" data-share-status aria-live="polite"></p>
+                        <p class="empty" data-share-status aria-live="polite"></p>
+                    </details>
                 </section>
             <?php endif; ?>
 
@@ -1117,10 +1121,12 @@ $get_google_maps_url = static function( string $address ): string {
                             confirmCopied();
                         }).catch(function() {
                             window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
+                            confirmCopied();
                         });
                     }
 
                     window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
+                    confirmCopied();
                     return Promise.resolve();
                 }
 

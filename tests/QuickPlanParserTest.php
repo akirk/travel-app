@@ -41,6 +41,43 @@ final class QuickPlanParserTest extends TestCase {
         self::assertSame( '06:45', $segment['time'] );
     }
 
+    public function test_parses_compact_flight_route_with_time_range(): void {
+        $segment = ( new QuickPlanParser() )->parse( 'os123 ber-vie 2026-10-10 15:00-17:00' );
+
+        self::assertSame( 'flight', $segment['type'] );
+        self::assertSame( 'OS123', $segment['title'] );
+        self::assertSame( 'BER', $segment['location'] );
+        self::assertSame( 'VIE', $segment['end_location'] );
+        self::assertSame( '2026-10-10', $segment['date'] );
+        self::assertSame( '2026-10-10', $segment['end_date'] );
+        self::assertSame( '15:00', $segment['time'] );
+        self::assertSame( '17:00', $segment['end_time'] );
+    }
+
+    public function test_parses_compact_flight_route_with_start_time_only(): void {
+        $segment = ( new QuickPlanParser() )->parse( 'os123 ber-vie 2026-10-10 15:00' );
+
+        self::assertSame( 'flight', $segment['type'] );
+        self::assertSame( 'OS123', $segment['title'] );
+        self::assertSame( 'BER', $segment['location'] );
+        self::assertSame( 'VIE', $segment['end_location'] );
+        self::assertSame( '2026-10-10', $segment['date'] );
+        self::assertSame( '', $segment['end_date'] );
+        self::assertSame( '15:00', $segment['time'] );
+        self::assertSame( '', $segment['end_time'] );
+    }
+
+    public function test_parses_dot_separated_time_range(): void {
+        $segment = ( new QuickPlanParser() )->parse( 'LH789 FRA-BER 2026-10-11 8.05-9.20' );
+
+        self::assertSame( 'flight', $segment['type'] );
+        self::assertSame( 'LH789', $segment['title'] );
+        self::assertSame( 'FRA', $segment['location'] );
+        self::assertSame( 'BER', $segment['end_location'] );
+        self::assertSame( '08:05', $segment['time'] );
+        self::assertSame( '09:20', $segment['end_time'] );
+    }
+
     public function test_parses_slash_dates_as_month_day_year(): void {
         $segment = ( new QuickPlanParser() )->parse( 'Rental car Boston 8/4/26 9am' );
 

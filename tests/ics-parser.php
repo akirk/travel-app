@@ -1,32 +1,9 @@
 <?php
 
-if ( ! function_exists( '__' ) ) {
-    function __( $text, $domain = null ) {
-        return $text;
-    }
-}
-
+require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/../src/Parser/IcsParser.php';
 
 use TravelApp\Parser\IcsParser;
-
-$failures = [];
-
-$test = static function( string $name, callable $callback ) use ( &$failures ): void {
-    try {
-        $callback();
-        echo "PASS $name\n";
-    } catch ( Throwable $e ) {
-        $failures[] = "$name: " . $e->getMessage();
-        echo "FAIL $name\n";
-    }
-};
-
-$assert = static function( bool $condition, string $message ): void {
-    if ( ! $condition ) {
-        throw new RuntimeException( $message );
-    }
-};
 
 $test( 'TripIt activity uses local time range and same-day end date', static function() use ( $assert ): void {
     $ics = <<<ICS
@@ -129,10 +106,4 @@ ICS;
     $assert( false === strpos( $segment['details'], '08:56' ), 'arrival time remained in details' );
 } );
 
-if ( $failures !== [] ) {
-    echo "\n";
-    foreach ( $failures as $failure ) {
-        echo "$failure\n";
-    }
-    exit( 1 );
-}
+$finish();

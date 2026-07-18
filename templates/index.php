@@ -6,6 +6,10 @@ $trips      = array_map( [ $travel_app, 'format_trip_for_output' ], $travel_app-
 $imported   = isset( $_GET['imported'] ) ? absint( $_GET['imported'] ) : 0;
 $deleted    = isset( $_GET['deleted'] ) ? absint( $_GET['deleted'] ) : 0;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
+$quick_plan_draft_key = isset( $_GET['quick_plan_draft'] ) ? sanitize_key( wp_unslash( $_GET['quick_plan_draft'] ) ) : '';
+$quick_plan_draft = '' !== $quick_plan_draft_key ? $travel_app->get_quick_plan_draft( $quick_plan_draft_key ) : [];
+$quick_plan_segment = isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] ) ? $quick_plan_draft['segment'] : [];
+$quick_plan_matches = isset( $quick_plan_draft['matches'] ) && is_array( $quick_plan_draft['matches'] ) ? $quick_plan_draft['matches'] : [];
 $has_ai     = function_exists( 'wp_ai_client_prompt' );
 $has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\AI_Assistant' );
 $demo_mode_enabled = $travel_app->is_demo_mode_enabled();
@@ -174,11 +178,11 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             padding: 16px;
             margin-bottom: 18px;
         }
+        .import-panel input,
+        .import-panel select,
         .import-panel textarea {
             width: 100%;
-            min-height: 118px;
             box-sizing: border-box;
-            resize: vertical;
             border: 1px solid var(--wp-app-color-border);
             border-radius: 6px;
             padding: 10px;
@@ -186,6 +190,32 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             color: var(--wp-app-color-text);
             font: inherit;
         }
+        .import-panel textarea {
+            min-height: 118px;
+            resize: vertical;
+        }
+        .quick-plan-fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .quick-plan-fields .field-wide { grid-column: 1 / -1; }
+        .quick-plan-match-list { display: grid; gap: 8px; margin: 4px 0; }
+        .quick-plan-choice {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            padding: 10px;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            background: var(--wp-app-color-background);
+            font-weight: 400;
+        }
+        .quick-plan-choice input[type="radio"] { width: auto; margin-top: 4px; }
+        .quick-plan-choice input[type="text"] { margin-top: 6px; }
+        .quick-plan-choice strong { display: block; overflow-wrap: anywhere; }
+        .quick-plan-confirm { color: var(--wp-app-color-muted); font-size: 0.9rem; }
+        .quick-plan-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
         label { display: block; font-weight: 650; margin-bottom: 7px; }
         .drop-zone {
             display: grid;
@@ -312,7 +342,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             padding: 18px;
         }
         @media (max-width: 880px) {
-            .app-header, .dashboard, .mini-timeline { grid-template-columns: 1fr; }
+            .app-header, .dashboard, .mini-timeline, .quick-plan-fields { grid-template-columns: 1fr; }
             .status-stack { justify-content: flex-start; }
             button { width: 100%; }
         }
@@ -447,6 +477,94 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
 
             <aside class="panel import-panel" aria-labelledby="import-trip-heading">
                 <h2 id="import-trip-heading"><?php esc_html_e( 'Import', 'travel-app' ); ?></h2>
+                    <?php if ( ! empty( $quick_plan_segment ) ) : ?>
+                        <?php
+                        $quick_plan_trip_title = isset( $quick_plan_draft['trip_title'] )
+                            ? (string) $quick_plan_draft['trip_title']
+                            : ( ! empty( $quick_plan_segment['location'] ) ? (string) $quick_plan_segment['location'] : __( 'Quick Travel Plan', 'travel-app' ) );
+                        ?>
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                            <input type="hidden" name="action" value="travel_app_import">
+                            <input type="hidden" name="quick_plan_draft" value="<?php echo esc_attr( $quick_plan_draft_key ); ?>">
+                            <?php wp_nonce_field( 'travel_app_import' ); ?>
+                            <p class="quick-plan-confirm">
+                                <?php esc_html_e( 'Review the parsed fields, update matches if needed, then choose where to save it.', 'travel-app' ); ?>
+                            </p>
+                            <div class="quick-plan-fields">
+                                <label class="field-wide">
+                                    <?php esc_html_e( 'Title', 'travel-app' ); ?>
+                                    <input name="segment_title" value="<?php echo esc_attr( (string) ( $quick_plan_segment['title'] ?? '' ) ); ?>">
+                                </label>
+                                <label>
+                                    <?php esc_html_e( 'Type', 'travel-app' ); ?>
+                                    <select name="segment_type">
+                                        <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
+                                            <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $quick_plan_segment['type'] ?? 'activity', $type ); ?>><?php echo esc_html( ucfirst( $type ) ); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </label>
+                                <label>
+                                    <?php esc_html_e( 'Location', 'travel-app' ); ?>
+                                    <input name="segment_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['location'] ?? '' ) ); ?>">
+                                </label>
+                                <label>
+                                    <?php esc_html_e( 'Start Date', 'travel-app' ); ?>
+                                    <input type="date" name="segment_date" value="<?php echo esc_attr( (string) ( $quick_plan_segment['date'] ?? '' ) ); ?>">
+                                </label>
+                                <label>
+                                    <?php esc_html_e( 'Start Time', 'travel-app' ); ?>
+                                    <input type="time" name="segment_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['time'] ?? '' ) ); ?>">
+                                </label>
+                                <label>
+                                    <?php esc_html_e( 'End Date', 'travel-app' ); ?>
+                                    <input type="date" name="segment_end_date" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_date'] ?? '' ) ); ?>">
+                                </label>
+                                <label>
+                                    <?php esc_html_e( 'End Time', 'travel-app' ); ?>
+                                    <input type="time" name="segment_end_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_time'] ?? '' ) ); ?>">
+                                </label>
+                                <label class="field-wide">
+                                    <?php esc_html_e( 'End Location', 'travel-app' ); ?>
+                                    <input name="segment_end_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_location'] ?? '' ) ); ?>">
+                                </label>
+                                <label class="field-wide">
+                                    <?php esc_html_e( 'URL', 'travel-app' ); ?>
+                                    <input type="url" name="segment_url" value="<?php echo esc_attr( (string) ( $quick_plan_segment['url'] ?? '' ) ); ?>">
+                                </label>
+                                <label class="field-wide">
+                                    <?php esc_html_e( 'Details', 'travel-app' ); ?>
+                                    <textarea name="segment_details"><?php echo esc_textarea( (string) ( $quick_plan_segment['details'] ?? '' ) ); ?></textarea>
+                                </label>
+                            </div>
+                            <div class="quick-plan-match-list">
+                                <?php if ( ! empty( $quick_plan_matches ) ) : ?>
+                                    <?php foreach ( $quick_plan_matches as $index => $match ) : ?>
+                                        <label class="quick-plan-choice">
+                                            <input type="radio" name="quick_plan_target" value="<?php echo esc_attr( (string) ( $match['id'] ?? 0 ) ); ?>" <?php checked( 0, $index ); ?>>
+                                            <span>
+                                                <strong><?php echo esc_html( (string) ( $match['title'] ?? __( 'Travel plan', 'travel-app' ) ) ); ?></strong>
+                                                <?php echo esc_html( $travel_app->format_date_range_label( (string) ( $match['starts_at'] ?? '' ), (string) ( $match['ends_at'] ?? '' ) ) ); ?>
+                                            </span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                <?php else : ?>
+                                    <p class="quick-plan-confirm"><?php esc_html_e( 'No matching existing travel plan was found for these fields.', 'travel-app' ); ?></p>
+                                <?php endif; ?>
+                                <label class="quick-plan-choice">
+                                    <input type="radio" name="quick_plan_target" value="new" <?php checked( empty( $quick_plan_matches ) ); ?>>
+                                    <span>
+                                        <strong><?php esc_html_e( 'Create a new travel plan', 'travel-app' ); ?></strong>
+                                        <?php esc_html_e( 'Use this item as the first entry.', 'travel-app' ); ?>
+                                        <input type="text" name="quick_plan_trip_title" value="<?php echo esc_attr( $quick_plan_trip_title ); ?>" aria-label="<?php esc_attr_e( 'New travel plan title', 'travel-app' ); ?>">
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="quick-plan-actions">
+                                <button class="ghost-button" type="submit" name="quick_plan_update_draft" value="1"><?php esc_html_e( 'Update Matches', 'travel-app' ); ?></button>
+                                <button type="submit"><?php esc_html_e( 'Add Plan', 'travel-app' ); ?></button>
+                            </div>
+                        </form>
+                    <?php else : ?>
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="travel_app_import">
                     <?php wp_nonce_field( 'travel_app_import' ); ?>
@@ -455,11 +573,12 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <span class="drop-file-name" id="itinerary_file_name"><?php esc_html_e( 'ICS or text file', 'travel-app' ); ?></span>
                         <input type="file" id="itinerary_file" name="itinerary_file" accept=".ics,.txt,text/calendar,text/plain">
                     </label>
-                    <label for="itinerary_text"><?php esc_html_e( 'Paste confirmation', 'travel-app' ); ?></label>
-                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Paste itinerary text...', 'travel-app' ); ?>"></textarea>
-                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'Uses calendar parsing or AI extraction.', 'travel-app' ) : __( 'Uses calendar parsing or a basic parser.', 'travel-app' ) ); ?></p>
+                    <label for="itinerary_text"><?php esc_html_e( 'Paste confirmation or plan', 'travel-app' ); ?></label>
+                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Paste itinerary text or a dated plan...', 'travel-app' ); ?>"></textarea>
+                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'Uses quick parsing, calendar parsing, or AI extraction.', 'travel-app' ) : __( 'Uses quick parsing, calendar parsing, or a basic parser.', 'travel-app' ) ); ?></p>
                     <button type="submit"><?php esc_html_e( 'Import', 'travel-app' ); ?></button>
                 </form>
+                    <?php endif; ?>
             </aside>
         </div>
     </main>

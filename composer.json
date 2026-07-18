@@ -13,7 +13,7 @@
         }
     },
     "scripts": {
-        "test": "php tests/ics-parser.php"
+        "test": "php tests/ics-parser.php && php tests/quick-plan-parser.php"
     },
     "version": "0.1.0",
     "authors": [

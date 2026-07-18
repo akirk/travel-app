@@ -204,7 +204,7 @@ if ( count( $route_locations ) >= 2 ) {
         .trip-title-form label { margin: 0; }
         .trip-title-form input { font-size: 1.35rem; font-weight: 750; }
         .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
-        .trip-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: -10px 0 24px; }
+        .trip-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
         .trip-actions .ghost-button {
             display: inline-flex;
             align-items: center;
@@ -568,6 +568,7 @@ if ( count( $route_locations ) >= 2 ) {
             gap: 12px;
             align-items: center;
         }
+        .route-zone,
         .sharing-zone,
         .danger-zone {
             margin-top: 28px;
@@ -575,16 +576,19 @@ if ( count( $route_locations ) >= 2 ) {
             padding-top: 18px;
             color: var(--wp-app-color-muted);
         }
+        .route-zone h2,
         .sharing-zone h2,
         .danger-zone h2 {
             color: var(--wp-app-color-text);
         }
+        .route-zone details summary,
         .sharing-zone details summary,
         .danger-zone details summary {
             cursor: pointer;
             color: var(--wp-app-color-text);
             font-weight: 700;
         }
+        .route-zone details summary h2,
         .sharing-zone details summary h2,
         .danger-zone details summary h2 {
             display: inline;
@@ -660,22 +664,6 @@ if ( count( $route_locations ) >= 2 ) {
                     <?php endforeach; ?>
                     <span><?php echo esc_html( sprintf( _n( '%d item', '%d items', count( $segments ), 'travel-app' ), count( $segments ) ) ); ?></span>
                 </div>
-                <?php if ( $show_private_share_details && ( ! empty( $trip_route_links ) || '' !== $trip_direct_map_url ) ) : ?>
-                    <div class="trip-actions" aria-label="<?php esc_attr_e( 'Route links', 'travel-app' ); ?>">
-                        <?php if ( ! empty( $trip_route_links['google'] ) ) : ?>
-                            <a class="ghost-button" href="<?php echo esc_url( (string) $trip_route_links['google'] ); ?>" target="_blank" rel="noopener noreferrer">
-                                <span aria-hidden="true">&#x1F5FA;</span>
-                                <?php esc_html_e( 'Google Maps', 'travel-app' ); ?>
-                            </a>
-                        <?php endif; ?>
-                        <?php if ( '' !== $trip_direct_map_url ) : ?>
-                            <a class="ghost-button" href="<?php echo esc_url( $trip_direct_map_url ); ?>">
-                                <span aria-hidden="true">&#x1F5FA;</span>
-                                <?php esc_html_e( 'OpenStreetMap', 'travel-app' ); ?>
-                            </a>
-                        <?php endif; ?>
-                    </div>
-                <?php endif; ?>
             </header>
 
             <section class="panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
@@ -930,6 +918,28 @@ if ( count( $route_locations ) >= 2 ) {
                             </div>
                         <?php endforeach; ?>
                     </div>
+                </section>
+            <?php endif; ?>
+
+            <?php if ( $show_private_share_details && ( ! empty( $trip_route_links ) || '' !== $trip_direct_map_url ) ) : ?>
+                <section class="route-zone" aria-labelledby="route-maps-heading">
+                    <details>
+                        <summary><h2 id="route-maps-heading"><?php esc_html_e( 'Route Maps', 'travel-app' ); ?></h2></summary>
+                        <div class="trip-actions" aria-label="<?php esc_attr_e( 'Route links', 'travel-app' ); ?>">
+                            <?php if ( ! empty( $trip_route_links['google'] ) ) : ?>
+                                <a class="ghost-button" href="<?php echo esc_url( (string) $trip_route_links['google'] ); ?>" target="_blank" rel="noopener noreferrer">
+                                    <span aria-hidden="true">&#x1F5FA;</span>
+                                    <?php esc_html_e( 'Google Maps', 'travel-app' ); ?>
+                                </a>
+                            <?php endif; ?>
+                            <?php if ( '' !== $trip_direct_map_url ) : ?>
+                                <a class="ghost-button" href="<?php echo esc_url( $trip_direct_map_url ); ?>">
+                                    <span aria-hidden="true">&#x1F5FA;</span>
+                                    <?php esc_html_e( 'OpenStreetMap', 'travel-app' ); ?>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </details>
                 </section>
             <?php endif; ?>
 

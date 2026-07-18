@@ -51,7 +51,7 @@ class AiParser {
     }
 
     private function generate_ai_text( $builder ) {
-        if ( method_exists( $builder, 'generate_text_result' ) ) {
+        if ( is_callable( [ $builder, 'generate_text_result' ] ) ) {
             $result = $builder->generate_text_result();
             if ( is_wp_error( $result ) ) {
                 return $result;
@@ -64,7 +64,7 @@ class AiParser {
             }
         }
 
-        if ( method_exists( $builder, 'generateTextResult' ) ) {
+        if ( is_callable( [ $builder, 'generateTextResult' ] ) ) {
             $result = $builder->generateTextResult();
             if ( is_wp_error( $result ) ) {
                 return $result;
@@ -74,7 +74,7 @@ class AiParser {
             }
         }
 
-        if ( method_exists( $builder, 'generate_text' ) ) {
+        if ( is_callable( [ $builder, 'generate_text' ] ) ) {
             return $builder->generate_text();
         }
 

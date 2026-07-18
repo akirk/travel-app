@@ -6,7 +6,9 @@ global $wp_app_route;
 $travel_app = App::get_instance();
 $demo_mode_enabled = $travel_app->is_demo_mode_enabled();
 $trip_id    = isset( $wp_app_route['params']['id'] ) ? absint( $wp_app_route['params']['id'] ) : absint( get_query_var( 'id' ) );
-$trip       = $travel_app->get_user_trip( $trip_id );
+$share_token = isset( $wp_app_route['params']['token'] ) ? sanitize_text_field( wp_unslash( $wp_app_route['params']['token'] ) ) : '';
+$is_shared_timeline = ! empty( $travel_app_shared_timeline ) || '' !== $share_token;
+$trip       = $is_shared_timeline ? $travel_app->get_public_trip_by_share_token( $trip_id, $share_token ) : $travel_app->get_user_trip( $trip_id );
 $updated    = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
 $trip_updated = isset( $_GET['trip_updated'] ) ? absint( $_GET['trip_updated'] ) : null;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
@@ -15,8 +17,9 @@ if ( ! $trip ) {
     status_header( 404 );
 }
 
-$trip_data = $trip ? $travel_app->format_trip_for_output( $trip ) : null;
+$trip_data = $trip ? $travel_app->format_trip_for_output( $trip, $is_shared_timeline ? $travel_app->get_trip_owner_id( $trip_id ) : null ) : null;
 $segments  = $trip_data['segments'] ?? [];
+$share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'] ) : '';
 $timeline_segments = [];
 
 foreach ( $segments as $segment ) {
@@ -137,6 +140,34 @@ $demo_start_time = $demo_start . 'T12:00';
         .trip-title-form label { margin: 0; }
         .trip-title-form input { font-size: 1.35rem; font-weight: 750; }
         .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
+        .share-link {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 18px;
+        }
+        .share-link label { margin: 0; }
+        .share-link input { color: var(--wp-app-color-muted); }
+        .share-link .ghost-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            box-sizing: border-box;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+        .share-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .share-actions .copied {
+            border-color: rgba(15, 107, 66, 0.42);
+            color: #0f6b42;
+        }
         .panel {
             background: var(--wp-app-color-surface);
             border: 1px solid var(--wp-app-color-border);
@@ -397,11 +428,26 @@ $demo_start_time = $demo_start . 'T12:00';
             gap: 12px;
             align-items: center;
         }
+        .sharing-zone,
         .danger-zone {
             margin-top: 28px;
             border-top: 1px solid var(--wp-app-color-border);
             padding-top: 18px;
             color: var(--wp-app-color-muted);
+        }
+        .sharing-zone h2,
+        .danger-zone h2 {
+            color: var(--wp-app-color-text);
+        }
+        .danger-zone details summary {
+            cursor: pointer;
+            color: var(--wp-app-color-text);
+            font-weight: 700;
+        }
+        .danger-zone details summary h2 {
+            display: inline;
+            margin: 0;
+            font-size: 1.15rem;
         }
         .delete-button {
             background: transparent;
@@ -410,7 +456,7 @@ $demo_start_time = $demo_start . 'T12:00';
         }
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
-            .timeline-item, .summary-grid, .edit-form { grid-template-columns: 1fr; }
+            .timeline-item, .summary-grid, .edit-form, .share-link { grid-template-columns: 1fr; }
             .url-preview { grid-template-columns: 1fr; }
             .url-preview-image { width: 100%; }
             .trip-title-header { align-items: flex-start; }
@@ -424,15 +470,17 @@ $demo_start_time = $demo_start . 'T12:00';
     <?php wp_app_body_open(); ?>
 
     <main>
-        <div class="topbar">
-            <a href="<?php echo esc_url( home_url( '/travel-app/' ) ); ?>"><?php esc_html_e( 'Back to Travel App', 'travel-app' ); ?></a>
-        </div>
+        <?php if ( ! $is_shared_timeline ) : ?>
+            <div class="topbar">
+                <a href="<?php echo esc_url( home_url( '/travel-app/' ) ); ?>"><?php esc_html_e( 'Back to Travel App', 'travel-app' ); ?></a>
+            </div>
+        <?php endif; ?>
 
-        <?php if ( null !== $trip_updated ) : ?>
+        <?php if ( ! $is_shared_timeline && null !== $trip_updated ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Travel plan updated.', 'travel-app' ); ?></div>
-        <?php elseif ( null !== $updated ) : ?>
+        <?php elseif ( ! $is_shared_timeline && null !== $updated ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Itinerary item updated.', 'travel-app' ); ?></div>
-        <?php elseif ( $error ) : ?>
+        <?php elseif ( ! $is_shared_timeline && $error ) : ?>
             <div class="notice error" role="alert"><?php esc_html_e( 'The requested change could not be saved.', 'travel-app' ); ?></div>
         <?php endif; ?>
 
@@ -445,21 +493,25 @@ $demo_start_time = $demo_start . 'T12:00';
             <header>
                 <div class="trip-title-header">
                     <h1><?php echo esc_html( $trip_data['title'] ); ?></h1>
-                    <button class="trip-title-edit-button" type="button" data-trip-title-edit aria-controls="trip-title-form" aria-expanded="false" title="<?php esc_attr_e( 'Edit travel plan title', 'travel-app' ); ?>">
-                        <span aria-hidden="true">✎</span>
-                        <span class="screen-reader-text"><?php esc_html_e( 'Edit travel plan title', 'travel-app' ); ?></span>
-                    </button>
+                    <?php if ( ! $is_shared_timeline ) : ?>
+                        <button class="trip-title-edit-button" type="button" data-trip-title-edit aria-controls="trip-title-form" aria-expanded="false" title="<?php esc_attr_e( 'Edit travel plan title', 'travel-app' ); ?>">
+                            <span aria-hidden="true">✎</span>
+                            <span class="screen-reader-text"><?php esc_html_e( 'Edit travel plan title', 'travel-app' ); ?></span>
+                        </button>
+                    <?php endif; ?>
                 </div>
-                <form class="trip-title-form" id="trip-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
-                    <input type="hidden" name="action" value="travel_app_update_trip">
-                    <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
-                    <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
-                    <label for="trip_title">
-                        <span class="screen-reader-text"><?php esc_html_e( 'Travel plan title', 'travel-app' ); ?></span>
-                        <input type="text" id="trip_title" name="trip_title" value="<?php echo esc_attr( $trip_data['title'] ); ?>" required>
-                    </label>
-                    <button type="submit"><?php esc_html_e( 'Save', 'travel-app' ); ?></button>
-                </form>
+                <?php if ( ! $is_shared_timeline ) : ?>
+                    <form class="trip-title-form" id="trip-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
+                        <input type="hidden" name="action" value="travel_app_update_trip">
+                        <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                        <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
+                        <label for="trip_title">
+                            <span class="screen-reader-text"><?php esc_html_e( 'Travel plan title', 'travel-app' ); ?></span>
+                            <input type="text" id="trip_title" name="trip_title" value="<?php echo esc_attr( $trip_data['title'] ); ?>" required>
+                        </label>
+                        <button type="submit"><?php esc_html_e( 'Save', 'travel-app' ); ?></button>
+                    </form>
+                <?php endif; ?>
                 <div class="meta">
                     <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data ) as $summary_part ) : ?>
                         <span><?php echo esc_html( $summary_part ); ?></span>
@@ -471,74 +523,78 @@ $demo_start_time = $demo_start . 'T12:00';
             <section class="panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
                 <div class="timeline-header">
                     <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
-                    <button class="add-item-button" type="button" data-add-item-toggle aria-controls="add-item-form" aria-expanded="false">
-                        <?php esc_html_e( '+ Add Item', 'travel-app' ); ?>
-                    </button>
+                    <?php if ( ! $is_shared_timeline ) : ?>
+                        <button class="add-item-button" type="button" data-add-item-toggle aria-controls="add-item-form" aria-expanded="false">
+                            <?php esc_html_e( '+ Add Item', 'travel-app' ); ?>
+                        </button>
+                    <?php endif; ?>
                 </div>
                 <?php
                 $demo_control_id = 'trip-' . (string) $trip_data['id'];
                 $demo_control_value = $demo_start_time;
-                if ( $demo_mode_enabled ) {
+                if ( ! $is_shared_timeline && $demo_mode_enabled ) {
                     require __DIR__ . '/partials/demo-controls.php';
                 }
                 ?>
 
-                <form class="edit-form add-item-form" id="add-item-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
-                    <input type="hidden" name="action" value="travel_app_add_segment">
-                    <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
-                    <?php wp_nonce_field( 'travel_app_add_segment_' . $trip_data['id'] ); ?>
-                    <label class="field-wide">
-                        <?php esc_html_e( 'Title', 'travel-app' ); ?>
-                        <input name="segment_title">
-                    </label>
-                    <label class="field-wide">
-                        <?php esc_html_e( 'Type', 'travel-app' ); ?>
-                        <select name="segment_type">
-                            <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
-                                <option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </label>
-                    <label class="field-wide">
-                        <?php esc_html_e( 'URL', 'travel-app' ); ?>
-                        <input type="url" name="segment_url">
-                    </label>
-                    <label>
-                        <?php esc_html_e( 'Location', 'travel-app' ); ?>
-                        <input name="segment_location">
-                    </label>
-                    <label>
-                        <?php esc_html_e( 'End Location', 'travel-app' ); ?>
-                        <input name="segment_end_location">
-                    </label>
-                    <div class="date-time-group">
-                        <label>
-                            <?php esc_html_e( 'Start Date', 'travel-app' ); ?>
-                            <input type="date" name="segment_date">
+                <?php if ( ! $is_shared_timeline ) : ?>
+                    <form class="edit-form add-item-form" id="add-item-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
+                        <input type="hidden" name="action" value="travel_app_add_segment">
+                        <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                        <?php wp_nonce_field( 'travel_app_add_segment_' . $trip_data['id'] ); ?>
+                        <label class="field-wide">
+                            <?php esc_html_e( 'Title', 'travel-app' ); ?>
+                            <input name="segment_title">
+                        </label>
+                        <label class="field-wide">
+                            <?php esc_html_e( 'Type', 'travel-app' ); ?>
+                            <select name="segment_type">
+                                <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
+                                    <option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label class="field-wide">
+                            <?php esc_html_e( 'URL', 'travel-app' ); ?>
+                            <input type="url" name="segment_url">
                         </label>
                         <label>
-                            <?php esc_html_e( 'Start Time', 'travel-app' ); ?>
-                            <input type="time" name="segment_time">
-                        </label>
-                    </div>
-                    <div class="date-time-group">
-                        <label>
-                            <?php esc_html_e( 'End Date', 'travel-app' ); ?>
-                            <input type="date" name="segment_end_date">
+                            <?php esc_html_e( 'Location', 'travel-app' ); ?>
+                            <input name="segment_location">
                         </label>
                         <label>
-                            <?php esc_html_e( 'End Time', 'travel-app' ); ?>
-                            <input type="time" name="segment_end_time">
+                            <?php esc_html_e( 'End Location', 'travel-app' ); ?>
+                            <input name="segment_end_location">
                         </label>
-                    </div>
-                    <label class="field-wide">
-                        <?php esc_html_e( 'Details', 'travel-app' ); ?>
-                        <textarea name="segment_details"></textarea>
-                    </label>
-                    <div class="form-actions">
-                        <button type="submit"><?php esc_html_e( 'Add Item', 'travel-app' ); ?></button>
-                    </div>
-                </form>
+                        <div class="date-time-group">
+                            <label>
+                                <?php esc_html_e( 'Start Date', 'travel-app' ); ?>
+                                <input type="date" name="segment_date">
+                            </label>
+                            <label>
+                                <?php esc_html_e( 'Start Time', 'travel-app' ); ?>
+                                <input type="time" name="segment_time">
+                            </label>
+                        </div>
+                        <div class="date-time-group">
+                            <label>
+                                <?php esc_html_e( 'End Date', 'travel-app' ); ?>
+                                <input type="date" name="segment_end_date">
+                            </label>
+                            <label>
+                                <?php esc_html_e( 'End Time', 'travel-app' ); ?>
+                                <input type="time" name="segment_end_time">
+                            </label>
+                        </div>
+                        <label class="field-wide">
+                            <?php esc_html_e( 'Details', 'travel-app' ); ?>
+                            <textarea name="segment_details"></textarea>
+                        </label>
+                        <div class="form-actions">
+                            <button type="submit"><?php esc_html_e( 'Add Item', 'travel-app' ); ?></button>
+                        </div>
+                    </form>
+                <?php endif; ?>
 
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'travel-app' ); ?></p>
@@ -566,9 +622,13 @@ $demo_start_time = $demo_start . 'T12:00';
                                             <div>
                                                 <div class="type"><?php echo esc_html( $type_label ); ?></div>
                                                 <div class="timeline-title-row title">
-                                                    <a class="timeline-title-link" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
-                                                        <?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?>
-                                                    </a>
+                                                    <?php if ( $is_shared_timeline ) : ?>
+                                                        <span><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
+                                                    <?php else : ?>
+                                                        <a class="timeline-title-link" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
+                                                            <?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?>
+                                                        </a>
+                                                    <?php endif; ?>
                                                     <?php if ( $show_url_preview && ! $has_url_preview && ! empty( $segment['url'] ) ) : ?>
                                                         <a class="timeline-url-link" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer" title="<?php esc_attr_e( 'Open item URL', 'travel-app' ); ?>">
                                                             <span aria-hidden="true">↗</span>
@@ -622,7 +682,11 @@ $demo_start_time = $demo_start . 'T12:00';
                     <div>
                         <?php foreach ( $unscheduled_segments as $segment ) : ?>
                             <?php $index = (int) $segment['_index']; ?>
-                            <a class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
+                            <?php if ( $is_shared_timeline ) : ?>
+                                <div class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>">
+                            <?php else : ?>
+                                <a class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
+                            <?php endif; ?>
                                     <div class="summary-grid">
                                         <span class="time"><?php echo esc_html( trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) ) ); ?></span>
                                         <span>
@@ -638,85 +702,269 @@ $demo_start_time = $demo_start . 'T12:00';
                                                 <br><span class="detail"><?php echo esc_html( sprintf( __( 'To: %s', 'travel-app' ), $segment['end_location'] ) ); ?></span>
                                             <?php endif; ?>
                                         </span>
-                                        <span class="detail"><?php esc_html_e( 'Open', 'travel-app' ); ?></span>
+                                        <?php if ( ! $is_shared_timeline ) : ?>
+                                            <span class="detail"><?php esc_html_e( 'Open', 'travel-app' ); ?></span>
+                                        <?php endif; ?>
                                     </div>
-                            </a>
+                            <?php if ( $is_shared_timeline ) : ?>
+                                </div>
+                            <?php else : ?>
+                                </a>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
                 </section>
             <?php endif; ?>
 
-            <section class="danger-zone" aria-labelledby="delete-heading">
-                <h2 id="delete-heading"><?php esc_html_e( 'Delete Travel Plan', 'travel-app' ); ?></h2>
-                <p><?php esc_html_e( 'This deletes the travel plan and moves its itinerary items to the trash.', 'travel-app' ); ?></p>
-                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo esc_js( __( 'Delete this travel plan?', 'travel-app' ) ); ?>');">
-                    <input type="hidden" name="action" value="travel_app_delete">
-                    <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
-                    <?php wp_nonce_field( 'travel_app_delete_' . $trip_data['id'] ); ?>
-                    <button class="delete-button" type="submit"><?php esc_html_e( 'Delete Travel Plan', 'travel-app' ); ?></button>
-                </form>
-            </section>
+            <?php if ( ! $is_shared_timeline ) : ?>
+                <section class="sharing-zone" aria-labelledby="sharing-heading" data-share-control data-trip-id="<?php echo esc_attr( (string) $trip_data['id'] ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'travel_app_share_link_' . $trip_data['id'] ) ); ?>" data-ajax-url="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
+                    <h2 id="sharing-heading"><?php esc_html_e( 'Sharing', 'travel-app' ); ?></h2>
+                    <div class="share-link" data-share-active data-share-url="<?php echo esc_attr( $share_url ); ?>">
+                        <span data-share-label>
+                            <?php echo esc_html( '' === $share_url ? __( 'Read-only timeline sharing is off.', 'travel-app' ) : __( 'Read-only timeline sharing is on.', 'travel-app' ) ); ?>
+                        </span>
+                        <div class="share-actions">
+                            <button class="ghost-button" type="button" data-share-copy><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                            <button class="ghost-button" type="button" data-share-remove <?php echo '' === $share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                        </div>
+                    </div>
+                    <p class="empty" data-share-status aria-live="polite"></p>
+                </section>
+            <?php endif; ?>
+
+            <?php if ( ! $is_shared_timeline ) : ?>
+                <section class="danger-zone" aria-labelledby="delete-heading">
+                    <details>
+                        <summary><h2 id="delete-heading"><?php esc_html_e( 'Delete Travel Plan', 'travel-app' ); ?></h2></summary>
+                        <p><?php esc_html_e( 'This deletes the travel plan and moves its itinerary items to the trash.', 'travel-app' ); ?></p>
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo esc_js( __( 'Delete this travel plan?', 'travel-app' ) ); ?>');">
+                            <input type="hidden" name="action" value="travel_app_delete">
+                            <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                            <?php wp_nonce_field( 'travel_app_delete_' . $trip_data['id'] ); ?>
+                            <button class="delete-button" type="submit"><?php esc_html_e( 'Delete Travel Plan', 'travel-app' ); ?></button>
+                        </form>
+                    </details>
+                </section>
+            <?php endif; ?>
         <?php endif; ?>
     </main>
 
-    <script>
-        (function() {
-            var button = document.querySelector('[data-trip-title-edit]');
-            var form = document.getElementById('trip-title-form');
+    <?php if ( ! $is_shared_timeline ) : ?>
+        <script>
+            (function() {
+                var button = document.querySelector('[data-trip-title-edit]');
+                var form = document.getElementById('trip-title-form');
 
-            if (!button || !form) {
-                return;
-            }
-
-            button.addEventListener('click', function() {
-                var titleInput = form.querySelector('input[name="trip_title"]');
-                var isHidden = form.hasAttribute('hidden');
-
-                if (isHidden) {
-                    form.removeAttribute('hidden');
-                    button.setAttribute('aria-expanded', 'true');
-
-                    if (titleInput) {
-                        titleInput.focus();
-                        titleInput.select();
-                    }
-
+                if (!button || !form) {
                     return;
                 }
 
-                form.setAttribute('hidden', '');
-                button.setAttribute('aria-expanded', 'false');
-            });
-        })();
+                button.addEventListener('click', function() {
+                    var titleInput = form.querySelector('input[name="trip_title"]');
+                    var isHidden = form.hasAttribute('hidden');
 
-        (function() {
-            var button = document.querySelector('[data-add-item-toggle]');
-            var form = document.getElementById('add-item-form');
+                    if (isHidden) {
+                        form.removeAttribute('hidden');
+                        button.setAttribute('aria-expanded', 'true');
 
-            if (!button || !form) {
-                return;
-            }
+                        if (titleInput) {
+                            titleInput.focus();
+                            titleInput.select();
+                        }
 
-            button.addEventListener('click', function() {
-                var titleInput = form.querySelector('input[name="segment_title"]');
-                var isHidden = form.hasAttribute('hidden');
-
-                if (isHidden) {
-                    form.removeAttribute('hidden');
-                    button.setAttribute('aria-expanded', 'true');
-
-                    if (titleInput) {
-                        titleInput.focus();
+                        return;
                     }
 
+                    form.setAttribute('hidden', '');
+                    button.setAttribute('aria-expanded', 'false');
+                });
+            })();
+
+            (function() {
+                var button = document.querySelector('[data-add-item-toggle]');
+                var form = document.getElementById('add-item-form');
+
+                if (!button || !form) {
                     return;
                 }
 
-                form.setAttribute('hidden', '');
-                button.setAttribute('aria-expanded', 'false');
-            });
-        })();
-    </script>
+                button.addEventListener('click', function() {
+                    var titleInput = form.querySelector('input[name="segment_title"]');
+                    var isHidden = form.hasAttribute('hidden');
+
+                    if (isHidden) {
+                        form.removeAttribute('hidden');
+                        button.setAttribute('aria-expanded', 'true');
+
+                        if (titleInput) {
+                            titleInput.focus();
+                        }
+
+                        return;
+                    }
+
+                    form.setAttribute('hidden', '');
+                    button.setAttribute('aria-expanded', 'false');
+                });
+            })();
+
+            (function() {
+                var control = document.querySelector('[data-share-control]');
+
+                if (!control) {
+                    return;
+                }
+
+                var active = control.querySelector('[data-share-active]');
+                var shareLabel = control.querySelector('[data-share-label]');
+                var removeButton = control.querySelector('[data-share-remove]');
+                var copyButtons = Array.prototype.slice.call(control.querySelectorAll('[data-share-copy]'));
+                var primaryCopyButton = copyButtons[0] || null;
+                var status = control.querySelector('[data-share-status]');
+                var defaultCopyText = primaryCopyButton ? primaryCopyButton.textContent : '';
+                var copyResetTimer = null;
+
+                function setStatus(message) {
+                    if (status) {
+                        status.textContent = message || '';
+                    }
+                }
+
+                function setBusy(isBusy) {
+                    [removeButton].concat(copyButtons).forEach(function(button) {
+                        if (button) {
+                            button.disabled = isBusy;
+                        }
+                    });
+                }
+
+                function setShareUrl(url) {
+                    var hasUrl = !!url;
+
+                    if (active) {
+                        active.setAttribute('data-share-url', url || '');
+                    }
+
+                    if (shareLabel) {
+                        shareLabel.textContent = hasUrl ? '<?php echo esc_js( __( 'Read-only timeline sharing is on.', 'travel-app' ) ); ?>' : '<?php echo esc_js( __( 'Read-only timeline sharing is off.', 'travel-app' ) ); ?>';
+                    }
+
+                    if (removeButton) {
+                        removeButton.hidden = !hasUrl;
+                    }
+
+                    resetCopyButtons();
+                }
+
+                function setCopyButtonsText(text) {
+                    copyButtons.forEach(function(button) {
+                        button.textContent = text;
+                    });
+                }
+
+                function resetCopyButtons() {
+                    copyButtons.forEach(function(button) {
+                        button.textContent = defaultCopyText;
+                        button.classList.remove('copied');
+                    });
+                }
+
+                function confirmCopied() {
+                    setCopyButtonsText('<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>');
+                    copyButtons.forEach(function(button) {
+                        button.classList.add('copied');
+                    });
+                    setStatus('<?php echo esc_js( __( 'Share link copied.', 'travel-app' ) ); ?>');
+
+                    if (copyResetTimer) {
+                        window.clearTimeout(copyResetTimer);
+                    }
+
+                    copyResetTimer = window.setTimeout(function() {
+                        resetCopyButtons();
+                    }, 1800);
+                }
+
+                function requestShareAction(action) {
+                    var body = new URLSearchParams();
+                    body.set('action', action);
+                    body.set('trip_id', control.getAttribute('data-trip-id') || '');
+                    body.set('nonce', control.getAttribute('data-nonce') || '');
+
+                    setBusy(true);
+                    setStatus('');
+
+                    return fetch(control.getAttribute('data-ajax-url') || '', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                        },
+                        body: body.toString()
+                    }).then(function(response) {
+                        return response.json().then(function(data) {
+                            if (!response.ok || !data || !data.success) {
+                                throw new Error(data && data.data && data.data.message ? data.data.message : '<?php echo esc_js( __( 'The sharing change could not be saved.', 'travel-app' ) ); ?>');
+                            }
+
+                            return data.data || {};
+                        });
+                    }).then(function(data) {
+                        setShareUrl(data.url || '');
+                        setStatus(data.message || '');
+                        return data;
+                    }).catch(function(error) {
+                        setStatus(error.message || '<?php echo esc_js( __( 'The sharing change could not be saved.', 'travel-app' ) ); ?>');
+                        throw error;
+                    }).finally(function() {
+                        setBusy(false);
+                    });
+                }
+
+                if (removeButton) {
+                    removeButton.addEventListener('click', function() {
+                        requestShareAction('travel_app_remove_share_link');
+                    });
+                }
+
+                function copyShareUrl(url) {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        return navigator.clipboard.writeText(url).then(function() {
+                            confirmCopied();
+                        }).catch(function() {
+                            window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
+                        });
+                    }
+
+                    window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
+                    return Promise.resolve();
+                }
+
+                copyButtons.forEach(function(copyButton) {
+                    copyButton.addEventListener('click', function() {
+                        var url = active.getAttribute('data-share-url') || '';
+
+                        if (url) {
+                            copyShareUrl(url);
+                            return;
+                        }
+
+                        setCopyButtonsText('<?php echo esc_js( __( 'Generating...', 'travel-app' ) ); ?>');
+                        requestShareAction('travel_app_generate_share_link').then(function(data) {
+                            if (data && data.url) {
+                                copyShareUrl(data.url);
+                                return;
+                            }
+
+                            resetCopyButtons();
+                        }).catch(function() {
+                            resetCopyButtons();
+                        });
+                    });
+                });
+            })();
+        </script>
+    <?php endif; ?>
 
     <?php wp_app_body_close(); ?>
 </body>

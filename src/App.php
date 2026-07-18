@@ -47,6 +47,8 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_travel_app_import', [ $this, 'handle_import' ] );
         add_action( 'admin_post_travel_app_update_trip', [ $this, 'handle_update_trip' ] );
+        add_action( 'wp_ajax_travel_app_generate_share_link', [ $this, 'handle_generate_share_link' ] );
+        add_action( 'wp_ajax_travel_app_remove_share_link', [ $this, 'handle_remove_share_link' ] );
         add_action( 'admin_post_travel_app_delete', [ $this, 'handle_delete' ] );
         add_action( 'admin_post_travel_app_update_segment', [ $this, 'handle_update_segment' ] );
         add_action( 'admin_post_travel_app_add_segment', [ $this, 'handle_add_segment' ] );
@@ -58,6 +60,7 @@ class App extends BaseApp {
         add_filter( 'ai_assistant_ability_instructions', [ $this, 'get_ai_assistant_ability_instructions' ], 10, 4 );
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'register_ai_assistant_welcome_tips' ], 10, 2 );
         add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
+        add_action( 'template_redirect', [ $this, 'maybe_render_shared_timeline' ], 0 );
     }
 
     protected function get_url_path(): string {
@@ -445,6 +448,30 @@ class App extends BaseApp {
         exit;
     }
 
+    public function maybe_render_shared_timeline(): void {
+        $trip_id = isset( $_GET['travel_app_share'] ) ? absint( $_GET['travel_app_share'] ) : 0;
+        $token = isset( $_GET['travel_app_token'] ) ? sanitize_text_field( wp_unslash( $_GET['travel_app_token'] ) ) : '';
+
+        if ( $trip_id <= 0 || '' === $token ) {
+            return;
+        }
+
+        global $wp_app_route;
+        $wp_app_route = [
+            'app_path' => $this->get_url_path(),
+            'pattern'  => 'share',
+            'template' => 'trip.php',
+            'params'   => [
+                'id'    => (string) $trip_id,
+                'token' => $token,
+            ],
+        ];
+
+        $travel_app_shared_timeline = true;
+        include $this->get_template_dir() . '/trip.php';
+        exit;
+    }
+
     public function handle_update_trip(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
             wp_die( esc_html__( 'You must be logged in to edit travel plans.', 'travel-app' ), 403 );
@@ -465,6 +492,44 @@ class App extends BaseApp {
 
         wp_safe_redirect( $redirect );
         exit;
+    }
+
+    public function handle_generate_share_link(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to share travel plans.', 'travel-app' ) ], 403 );
+        }
+
+        $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
+
+        if ( '' === $this->create_trip_share_token( $trip_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be shared.', 'travel-app' ) ], 404 );
+        }
+
+        wp_send_json_success( [
+            'url'     => $this->get_trip_share_url( $trip_id ),
+            'message' => __( 'Read-only timeline share link generated.', 'travel-app' ),
+        ] );
+    }
+
+    public function handle_remove_share_link(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to update travel plan sharing.', 'travel-app' ) ], 403 );
+        }
+
+        $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
+
+        if ( ! $this->get_user_trip( $trip_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be updated.', 'travel-app' ) ], 404 );
+        }
+
+        delete_term_meta( $trip_id, '_travel_app_share_token' );
+
+        wp_send_json_success( [
+            'url'     => '',
+            'message' => __( 'Read-only timeline share link removed.', 'travel-app' ),
+        ] );
     }
 
     public function handle_update_segment(): void {
@@ -769,13 +834,50 @@ class App extends BaseApp {
         return $term;
     }
 
+    public function get_trip_share_url( int $trip_id ): string {
+        $token = $this->get_trip_share_token( $trip_id );
+        if ( '' === $token ) {
+            return '';
+        }
+
+        return add_query_arg(
+            [
+                'travel_app_share' => $trip_id,
+                'travel_app_token' => $token,
+            ],
+            home_url( '/' )
+        );
+    }
+
+    public function get_public_trip_by_share_token( int $trip_id, string $token ) {
+        if ( $trip_id <= 0 || '' === $token ) {
+            return null;
+        }
+
+        $stored_token = (string) get_term_meta( $trip_id, '_travel_app_share_token', true );
+        if ( '' === $stored_token || ! hash_equals( $stored_token, $token ) ) {
+            return null;
+        }
+
+        $term = get_term( $trip_id, 'travel_app_trip' );
+        if ( ! $term || is_wp_error( $term ) ) {
+            return null;
+        }
+
+        return $term;
+    }
+
+    public function get_trip_owner_id( int $trip_id ): int {
+        return (int) get_term_meta( $trip_id, '_travel_app_user_id', true );
+    }
+
     public function get_user_trip_segment( int $trip_id, int $index ) {
         $item = $this->get_user_trip_item_post( $trip_id, $index );
 
         return $item ? $this->format_segment_for_output( $item ) : null;
     }
 
-    public function format_trip_for_output( $term ): array {
+    public function format_trip_for_output( $term, ?int $user_id = null ): array {
         if ( is_numeric( $term ) ) {
             $term = get_term( (int) $term, 'travel_app_trip' );
         }
@@ -784,7 +886,7 @@ class App extends BaseApp {
             return [];
         }
 
-        $segments = $this->get_trip_segments( (int) $term->term_id );
+        $segments = $this->get_trip_segments( (int) $term->term_id, $user_id );
 
         return [
             'id'            => (int) $term->term_id,
@@ -795,6 +897,30 @@ class App extends BaseApp {
             'segment_count' => count( $segments ),
             'parser'        => (string) get_term_meta( $term->term_id, '_travel_app_parser', true ),
         ];
+    }
+
+    private function get_trip_share_token( int $trip_id ): string {
+        if ( ! $this->get_user_trip( $trip_id ) ) {
+            return '';
+        }
+
+        return (string) get_term_meta( $trip_id, '_travel_app_share_token', true );
+    }
+
+    private function create_trip_share_token( int $trip_id ): string {
+        if ( ! $this->get_user_trip( $trip_id ) ) {
+            return '';
+        }
+
+        $token = (string) get_term_meta( $trip_id, '_travel_app_share_token', true );
+        if ( '' !== $token ) {
+            return $token;
+        }
+
+        $token = wp_generate_password( 32, false, false );
+        update_term_meta( $trip_id, '_travel_app_share_token', $token );
+
+        return $token;
     }
 
     public function get_trip_summary_parts( array $trip_data, ?string $today = null ): array {
@@ -1020,11 +1146,13 @@ class App extends BaseApp {
         return $post;
     }
 
-    private function get_trip_item_posts( int $trip_id ): array {
+    private function get_trip_item_posts( int $trip_id, ?int $user_id = null ): array {
+        $user_id = $user_id ?? get_current_user_id();
+
         return get_posts( [
             'post_type'      => 'travel_app_item',
             'post_status'    => [ 'private', 'publish', 'draft' ],
-            'author'         => get_current_user_id(),
+            'author'         => $user_id,
             'posts_per_page' => -1,
             'orderby'        => 'meta_value',
             'meta_key'       => '_travel_app_sort',
@@ -1039,8 +1167,8 @@ class App extends BaseApp {
         ] );
     }
 
-    private function get_trip_segments( int $trip_id ): array {
-        return array_map( [ $this, 'format_segment_for_output' ], $this->get_trip_item_posts( $trip_id ) );
+    private function get_trip_segments( int $trip_id, ?int $user_id = null ): array {
+        return array_map( [ $this, 'format_segment_for_output' ], $this->get_trip_item_posts( $trip_id, $user_id ) );
     }
 
     private function format_segment_for_output( \WP_Post $post ): array {

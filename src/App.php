@@ -426,8 +426,10 @@ class App extends BaseApp {
             exit;
         }
 
-        if ( '' === trim( $file_text ) && $this->is_quick_plan_text( $text ) ) {
-            $segment = $this->parse_quick_plan_text( $text );
+        $parsed = $this->parse_itinerary_text( $text );
+
+        if ( '' === trim( $file_text ) && 1 === count( $parsed['segments'] ?? [] ) ) {
+            $segment = $parsed['segments'][0] ?? [];
 
             if ( '' !== $segment['date'] ) {
                 $matches = $this->find_quick_plan_trip_matches( $segment, $text );
@@ -437,31 +439,27 @@ class App extends BaseApp {
                         'segment'    => $segment,
                         'matches'    => $matches,
                         'trip_title' => $this->get_quick_plan_trip_title( $segment ),
+                        'parser'     => (string) ( $parsed['parser'] ?? 'fallback' ),
+                        'parser_error' => $parsed['parser_error'] ?? [],
                     ] );
 
                     wp_safe_redirect( add_query_arg( 'quick_plan_draft', rawurlencode( $draft_key ), $redirect ) );
                     exit;
                 }
 
-                $trip_id = $this->save_trip( [
-                    'title'     => $this->get_quick_plan_trip_title( $segment ),
-                    'starts_at' => (string) $segment['date'],
-                    'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
-                    'segments'  => [ $segment ],
-                    'parser'    => 'quick-plan',
-                ], $text );
+                if ( 'quick-plan' === (string) ( $parsed['parser'] ?? '' ) ) {
+                    $trip_id = $this->save_trip( $parsed, $text );
 
-                if ( is_wp_error( $trip_id ) ) {
-                    wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+                    if ( is_wp_error( $trip_id ) ) {
+                        wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+                        exit;
+                    }
+
+                    wp_safe_redirect( add_query_arg( 'imported', rawurlencode( (string) $trip_id ), $redirect ) );
                     exit;
                 }
-
-                wp_safe_redirect( add_query_arg( 'imported', rawurlencode( (string) $trip_id ), $redirect ) );
-                exit;
             }
         }
-
-        $parsed = $this->parse_itinerary_text( $text );
         $trip_id = $this->save_trip( $parsed, $text );
 
         if ( is_wp_error( $trip_id ) ) {
@@ -513,7 +511,7 @@ class App extends BaseApp {
                 'starts_at' => (string) $segment['date'],
                 'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
                 'segments'  => [ $segment ],
-                'parser'    => 'quick-plan',
+                'parser'    => sanitize_key( (string) ( $draft['parser'] ?? 'quick-plan' ) ),
             ], (string) ( $draft['text'] ?? '' ) );
             $item_id = 0;
         } else {
@@ -1321,9 +1319,24 @@ class App extends BaseApp {
 
     public function parse_itinerary_text( string $text ): array {
         $ics_parser = new IcsParser();
-        $parsed = $ics_parser->supports( $text )
-            ? $ics_parser->parse( $text )
-            : ( new GenericParser() )->parse( $text );
+        if ( $ics_parser->supports( $text ) ) {
+            return $this->normalize_trip_data( $ics_parser->parse( $text ) );
+        }
+
+        $parsed = ( new GenericParser() )->parse( $text );
+        if ( 'fallback' === (string) ( $parsed['parser'] ?? '' ) && $this->is_quick_plan_text( $text ) ) {
+            $segment = $this->parse_quick_plan_text( $text );
+            if ( '' !== $segment['date'] ) {
+                $parsed = [
+                    'title'     => $this->get_quick_plan_trip_title( $segment ),
+                    'starts_at' => (string) $segment['date'],
+                    'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
+                    'segments'  => [ $segment ],
+                    'parser'    => 'quick-plan',
+                    'parser_error' => $parsed['parser_error'] ?? [],
+                ];
+            }
+        }
 
         return $this->normalize_trip_data( $parsed );
     }
@@ -1428,6 +1441,24 @@ class App extends BaseApp {
             'ends_at'     => sanitize_text_field( (string) ( $data['ends_at'] ?? '' ) ),
             'segments'    => array_values( array_map( [ $this, 'normalize_segment' ], $segments ) ),
             'parser'      => sanitize_key( (string) ( $data['parser'] ?? 'fallback' ) ),
+            'parser_error' => $this->normalize_parser_error( $data['parser_error'] ?? [] ),
+        ];
+    }
+
+    private function normalize_parser_error( $error ): array {
+        if ( ! is_array( $error ) ) {
+            return [];
+        }
+
+        $code = sanitize_key( (string) ( $error['code'] ?? '' ) );
+        $message = sanitize_text_field( (string) ( $error['message'] ?? '' ) );
+        if ( '' === $code && '' === $message ) {
+            return [];
+        }
+
+        return [
+            'code'    => $code,
+            'message' => $message,
         ];
     }
 

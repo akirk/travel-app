@@ -7,13 +7,16 @@
         "php": ">=7.4",
         "akirk/wp-app": "^1.0"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    },
     "autoload": {
         "psr-4": {
             "TravelApp\\": "src/"
         }
     },
     "scripts": {
-        "test": "php tests/ics-parser.php && php tests/quick-plan-parser.php"
+        "test": "vendor/bin/phpunit"
     },
     "version": "0.1.0",
     "authors": [

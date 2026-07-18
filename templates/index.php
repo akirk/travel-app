@@ -482,6 +482,19 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         $quick_plan_trip_title = isset( $quick_plan_draft['trip_title'] )
                             ? (string) $quick_plan_draft['trip_title']
                             : ( ! empty( $quick_plan_segment['location'] ) ? (string) $quick_plan_segment['location'] : __( 'Quick Travel Plan', 'travel-app' ) );
+                        $quick_plan_parser = (string) ( $quick_plan_draft['parser'] ?? 'quick-plan' );
+                        $quick_plan_parser_labels = [
+                            'wp-ai-client' => __( 'AI extraction', 'travel-app' ),
+                            'quick-plan'   => __( 'quick planner fallback', 'travel-app' ),
+                            'fallback'     => __( 'basic parser fallback', 'travel-app' ),
+                            'ics'          => __( 'calendar parser', 'travel-app' ),
+                        ];
+                        $quick_plan_parser_label = $quick_plan_parser_labels[ $quick_plan_parser ] ?? $quick_plan_parser;
+                        $quick_plan_parser_error = isset( $quick_plan_draft['parser_error'] ) && is_array( $quick_plan_draft['parser_error'] )
+                            ? $quick_plan_draft['parser_error']
+                            : [];
+                        $quick_plan_parser_error_code = (string) ( $quick_plan_parser_error['code'] ?? '' );
+                        $quick_plan_parser_error_message = (string) ( $quick_plan_parser_error['message'] ?? '' );
                         ?>
                         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                             <input type="hidden" name="action" value="travel_app_import">
@@ -489,6 +502,23 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                             <?php wp_nonce_field( 'travel_app_import' ); ?>
                             <p class="quick-plan-confirm">
                                 <?php esc_html_e( 'Review the parsed fields, update matches if needed, then choose where to save it.', 'travel-app' ); ?>
+                                <?php
+                                printf(
+                                    /* translators: %s: parser source label. */
+                                    esc_html__( ' Parsed with: %s.', 'travel-app' ),
+                                    esc_html( $quick_plan_parser_label )
+                                );
+                                ?>
+                                <?php if ( '' !== $quick_plan_parser_error_code || '' !== $quick_plan_parser_error_message ) : ?>
+                                    <?php
+                                    printf(
+                                        /* translators: 1: parser error code, 2: parser error message. */
+                                        esc_html__( ' AI parser error: %1$s %2$s', 'travel-app' ),
+                                        esc_html( $quick_plan_parser_error_code ),
+                                        esc_html( $quick_plan_parser_error_message )
+                                    );
+                                    ?>
+                                <?php endif; ?>
                             </p>
                             <div class="quick-plan-fields">
                                 <label class="field-wide">

@@ -1,37 +1,46 @@
 <?php
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
 if ( ! function_exists( '__' ) ) {
     function __( $text, $domain = null ) {
         return $text;
     }
 }
 
-$failures = [];
+if ( ! class_exists( 'WP_Error' ) ) {
+    class WP_Error {
+        private $code;
+        private $message;
 
-$test = static function( string $name, callable $callback ) use ( &$failures ): void {
-    try {
-        $callback();
-        echo "PASS $name\n";
-    } catch ( Throwable $e ) {
-        $failures[] = "$name: " . $e->getMessage();
-        echo "FAIL $name\n";
-    }
-};
+        public function __construct( string $code = '', string $message = '' ) {
+            $this->code = $code;
+            $this->message = $message;
+        }
 
-$assert = static function( bool $condition, string $message ): void {
-    if ( ! $condition ) {
-        throw new RuntimeException( $message );
-    }
-};
+        public function get_error_code(): string {
+            return $this->code;
+        }
 
-$finish = static function() use ( &$failures ): void {
-    if ( $failures === [] ) {
-        return;
+        public function get_error_message(): string {
+            return $this->message;
+        }
     }
+}
 
-    echo "\n";
-    foreach ( $failures as $failure ) {
-        echo "$failure\n";
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( $thing ): bool {
+        return $thing instanceof WP_Error;
     }
-    exit( 1 );
-};
+}
+
+if ( ! function_exists( 'wp_trim_words' ) ) {
+    function wp_trim_words( string $text, int $num_words = 55, string $more = null ): string {
+        $words = preg_split( '/\s+/', trim( $text ) );
+        if ( ! is_array( $words ) ) {
+            return '';
+        }
+
+        return implode( ' ', array_slice( $words, 0, $num_words ) ) . ( count( $words ) > $num_words ? (string) $more : '' );
+    }
+}

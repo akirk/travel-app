@@ -19,6 +19,7 @@ class QuickPlanParser {
         $working = $original;
         $date = '';
         $time = '';
+        $end_time = '';
 
         $date_match = $this->extract_date_match( $working );
         if ( $date_match ) {
@@ -26,10 +27,17 @@ class QuickPlanParser {
             $working = substr_replace( $working, ' ', $date_match['offset'], strlen( $date_match['text'] ) );
         }
 
-        $time_match = $this->extract_time_match( $working );
-        if ( $time_match ) {
-            $time = $time_match['time'];
-            $working = substr_replace( $working, ' ', $time_match['offset'], strlen( $time_match['text'] ) );
+        $time_range_match = $this->extract_time_range_match( $working );
+        if ( $time_range_match ) {
+            $time = $time_range_match['time'];
+            $end_time = $time_range_match['end_time'];
+            $working = substr_replace( $working, ' ', $time_range_match['offset'], strlen( $time_range_match['text'] ) );
+        } else {
+            $time_match = $this->extract_time_match( $working );
+            if ( $time_match ) {
+                $time = $time_match['time'];
+                $working = substr_replace( $working, ' ', $time_match['offset'], strlen( $time_match['text'] ) );
+            }
         }
 
         $working = $this->normalize_spaces( preg_replace( '/\b(?:on|at)\b/i', ' ', $working ) );
@@ -39,11 +47,11 @@ class QuickPlanParser {
             'type'         => $this->infer_type( $title_location['title'] ),
             'title'        => $this->title_case( $title_location['title'] ?: $working ),
             'date'         => $date,
-            'end_date'     => '',
+            'end_date'     => '' !== $end_time ? $date : '',
             'time'         => $time,
-            'end_time'     => '',
+            'end_time'     => $end_time,
             'location'     => $this->title_case( $title_location['location'] ),
-            'end_location' => '',
+            'end_location' => $this->title_case( $title_location['end_location'] ?? '' ),
             'url'          => '',
             'details'      => $original,
         ];
@@ -55,6 +63,7 @@ class QuickPlanParser {
             '/\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?(?:,)?\s+\d{4}\b/i',
             '/\b\d{4}-\d{1,2}-\d{1,2}\b/',
             '/\b\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4}\b/',
+            '/\b\d{1,2}\.\s*\d{1,2}\.(?!\d)(?=\s|$)/',
         ];
 
         foreach ( $patterns as $pattern ) {
@@ -95,6 +104,13 @@ class QuickPlanParser {
                 : '';
         }
 
+        if ( preg_match( '/^(\d{1,2})\.\s*(\d{1,2})\.$/', $date_text, $match ) ) {
+            $year = (int) gmdate( 'Y' );
+            return checkdate( (int) $match[2], (int) $match[1], $year )
+                ? sprintf( '%04d-%02d-%02d', $year, (int) $match[2], (int) $match[1] )
+                : '';
+        }
+
         if ( preg_match( '/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/', $date_text, $match ) ) {
             $year = (int) $match[3];
             $year = $year < 100 ? 2000 + $year : $year;
@@ -105,6 +121,25 @@ class QuickPlanParser {
 
         $timestamp = strtotime( $date_text . ' 12:00:00 UTC' );
         return false === $timestamp ? '' : gmdate( 'Y-m-d', $timestamp );
+    }
+
+    private function extract_time_range_match( string $text ): array {
+        if ( ! preg_match( '/\b((?:[01]?\d|2[0-3])[:.][0-5]\d\s*(?:am|pm)?)\s*-\s*((?:[01]?\d|2[0-3])[:.][0-5]\d\s*(?:am|pm)?)\b/i', $text, $match, PREG_OFFSET_CAPTURE ) ) {
+            return [];
+        }
+
+        $time = $this->normalize_time( $match[1][0] );
+        $end_time = $this->normalize_time( $match[2][0] );
+        if ( '' === $time || '' === $end_time ) {
+            return [];
+        }
+
+        return [
+            'text'     => $match[0][0],
+            'offset'   => $match[0][1],
+            'time'     => $time,
+            'end_time' => $end_time,
+        ];
     }
 
     private function extract_time_match( string $text ): array {
@@ -160,6 +195,14 @@ class QuickPlanParser {
             return [ 'title' => '', 'location' => '' ];
         }
 
+        if ( preg_match( '/^([a-z]{2}\d{1,4})\s+([a-z]{3})-([a-z]{3})$/i', $text, $match ) ) {
+            return [
+                'title'        => strtoupper( $match[1] ),
+                'location'     => strtoupper( $match[2] ),
+                'end_location' => strtoupper( $match[3] ),
+            ];
+        }
+
         if ( preg_match( '/^(.+?)\s+(?:in|near)\s+(.+)$/i', $text, $match ) ) {
             return [
                 'title'    => trim( $match[1], " \t\n\r\0\x0B,-" ),
@@ -187,7 +230,7 @@ class QuickPlanParser {
     }
 
     private function infer_type( string $title ): string {
-        if ( preg_match( '/\b(flight|airport|airline|boarding)\b/i', $title ) ) {
+        if ( preg_match( '/\b(flight|airport|airline|boarding|[a-z]{2}\d{1,4})\b/i', $title ) ) {
             return 'flight';
         }
         if ( preg_match( '/\b(hotel|lodging|check-?in|checkout|check-?out|hostel|airbnb)\b/i', $title ) ) {

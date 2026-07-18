@@ -138,6 +138,7 @@ class App extends BaseApp {
 
     protected function setup_routes(): void {
         $this->app->route( 'trip/{id}', 'trip.php' );
+        $this->app->route( 'trip/{id}/map', 'map.php' );
         $this->app->route( 'trip/{id}/item/{item_id}', 'item.php' );
     }
 

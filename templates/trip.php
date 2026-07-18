@@ -76,6 +76,51 @@ $get_google_maps_url = static function( string $address ): string {
         'https://www.google.com/maps/search/'
     );
 };
+
+$get_google_maps_route_url = static function( array $locations ): string {
+    $locations = array_values( array_filter( array_map( 'trim', $locations ) ) );
+
+    if ( count( $locations ) < 2 ) {
+        return '';
+    }
+
+    $origin = array_shift( $locations );
+    $destination = array_pop( $locations );
+    $args = [
+        'api'         => '1',
+        'origin'      => $origin,
+        'destination' => $destination,
+        'travelmode'  => 'driving',
+    ];
+
+    if ( ! empty( $locations ) ) {
+        $args['waypoints'] = implode( '|', $locations );
+    }
+
+    return add_query_arg( $args, 'https://www.google.com/maps/dir/' );
+};
+
+$route_locations = [];
+foreach ( $segments as $segment ) {
+    foreach ( [ 'location', 'end_location' ] as $location_key ) {
+        $location = trim( (string) ( $segment[ $location_key ] ?? '' ) );
+
+        if ( '' === $location ) {
+            continue;
+        }
+
+        if ( empty( $route_locations ) || end( $route_locations ) !== $location ) {
+            $route_locations[] = $location;
+        }
+    }
+}
+
+$trip_route_links = [];
+$trip_direct_map_url = '';
+if ( count( $route_locations ) >= 2 ) {
+    $trip_route_links['google'] = $get_google_maps_route_url( $route_locations );
+    $trip_direct_map_url = home_url( '/travel-app/trip/' . (int) $trip_data['id'] . '/map/' );
+}
 ?>
 <!DOCTYPE html>
 <html <?php wp_app_language_attributes(); ?>>
@@ -159,6 +204,17 @@ $get_google_maps_url = static function( string $address ): string {
         .trip-title-form label { margin: 0; }
         .trip-title-form input { font-size: 1.35rem; font-weight: 750; }
         .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
+        .trip-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+        .trip-actions .ghost-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 38px;
+            box-sizing: border-box;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+        }
         .share-link {
             display: grid;
             gap: 10px;
@@ -512,6 +568,7 @@ $get_google_maps_url = static function( string $address ): string {
             gap: 12px;
             align-items: center;
         }
+        .route-zone,
         .sharing-zone,
         .danger-zone {
             margin-top: 28px;
@@ -519,16 +576,19 @@ $get_google_maps_url = static function( string $address ): string {
             padding-top: 18px;
             color: var(--wp-app-color-muted);
         }
+        .route-zone h2,
         .sharing-zone h2,
         .danger-zone h2 {
             color: var(--wp-app-color-text);
         }
+        .route-zone details summary,
         .sharing-zone details summary,
         .danger-zone details summary {
             cursor: pointer;
             color: var(--wp-app-color-text);
             font-weight: 700;
         }
+        .route-zone details summary h2,
         .sharing-zone details summary h2,
         .danger-zone details summary h2 {
             display: inline;
@@ -858,6 +918,28 @@ $get_google_maps_url = static function( string $address ): string {
                             </div>
                         <?php endforeach; ?>
                     </div>
+                </section>
+            <?php endif; ?>
+
+            <?php if ( $show_private_share_details && ( ! empty( $trip_route_links ) || '' !== $trip_direct_map_url ) ) : ?>
+                <section class="route-zone" aria-labelledby="route-maps-heading">
+                    <details>
+                        <summary><h2 id="route-maps-heading"><?php esc_html_e( 'Route Maps', 'travel-app' ); ?></h2></summary>
+                        <div class="trip-actions" aria-label="<?php esc_attr_e( 'Route links', 'travel-app' ); ?>">
+                            <?php if ( ! empty( $trip_route_links['google'] ) ) : ?>
+                                <a class="ghost-button" href="<?php echo esc_url( (string) $trip_route_links['google'] ); ?>" target="_blank" rel="noopener noreferrer">
+                                    <span aria-hidden="true">&#x1F5FA;</span>
+                                    <?php esc_html_e( 'Google Maps', 'travel-app' ); ?>
+                                </a>
+                            <?php endif; ?>
+                            <?php if ( '' !== $trip_direct_map_url ) : ?>
+                                <a class="ghost-button" href="<?php echo esc_url( $trip_direct_map_url ); ?>">
+                                    <span aria-hidden="true">&#x1F5FA;</span>
+                                    <?php esc_html_e( 'OpenStreetMap', 'travel-app' ); ?>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </details>
                 </section>
             <?php endif; ?>
 

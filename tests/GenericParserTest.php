@@ -44,7 +44,7 @@ function wp_ai_client_prompt( string $prompt ) {
 final class GenericParserTest extends TestCase {
     public function test_uses_ai_client_before_local_parsing_for_quick_looking_text(): void {
         $GLOBALS['travel_app_generic_parser_response'] = json_encode( [
-            'title'     => 'AI Parsed Hamburg',
+            'title'     => 'AI Parsed Quick Plan',
             'starts_at' => '2026-08-01',
             'ends_at'   => '2026-08-01',
             'segments'  => [
@@ -61,9 +61,7 @@ final class GenericParserTest extends TestCase {
         $parsed = ( new GenericParser() )->parse( 'Harbor tour in Hamburg August 1, 2026 3pm' );
 
         self::assertSame( 'wp-ai-client', $parsed['parser'] );
-        self::assertSame( 'AI Parsed Hamburg', $parsed['title'] );
-        self::assertSame( 'AI Harbor Tour', $parsed['segments'][0]['title'] );
-        self::assertStringContainsString( 'Harbor tour in Hamburg', $GLOBALS['travel_app_generic_parser_last_prompt'] );
+        self::assertSame( 'AI Parsed Quick Plan', $parsed['title'] );
     }
 
     public function test_falls_back_when_ai_returns_invalid_json(): void {

@@ -63,6 +63,7 @@ class QuickPlanParser {
             '/\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?(?:,)?\s+\d{4}\b/i',
             '/\b\d{4}-\d{1,2}-\d{1,2}\b/',
             '/\b\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4}\b/',
+            '/\b\d{1,2}\.\s*\d{1,2}\.(?!\d)(?=\s|$)/',
         ];
 
         foreach ( $patterns as $pattern ) {
@@ -98,6 +99,13 @@ class QuickPlanParser {
         if ( preg_match( '/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/', $date_text, $match ) ) {
             $year = (int) $match[3];
             $year = $year < 100 ? 2000 + $year : $year;
+            return checkdate( (int) $match[2], (int) $match[1], $year )
+                ? sprintf( '%04d-%02d-%02d', $year, (int) $match[2], (int) $match[1] )
+                : '';
+        }
+
+        if ( preg_match( '/^(\d{1,2})\.\s*(\d{1,2})\.$/', $date_text, $match ) ) {
+            $year = (int) gmdate( 'Y' );
             return checkdate( (int) $match[2], (int) $match[1], $year )
                 ? sprintf( '%04d-%02d-%02d', $year, (int) $match[2], (int) $match[1] )
                 : '';

@@ -623,16 +623,18 @@ class App extends BaseApp {
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        $mode = isset( $_POST['share_mode'] ) ? sanitize_key( wp_unslash( $_POST['share_mode'] ) ) : 'fellow';
         check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
 
-        if ( '' === $this->create_trip_share_token( $trip_id ) ) {
+        if ( '' === $this->create_trip_share_token( $trip_id, $mode ) ) {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be shared.', 'travel-app' ) ], 404 );
         }
 
         $this->clear_trip_public_cache( $trip_id );
 
         wp_send_json_success( [
-            'url'     => $this->get_trip_share_url( $trip_id ),
+            'mode'    => $this->normalize_share_mode( $mode ),
+            'url'     => $this->get_trip_share_url( $trip_id, $mode ),
             'message' => __( 'Read-only timeline share link generated.', 'travel-app' ),
         ] );
     }
@@ -651,10 +653,15 @@ class App extends BaseApp {
 
         $this->clear_trip_public_cache( $trip_id );
         delete_term_meta( $trip_id, '_travel_app_share_token' );
+        delete_term_meta( $trip_id, '_travel_app_public_share_token' );
 
         wp_send_json_success( [
             'url'     => '',
-            'message' => __( 'Read-only timeline share link removed.', 'travel-app' ),
+            'urls'    => [
+                'fellow' => '',
+                'public' => '',
+            ],
+            'message' => __( 'Read-only timeline share links removed.', 'travel-app' ),
         ] );
     }
 
@@ -673,7 +680,10 @@ class App extends BaseApp {
         $this->clear_trip_public_cache( $trip_id );
 
         wp_send_json_success( [
-            'url'     => $this->get_trip_share_url( $trip_id ),
+            'urls'    => [
+                'fellow' => $this->get_trip_share_url( $trip_id, 'fellow' ),
+                'public' => $this->get_trip_share_url( $trip_id, 'public' ),
+            ],
             'message' => __( 'Read-only timeline cache refreshed.', 'travel-app' ),
         ] );
     }
@@ -992,7 +1002,13 @@ class App extends BaseApp {
     }
 
     private function clear_trip_public_cache( int $trip_id ): void {
-        if ( $trip_id <= 0 || '' === (string) get_term_meta( $trip_id, '_travel_app_share_token', true ) ) {
+        if ( $trip_id <= 0 ) {
+            return;
+        }
+
+        $has_share_token = '' !== (string) get_term_meta( $trip_id, '_travel_app_share_token', true )
+            || '' !== (string) get_term_meta( $trip_id, '_travel_app_public_share_token', true );
+        if ( ! $has_share_token ) {
             return;
         }
 
@@ -1179,8 +1195,8 @@ class App extends BaseApp {
         return $term;
     }
 
-    public function get_trip_share_url( int $trip_id ): string {
-        $token = $this->get_trip_share_token( $trip_id );
+    public function get_trip_share_url( int $trip_id, string $mode = 'fellow' ): string {
+        $token = $this->get_trip_share_token( $trip_id, $mode );
         if ( '' === $token ) {
             return '';
         }
@@ -1199,8 +1215,7 @@ class App extends BaseApp {
             return null;
         }
 
-        $stored_token = (string) get_term_meta( $trip_id, '_travel_app_share_token', true );
-        if ( '' === $stored_token || ! hash_equals( $stored_token, $token ) ) {
+        if ( '' === $this->get_trip_share_mode_by_token( $trip_id, $token ) ) {
             return null;
         }
 
@@ -1210,6 +1225,21 @@ class App extends BaseApp {
         }
 
         return $term;
+    }
+
+    public function get_trip_share_mode_by_token( int $trip_id, string $token ): string {
+        if ( $trip_id <= 0 || '' === $token ) {
+            return '';
+        }
+
+        foreach ( [ 'fellow', 'public' ] as $mode ) {
+            $stored_token = (string) get_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ), true );
+            if ( '' !== $stored_token && hash_equals( $stored_token, $token ) ) {
+                return $mode;
+            }
+        }
+
+        return '';
     }
 
     public function get_trip_owner_id( int $trip_id ): int {
@@ -1253,28 +1283,37 @@ class App extends BaseApp {
         ];
     }
 
-    private function get_trip_share_token( int $trip_id ): string {
+    private function get_trip_share_token( int $trip_id, string $mode = 'fellow' ): string {
         if ( ! $this->get_user_trip( $trip_id ) ) {
             return '';
         }
 
-        return (string) get_term_meta( $trip_id, '_travel_app_share_token', true );
+        return (string) get_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ), true );
     }
 
-    private function create_trip_share_token( int $trip_id ): string {
+    private function create_trip_share_token( int $trip_id, string $mode = 'fellow' ): string {
         if ( ! $this->get_user_trip( $trip_id ) ) {
             return '';
         }
 
-        $token = (string) get_term_meta( $trip_id, '_travel_app_share_token', true );
+        $mode = $this->normalize_share_mode( $mode );
+        $token = (string) get_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ), true );
         if ( '' !== $token ) {
             return $token;
         }
 
         $token = wp_generate_password( 32, false, false );
-        update_term_meta( $trip_id, '_travel_app_share_token', $token );
+        update_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ), $token );
 
         return $token;
+    }
+
+    private function normalize_share_mode( string $mode ): string {
+        return 'public' === $mode ? 'public' : 'fellow';
+    }
+
+    private function get_trip_share_token_meta_key( string $mode ): string {
+        return 'public' === $this->normalize_share_mode( $mode ) ? '_travel_app_public_share_token' : '_travel_app_share_token';
     }
 
     public function get_trip_summary_parts( array $trip_data, ?string $today = null ): array {

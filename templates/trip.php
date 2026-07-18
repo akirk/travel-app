@@ -474,7 +474,7 @@ $demo_start_time = $demo_start . 'T12:00';
                         <div class="time-marker"><span class="time-marker-label"></span></div>
                         <?php foreach ( $segments_by_day as $day => $day_segments ) : ?>
                             <section class="timeline-day" data-date="<?php echo esc_attr( $day ); ?>">
-                                <h3 class="day-heading"><?php echo esc_html( $day ); ?></h3>
+                                <h3 class="day-heading"><?php echo esc_html( $travel_app->format_date_label( $day ) ); ?></h3>
                                 <?php foreach ( $day_segments as $segment ) : ?>
                                     <?php $index = (int) $segment['_index']; ?>
                                     <?php $timeline_kind = (string) ( $segment['_timeline_kind'] ?? 'start' ); ?>

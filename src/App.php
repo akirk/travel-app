@@ -811,7 +811,57 @@ class App extends BaseApp {
             return $date;
         }
 
-        return wp_date( $include_year ? 'D, j. F Y' : 'D, j. F', $timestamp );
+        return wp_date( $this->get_date_label_format( $include_year ), $timestamp );
+    }
+
+    private function get_date_label_format( bool $include_year = true, bool $include_weekday = true ): string {
+        $format = (string) get_option( 'date_format' );
+        if ( '' === $format ) {
+            $format = 'F j, Y';
+        }
+
+        $localized_default_format = _x( 'F j, Y', 'date format' );
+        if ( 'F j, Y' === $format && 'F j, Y' !== $localized_default_format ) {
+            $format = $localized_default_format;
+        }
+
+        if ( ! $include_year ) {
+            $format = $this->remove_year_from_date_format( $format );
+        }
+
+        if ( $include_weekday && ! $this->date_format_has_unescaped_character( $format, [ 'D', 'l' ] ) ) {
+            $format = 'l, ' . $format;
+        }
+
+        return $format;
+    }
+
+    private function remove_year_from_date_format( string $format ): string {
+        $format = preg_replace( '/(^|[\s,.\-\/]+)(?<!\\\\)[YyoxX]([\s,.\-\/]+|$)/', '$1', $format );
+        $format = preg_replace( '/([\s,.\-\/]+)(?<!\\\\)[YyoxX]($|[\s,.\-\/]+)/', '$2', (string) $format );
+
+        return trim( (string) $format, " \t\n\r\0\x0B,.-/" );
+    }
+
+    private function date_format_has_unescaped_character( string $format, array $characters ): bool {
+        $escaped = false;
+        foreach ( str_split( $format ) as $character ) {
+            if ( $escaped ) {
+                $escaped = false;
+                continue;
+            }
+
+            if ( '\\' === $character ) {
+                $escaped = true;
+                continue;
+            }
+
+            if ( in_array( $character, $characters, true ) ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function format_date_range_label( string $starts, string $ends = '' ): string {

@@ -57,6 +57,22 @@ if ( '' === $demo_start ) {
     $demo_start = gmdate( 'Y-m-d' );
 }
 $demo_start_time = $demo_start . 'T12:00';
+
+$get_google_maps_url = static function( string $address ): string {
+    $address = trim( $address );
+
+    if ( '' === $address ) {
+        return '';
+    }
+
+    return add_query_arg(
+        [
+            'api'   => '1',
+            'query' => $address,
+        ],
+        'https://www.google.com/maps/search/'
+    );
+};
 ?>
 <!DOCTYPE html>
 <html <?php wp_app_language_attributes(); ?>>
@@ -307,6 +323,23 @@ $demo_start_time = $demo_start . 'T12:00';
         .type { color: var(--wp-app-color-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0; }
         .title { font-weight: 750; overflow-wrap: anywhere; }
         .detail { color: var(--wp-app-color-muted); overflow-wrap: anywhere; }
+        .detail a {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: inherit;
+            text-decoration: none;
+        }
+        .detail a:hover,
+        .detail a:focus,
+        .detail a:focus-visible {
+            color: var(--wp-app-color-link);
+            text-decoration: none;
+        }
+        .detail a:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
         .timeline-item .detail,
         .summary-grid .detail {
             font-size: 0.88rem;
@@ -640,10 +673,23 @@ $demo_start_time = $demo_start . 'T12:00';
                                                     <div class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></div>
                                                 <?php endif; ?>
                                                 <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
-                                                    <div class="detail"><?php echo esc_html( $segment['location'] ); ?></div>
+                                                    <?php $location = (string) $segment['location']; ?>
+                                                    <div class="detail">
+                                                        <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
+                                                            <span aria-hidden="true">&#x1F4CD;</span>
+                                                            <?php echo esc_html( $location ); ?>
+                                                        </a>
+                                                    </div>
                                                 <?php endif; ?>
                                                 <?php if ( $show_location && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
-                                                    <div class="detail"><?php echo esc_html( sprintf( __( 'To: %s', 'travel-app' ), $segment['end_location'] ) ); ?></div>
+                                                    <?php $end_location = (string) $segment['end_location']; ?>
+                                                    <div class="detail">
+                                                        <?php esc_html_e( 'To:', 'travel-app' ); ?>
+                                                        <a href="<?php echo esc_url( $get_google_maps_url( $end_location ) ); ?>" target="_blank" rel="noopener noreferrer">
+                                                            <span aria-hidden="true">&#x1F4CD;</span>
+                                                            <?php echo esc_html( $end_location ); ?>
+                                                        </a>
+                                                    </div>
                                                 <?php endif; ?>
                                                 <?php if ( ! empty( $segment['details'] ) ) : ?>
                                                     <div class="detail"><?php echo esc_html( $segment['details'] ); ?></div>

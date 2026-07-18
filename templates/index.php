@@ -482,6 +482,14 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         $quick_plan_trip_title = isset( $quick_plan_draft['trip_title'] )
                             ? (string) $quick_plan_draft['trip_title']
                             : ( ! empty( $quick_plan_segment['location'] ) ? (string) $quick_plan_segment['location'] : __( 'Quick Travel Plan', 'travel-app' ) );
+                        $quick_plan_parser = (string) ( $quick_plan_draft['parser'] ?? 'quick-plan' );
+                        $quick_plan_parser_labels = [
+                            'wp-ai-client' => __( 'AI extraction', 'travel-app' ),
+                            'quick-plan'   => __( 'quick planner fallback', 'travel-app' ),
+                            'fallback'     => __( 'basic parser fallback', 'travel-app' ),
+                            'ics'          => __( 'calendar parser', 'travel-app' ),
+                        ];
+                        $quick_plan_parser_label = $quick_plan_parser_labels[ $quick_plan_parser ] ?? $quick_plan_parser;
                         ?>
                         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                             <input type="hidden" name="action" value="travel_app_import">
@@ -489,6 +497,13 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                             <?php wp_nonce_field( 'travel_app_import' ); ?>
                             <p class="quick-plan-confirm">
                                 <?php esc_html_e( 'Review the parsed fields, update matches if needed, then choose where to save it.', 'travel-app' ); ?>
+                                <?php
+                                printf(
+                                    /* translators: %s: parser source label. */
+                                    esc_html__( ' Parsed with: %s.', 'travel-app' ),
+                                    esc_html( $quick_plan_parser_label )
+                                );
+                                ?>
                             </p>
                             <div class="quick-plan-fields">
                                 <label class="field-wide">

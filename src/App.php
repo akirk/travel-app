@@ -428,7 +428,7 @@ class App extends BaseApp {
 
         $parsed = $this->parse_itinerary_text( $text );
 
-        if ( '' === trim( $file_text ) && 'quick-plan' === (string) ( $parsed['parser'] ?? '' ) ) {
+        if ( '' === trim( $file_text ) && 1 === count( $parsed['segments'] ?? [] ) ) {
             $segment = $parsed['segments'][0] ?? [];
 
             if ( '' !== $segment['date'] ) {
@@ -439,21 +439,24 @@ class App extends BaseApp {
                         'segment'    => $segment,
                         'matches'    => $matches,
                         'trip_title' => $this->get_quick_plan_trip_title( $segment ),
+                        'parser'     => (string) ( $parsed['parser'] ?? 'fallback' ),
                     ] );
 
                     wp_safe_redirect( add_query_arg( 'quick_plan_draft', rawurlencode( $draft_key ), $redirect ) );
                     exit;
                 }
 
-                $trip_id = $this->save_trip( $parsed, $text );
+                if ( 'quick-plan' === (string) ( $parsed['parser'] ?? '' ) ) {
+                    $trip_id = $this->save_trip( $parsed, $text );
 
-                if ( is_wp_error( $trip_id ) ) {
-                    wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+                    if ( is_wp_error( $trip_id ) ) {
+                        wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+                        exit;
+                    }
+
+                    wp_safe_redirect( add_query_arg( 'imported', rawurlencode( (string) $trip_id ), $redirect ) );
                     exit;
                 }
-
-                wp_safe_redirect( add_query_arg( 'imported', rawurlencode( (string) $trip_id ), $redirect ) );
-                exit;
             }
         }
         $trip_id = $this->save_trip( $parsed, $text );
@@ -507,7 +510,7 @@ class App extends BaseApp {
                 'starts_at' => (string) $segment['date'],
                 'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
                 'segments'  => [ $segment ],
-                'parser'    => 'quick-plan',
+                'parser'    => sanitize_key( (string) ( $draft['parser'] ?? 'quick-plan' ) ),
             ], (string) ( $draft['text'] ?? '' ) );
             $item_id = 0;
         } else {

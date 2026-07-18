@@ -645,6 +645,7 @@ class App extends BaseApp {
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        $mode = isset( $_POST['share_mode'] ) ? sanitize_key( wp_unslash( $_POST['share_mode'] ) ) : 'fellow';
         check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
 
         if ( ! $this->get_user_trip( $trip_id ) ) {
@@ -652,16 +653,12 @@ class App extends BaseApp {
         }
 
         $this->clear_trip_public_cache( $trip_id );
-        delete_term_meta( $trip_id, '_travel_app_share_token' );
-        delete_term_meta( $trip_id, '_travel_app_public_share_token' );
+        delete_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ) );
 
         wp_send_json_success( [
+            'mode'    => $this->normalize_share_mode( $mode ),
             'url'     => '',
-            'urls'    => [
-                'fellow' => '',
-                'public' => '',
-            ],
-            'message' => __( 'Read-only timeline share links removed.', 'travel-app' ),
+            'message' => __( 'Read-only timeline share link removed.', 'travel-app' ),
         ] );
     }
 

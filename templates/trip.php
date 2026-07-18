@@ -871,18 +871,20 @@ $get_google_maps_url = static function( string $address ): string {
                                     <strong><?php esc_html_e( 'Fellow travellers', 'travel-app' ); ?></strong><br>
                                     <span class="empty"><?php esc_html_e( 'Includes addresses and attachments.', 'travel-app' ); ?></span>
                                 </span>
-                                <button class="ghost-button" type="button" data-share-copy data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                                <span class="share-actions">
+                                    <button class="ghost-button" type="button" data-share-copy data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                                    <button class="ghost-button" type="button" data-share-remove data-share-mode="fellow" <?php echo '' === $fellow_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                </span>
                             </div>
                             <div class="share-option">
                                 <span>
                                     <strong><?php esc_html_e( 'Others', 'travel-app' ); ?></strong><br>
                                     <span class="empty"><?php esc_html_e( 'Hides addresses and attachments.', 'travel-app' ); ?></span>
                                 </span>
-                                <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
-                            </div>
-                            <div class="share-actions">
-                                <button class="ghost-button" type="button" data-share-refresh><?php esc_html_e( 'Refresh', 'travel-app' ); ?></button>
-                                <button class="ghost-button" type="button" data-share-remove <?php echo '' === $fellow_share_url && '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                <span class="share-actions">
+                                    <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                                    <button class="ghost-button" type="button" data-share-remove data-share-mode="public" <?php echo '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                </span>
                             </div>
                         </div>
                         <p class="empty" data-share-status aria-live="polite"></p>
@@ -973,13 +975,12 @@ $get_google_maps_url = static function( string $address ): string {
                     return;
                 }
 
-                var removeButton = control.querySelector('[data-share-remove]');
-                var refreshButton = control.querySelector('[data-share-refresh]');
                 var copyButtons = Array.prototype.slice.call(control.querySelectorAll('[data-share-copy]'));
+                var removeButtons = Array.prototype.slice.call(control.querySelectorAll('[data-share-remove]'));
                 var primaryCopyButton = copyButtons[0] || null;
                 var status = control.querySelector('[data-share-status]');
                 var defaultCopyText = primaryCopyButton ? primaryCopyButton.textContent : '';
-                var copyResetTimer = null;
+                var copyResetTimers = {};
 
                 function setStatus(message) {
                     if (status) {
@@ -988,16 +989,10 @@ $get_google_maps_url = static function( string $address ): string {
                 }
 
                 function setBusy(isBusy) {
-                    [removeButton, refreshButton].concat(copyButtons).forEach(function(button) {
+                    removeButtons.concat(copyButtons).forEach(function(button) {
                         if (button) {
                             button.disabled = isBusy;
                         }
-                    });
-                }
-
-                function hasAnyShareUrl() {
-                    return copyButtons.some(function(button) {
-                        return !!button.getAttribute('data-share-url');
                     });
                 }
 
@@ -1008,55 +1003,39 @@ $get_google_maps_url = static function( string $address ): string {
                         }
                     });
 
-                    if (removeButton) {
-                        removeButton.hidden = !hasAnyShareUrl();
-                    }
-
-                    resetCopyButtons();
-                }
-
-                function setShareUrls(urls) {
-                    if (!urls) {
-                        return;
-                    }
-
-                    Object.keys(urls).forEach(function(mode) {
-                        setShareUrl(mode, urls[mode] || '');
+                    removeButtons.forEach(function(button) {
+                        if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
+                            button.hidden = !url;
+                        }
                     });
 
-                    if (removeButton) {
-                        removeButton.hidden = !hasAnyShareUrl();
-                    }
-
-                    resetCopyButtons();
+                    resetCopyButton(mode);
                 }
 
-                function setCopyButtonsText(text) {
+                function resetCopyButton(mode) {
                     copyButtons.forEach(function(button) {
-                        button.textContent = text;
+                        if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
+                            button.textContent = defaultCopyText;
+                            button.classList.remove('copied');
+                        }
                     });
                 }
 
-                function resetCopyButtons() {
+                function confirmCopied(mode) {
                     copyButtons.forEach(function(button) {
-                        button.textContent = defaultCopyText;
-                        button.classList.remove('copied');
-                    });
-                }
-
-                function confirmCopied() {
-                    setCopyButtonsText('<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>');
-                    copyButtons.forEach(function(button) {
-                        button.classList.add('copied');
+                        if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
+                            button.textContent = '<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>';
+                            button.classList.add('copied');
+                        }
                     });
                     setStatus('<?php echo esc_js( __( 'Share link copied.', 'travel-app' ) ); ?>');
 
-                    if (copyResetTimer) {
-                        window.clearTimeout(copyResetTimer);
+                    if (copyResetTimers[mode]) {
+                        window.clearTimeout(copyResetTimers[mode]);
                     }
 
-                    copyResetTimer = window.setTimeout(function() {
-                        resetCopyButtons();
+                    copyResetTimers[mode] = window.setTimeout(function() {
+                        resetCopyButton(mode);
                     }, 1800);
                 }
 
@@ -1088,9 +1067,7 @@ $get_google_maps_url = static function( string $address ): string {
                             return data.data || {};
                         });
                     }).then(function(data) {
-                        if (data.urls) {
-                            setShareUrls(data.urls);
-                        } else if (data.mode) {
+                        if (data.mode) {
                             setShareUrl(data.mode, data.url || '');
                         }
                         setStatus(data.message || '');
@@ -1103,30 +1080,24 @@ $get_google_maps_url = static function( string $address ): string {
                     });
                 }
 
-                if (removeButton) {
+                removeButtons.forEach(function(removeButton) {
                     removeButton.addEventListener('click', function() {
-                        requestShareAction('travel_app_remove_share_link');
+                        requestShareAction('travel_app_remove_share_link', removeButton.getAttribute('data-share-mode') || 'fellow');
                     });
-                }
+                });
 
-                if (refreshButton) {
-                    refreshButton.addEventListener('click', function() {
-                        requestShareAction('travel_app_clear_share_cache');
-                    });
-                }
-
-                function copyShareUrl(url) {
+                function copyShareUrl(url, mode) {
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         return navigator.clipboard.writeText(url).then(function() {
-                            confirmCopied();
+                            confirmCopied(mode);
                         }).catch(function() {
                             window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
-                            confirmCopied();
+                            confirmCopied(mode);
                         });
                     }
 
                     window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
-                    confirmCopied();
+                    confirmCopied(mode);
                     return Promise.resolve();
                 }
 
@@ -1136,20 +1107,20 @@ $get_google_maps_url = static function( string $address ): string {
                         var url = copyButton.getAttribute('data-share-url') || '';
 
                         if (url) {
-                            copyShareUrl(url);
+                            copyShareUrl(url, mode);
                             return;
                         }
 
                         copyButton.textContent = '<?php echo esc_js( __( 'Generating...', 'travel-app' ) ); ?>';
                         requestShareAction('travel_app_generate_share_link', mode).then(function(data) {
                             if (data && data.url) {
-                                copyShareUrl(data.url);
+                                copyShareUrl(data.url, mode);
                                 return;
                             }
 
-                            resetCopyButtons();
+                            resetCopyButton(mode);
                         }).catch(function() {
-                            resetCopyButtons();
+                            resetCopyButton(mode);
                         });
                     });
                 });

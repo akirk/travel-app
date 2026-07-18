@@ -296,6 +296,271 @@ class App extends BaseApp {
             ],
         ] );
 
+        wp_register_ability( 'travel-app/get-trip', [
+            'label'               => __( 'Get Travel Plan', 'travel-app' ),
+            'description'         => 'Returns full details for one saved travel plan owned by the current user, including itinerary items, attachments, existing share links, and app URLs.',
+            'category'            => 'travel-app',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'id' => [
+                        'type'        => 'integer',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
+                    ],
+                ],
+                'required'             => [ 'id' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'id'            => [ 'type' => 'integer' ],
+                    'title'         => [ 'type' => 'string' ],
+                    'starts_at'     => [ 'type' => 'string' ],
+                    'ends_at'       => [ 'type' => 'string' ],
+                    'segment_count' => [ 'type' => 'integer' ],
+                    'segments'      => [ 'type' => 'array' ],
+                    'url'           => [ 'type' => 'string' ],
+                    'share_urls'    => [ 'type' => 'object' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'get_ability_trip' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Use this before editing or deleting itinerary items so item IDs and current values are known. When summarizing, group items by date and call out missing dates, times, or locations.',
+                    'readonly'     => true,
+                    'destructive'  => false,
+                    'idempotent'   => true,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'travel-app/update-travel-plan', [
+            'label'               => __( 'Rename Travel Plan', 'travel-app' ),
+            'description'         => 'Renames one travel plan owned by the current user.',
+            'category'            => 'travel-app',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'id'    => [
+                        'type'        => 'integer',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
+                    ],
+                    'title' => [
+                        'type'        => 'string',
+                        'description' => 'New travel plan title.',
+                    ],
+                ],
+                'required'             => [ 'id', 'title' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'updated' => [ 'type' => 'boolean' ],
+                    'trip'    => [ 'type' => 'object' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'update_ability_trip' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Use this when the user asks to rename or retitle a travel plan. Return the updated Travel App link.',
+                    'readonly'     => false,
+                    'destructive'  => false,
+                    'idempotent'   => true,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'travel-app/add-itinerary-item', [
+            'label'               => __( 'Add Itinerary Item', 'travel-app' ),
+            'description'         => 'Adds a flight, lodging, train, car, activity, or other itinerary item to an existing travel plan owned by the current user.',
+            'category'            => 'travel-app',
+            'input_schema'        => $this->get_itinerary_item_ability_input_schema( true ),
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'added'   => [ 'type' => 'boolean' ],
+                    'item_id' => [ 'type' => 'integer' ],
+                    'trip'    => [ 'type' => 'object' ],
+                    'url'     => [ 'type' => 'string' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'add_ability_segment' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Use this for adding one new reservation or plan to an existing trip. If the target trip is ambiguous, list or get trips first and ask the user to choose.',
+                    'readonly'     => false,
+                    'destructive'  => false,
+                    'idempotent'   => false,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'travel-app/update-itinerary-item', [
+            'label'               => __( 'Update Itinerary Item', 'travel-app' ),
+            'description'         => 'Updates selected fields on one itinerary item owned by the current user. Omitted item fields keep their existing values.',
+            'category'            => 'travel-app',
+            'input_schema'        => $this->get_itinerary_item_ability_input_schema( false ),
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'updated' => [ 'type' => 'boolean' ],
+                    'item_id' => [ 'type' => 'integer' ],
+                    'trip'    => [ 'type' => 'object' ],
+                    'url'     => [ 'type' => 'string' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'update_ability_segment' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Call travel-app/get-trip first unless the item ID and existing item values are already known. Preserve fields the user did not ask to change.',
+                    'readonly'     => false,
+                    'destructive'  => false,
+                    'idempotent'   => true,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'travel-app/delete-itinerary-item', [
+            'label'               => __( 'Delete Itinerary Item', 'travel-app' ),
+            'description'         => 'Moves one itinerary item owned by the current user to the trash.',
+            'category'            => 'travel-app',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'trip_id' => [
+                        'type'        => 'integer',
+                        'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
+                    ],
+                    'item_id' => [
+                        'type'        => 'integer',
+                        'description' => 'Itinerary item ID from the trip segments returned by travel-app/get-trip.',
+                    ],
+                ],
+                'required'             => [ 'trip_id', 'item_id' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'deleted' => [ 'type' => 'boolean' ],
+                    'item_id' => [ 'type' => 'integer' ],
+                    'trip'    => [ 'type' => 'object' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'delete_ability_segment' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Confirm the exact itinerary item before deleting when the request is ambiguous. Use get-trip first to map user-visible item descriptions to item IDs.',
+                    'readonly'     => false,
+                    'destructive'  => true,
+                    'idempotent'   => false,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'travel-app/create-share-link', [
+            'label'               => __( 'Create Travel Plan Share Link', 'travel-app' ),
+            'description'         => 'Creates or returns an existing read-only timeline share link for one travel plan owned by the current user.',
+            'category'            => 'travel-app',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'id'   => [
+                        'type'        => 'integer',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
+                    ],
+                    'mode' => [
+                        'type'        => 'string',
+                        'enum'        => [ 'fellow', 'public' ],
+                        'description' => 'Use fellow for private sharing with travel companions, public for a more public read-only link.',
+                        'default'     => 'fellow',
+                    ],
+                ],
+                'required'             => [ 'id' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'id'   => [ 'type' => 'integer' ],
+                    'mode' => [ 'type' => 'string' ],
+                    'url'  => [ 'type' => 'string' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'create_ability_share_link' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Use this when the user asks to share a trip or create a read-only timeline link. Tell the user it is read-only.',
+                    'readonly'     => false,
+                    'destructive'  => false,
+                    'idempotent'   => true,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'travel-app/remove-share-link', [
+            'label'               => __( 'Remove Travel Plan Share Link', 'travel-app' ),
+            'description'         => 'Removes a read-only share link for one travel plan owned by the current user.',
+            'category'            => 'travel-app',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'id'   => [
+                        'type'        => 'integer',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
+                    ],
+                    'mode' => [
+                        'type'        => 'string',
+                        'enum'        => [ 'fellow', 'public' ],
+                        'description' => 'Which share link to remove.',
+                        'default'     => 'fellow',
+                    ],
+                ],
+                'required'             => [ 'id' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'removed' => [ 'type' => 'boolean' ],
+                    'id'      => [ 'type' => 'integer' ],
+                    'mode'    => [ 'type' => 'string' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'remove_ability_share_link' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Confirm the exact travel plan and share mode before removing a link when the request is ambiguous.',
+                    'readonly'     => false,
+                    'destructive'  => true,
+                    'idempotent'   => false,
+                ],
+            ],
+        ] );
+
         wp_register_ability( 'travel-app/delete-travel-plan', [
             'label'               => __( 'Delete Travel Plan', 'travel-app' ),
             'description'         => 'Deletes one saved travel plan owned by the current user and moves its itinerary items to the trash.',
@@ -339,14 +604,105 @@ class App extends BaseApp {
         ];
     }
 
+    private function get_itinerary_item_ability_input_schema( bool $creating ): array {
+        $segment = [
+            'type'                 => 'object',
+            'properties'           => [
+                'type' => [
+                    'type'        => 'string',
+                    'enum'        => [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ],
+                    'description' => 'Kind of itinerary item.',
+                ],
+                'title' => [
+                    'type'        => 'string',
+                    'description' => 'Short user-visible item title, such as a flight number, hotel name, or activity name.',
+                ],
+                'date' => [
+                    'type'        => 'string',
+                    'description' => 'Start date in YYYY-MM-DD format.',
+                ],
+                'end_date' => [
+                    'type'        => 'string',
+                    'description' => 'End date in YYYY-MM-DD format, when different from date.',
+                ],
+                'time' => [
+                    'type'        => 'string',
+                    'description' => 'Start time in 24-hour HH:MM format when known.',
+                ],
+                'end_time' => [
+                    'type'        => 'string',
+                    'description' => 'End time in 24-hour HH:MM format when known.',
+                ],
+                'starts_at_utc' => [
+                    'type'        => 'string',
+                    'description' => 'Optional UTC start timestamp from a booking or calendar source.',
+                ],
+                'ends_at_utc' => [
+                    'type'        => 'string',
+                    'description' => 'Optional UTC end timestamp from a booking or calendar source.',
+                ],
+                'timezone' => [
+                    'type'        => 'string',
+                    'description' => 'IANA timezone when known, such as Europe/Berlin.',
+                ],
+                'location' => [
+                    'type'        => 'string',
+                    'description' => 'Start location, hotel, venue, airport, station, or city.',
+                ],
+                'end_location' => [
+                    'type'        => 'string',
+                    'description' => 'Destination location for transport items.',
+                ],
+                'url' => [
+                    'type'        => 'string',
+                    'description' => 'Booking, map, or reference URL.',
+                ],
+                'details' => [
+                    'type'        => 'string',
+                    'description' => 'Additional reservation details, confirmation numbers, notes, or instructions.',
+                ],
+            ],
+            'additionalProperties' => false,
+        ];
+
+        $schema = [
+            'type'                 => 'object',
+            'properties'           => [
+                'trip_id' => [
+                    'type'        => 'integer',
+                    'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
+                ],
+                'segment' => $segment,
+            ],
+            'required'             => [ 'trip_id', 'segment' ],
+            'additionalProperties' => false,
+        ];
+
+        if ( ! $creating ) {
+            $schema['properties']['item_id'] = [
+                'type'        => 'integer',
+                'description' => 'Itinerary item ID from the trip segments returned by travel-app/get-trip.',
+            ];
+            $schema['required'] = [ 'trip_id', 'item_id', 'segment' ];
+        }
+
+        return $schema;
+    }
+
     public function register_ai_assistant_ability_domains( array $domains ): array {
-        $domains['travel-app'] = 'Travel App, itinerary, travel plans, flights, lodging, booking confirmations, reservations, travel organizer';
+        $domains['travel-app'] = 'Travel App, itinerary, travel plans, trips, trip timeline, flights, lodging, hotels, trains, rental cars, activities, booking confirmations, reservations, travel organizer, share trip';
         return $domains;
     }
 
     public function get_ai_assistant_ability_instructions( string $instructions, string $ability_id, $args, $result ): string {
         if ( 'travel-app/import-itinerary' === $ability_id && ! empty( $result['id'] ) ) {
             $instructions = 'Tell the user the travel plan was saved. Summarize title, dates, and travel segments, then link to the Travel App URL if present.';
+        } elseif ( in_array( $ability_id, [ 'travel-app/add-itinerary-item', 'travel-app/update-itinerary-item', 'travel-app/delete-itinerary-item', 'travel-app/update-travel-plan' ], true ) && ! empty( $result['trip']['url'] ) ) {
+            $instructions = 'Tell the user what changed and include the Travel App URL for review.';
+        } elseif ( 'travel-app/create-share-link' === $ability_id && ! empty( $result['url'] ) ) {
+            $instructions = 'Tell the user the read-only travel timeline share link is ready and include the URL.';
+        } elseif ( 'travel-app/get-trip' === $ability_id && ! empty( $result['id'] ) ) {
+            $instructions = 'Summarize the travel plan by date. Mention any itinerary items missing dates, times, locations, or confirmation details.';
         }
 
         return $instructions;
@@ -355,7 +711,7 @@ class App extends BaseApp {
     public function register_ai_assistant_welcome_tips( array $tips, array $context ): array {
         $tips['travel-app'] = [
             __( 'Paste a booking confirmation and ask me to add it to Travel App.', 'travel-app' ),
-            __( 'Ask me to summarize your saved travel plans or find the next reservation.', 'travel-app' ),
+            __( 'Ask me to summarize, update, or share one of your saved travel plans.', 'travel-app' ),
         ];
 
         return $tips;
@@ -380,6 +736,135 @@ class App extends BaseApp {
         $output['url'] = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
 
         return $output;
+    }
+
+    public function get_ability_trip( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $trip_id = isset( $input['id'] ) ? absint( $input['id'] ) : 0;
+        $term = $this->get_user_trip( $trip_id );
+
+        if ( ! $term ) {
+            return new \WP_Error( 'trip_not_found', __( 'This travel plan could not be found.', 'travel-app' ) );
+        }
+
+        return $this->format_trip_for_ability_output( $term );
+    }
+
+    public function update_ability_trip( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $trip_id = isset( $input['id'] ) ? absint( $input['id'] ) : 0;
+        $title = isset( $input['title'] ) ? (string) $input['title'] : '';
+        $updated = $this->update_user_trip_title( $trip_id, $title );
+
+        if ( is_wp_error( $updated ) ) {
+            return $updated;
+        }
+
+        return [
+            'updated' => true,
+            'trip'    => $this->format_trip_for_ability_output( $trip_id ),
+        ];
+    }
+
+    public function add_ability_segment( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $trip_id = isset( $input['trip_id'] ) ? absint( $input['trip_id'] ) : 0;
+        $segment = isset( $input['segment'] ) && is_array( $input['segment'] ) ? $input['segment'] : [];
+        $item_id = $this->add_user_trip_segment( $trip_id, $segment );
+
+        if ( is_wp_error( $item_id ) ) {
+            return $item_id;
+        }
+
+        return [
+            'added'   => true,
+            'item_id' => (int) $item_id,
+            'trip'    => $this->format_trip_for_ability_output( $trip_id ),
+            'url'     => home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . (int) $item_id . '/' ),
+        ];
+    }
+
+    public function update_ability_segment( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $trip_id = isset( $input['trip_id'] ) ? absint( $input['trip_id'] ) : 0;
+        $item_id = isset( $input['item_id'] ) ? absint( $input['item_id'] ) : 0;
+        $current = $this->get_user_trip_segment( $trip_id, $item_id );
+
+        if ( ! $current ) {
+            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
+        }
+
+        $changes = isset( $input['segment'] ) && is_array( $input['segment'] ) ? $input['segment'] : [];
+        $segment = array_merge( $current, $changes );
+        $updated = $this->update_user_trip_segment( $trip_id, $item_id, $segment );
+
+        if ( is_wp_error( $updated ) ) {
+            return $updated;
+        }
+
+        return [
+            'updated' => true,
+            'item_id' => $item_id,
+            'trip'    => $this->format_trip_for_ability_output( $trip_id ),
+            'url'     => home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $item_id . '/' ),
+        ];
+    }
+
+    public function delete_ability_segment( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $trip_id = isset( $input['trip_id'] ) ? absint( $input['trip_id'] ) : 0;
+        $item_id = isset( $input['item_id'] ) ? absint( $input['item_id'] ) : 0;
+        $deleted = $this->delete_user_trip_segment( $trip_id, $item_id );
+
+        if ( is_wp_error( $deleted ) ) {
+            return $deleted;
+        }
+
+        return [
+            'deleted' => true,
+            'item_id' => $item_id,
+            'trip'    => $this->format_trip_for_ability_output( $trip_id ),
+        ];
+    }
+
+    public function create_ability_share_link( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $trip_id = isset( $input['id'] ) ? absint( $input['id'] ) : 0;
+        $mode = isset( $input['mode'] ) ? (string) $input['mode'] : 'fellow';
+        $token = $this->create_trip_share_token( $trip_id, $mode );
+
+        if ( '' === $token ) {
+            return new \WP_Error( 'share_forbidden', __( 'This travel plan cannot be shared.', 'travel-app' ) );
+        }
+
+        $this->clear_trip_public_cache( $trip_id );
+        $mode = $this->normalize_share_mode( $mode );
+
+        return [
+            'id'   => $trip_id,
+            'mode' => $mode,
+            'url'  => $this->get_trip_share_url( $trip_id, $mode ),
+        ];
+    }
+
+    public function remove_ability_share_link( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $trip_id = isset( $input['id'] ) ? absint( $input['id'] ) : 0;
+        $mode = isset( $input['mode'] ) ? (string) $input['mode'] : 'fellow';
+
+        if ( ! $this->get_user_trip( $trip_id ) ) {
+            return new \WP_Error( 'share_forbidden', __( 'This travel plan cannot be updated.', 'travel-app' ) );
+        }
+
+        $mode = $this->normalize_share_mode( $mode );
+        $this->clear_trip_public_cache( $trip_id );
+        delete_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ) );
+
+        return [
+            'removed' => true,
+            'id'      => $trip_id,
+            'mode'    => $mode,
+        ];
     }
 
     public function delete_ability_trip( $input ) {
@@ -1279,6 +1764,22 @@ class App extends BaseApp {
             'segment_count' => count( $segments ),
             'parser'        => (string) get_term_meta( $term->term_id, '_travel_app_parser', true ),
         ];
+    }
+
+    private function format_trip_for_ability_output( $term ): array {
+        $trip = $this->format_trip_for_output( $term );
+        if ( empty( $trip['id'] ) ) {
+            return [];
+        }
+
+        $trip_id = (int) $trip['id'];
+        $trip['url'] = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
+        $trip['share_urls'] = [
+            'fellow' => $this->get_trip_share_url( $trip_id, 'fellow' ),
+            'public' => $this->get_trip_share_url( $trip_id, 'public' ),
+        ];
+
+        return $trip;
     }
 
     private function get_trip_share_token( int $trip_id, string $mode = 'fellow' ): string {

@@ -70,6 +70,8 @@ final class GenericParserTest extends TestCase {
         $parsed = ( new GenericParser() )->parse( 'Hotel reservation August 1, 2026 15:00' );
 
         self::assertSame( 'fallback', $parsed['parser'] );
+        self::assertSame( 'ai_invalid_json', $parsed['parser_error']['code'] );
+        self::assertSame( 'The AI response did not include JSON.', $parsed['parser_error']['message'] );
         self::assertNotEmpty( $parsed['segments'] );
     }
 }

@@ -440,6 +440,7 @@ class App extends BaseApp {
                         'matches'    => $matches,
                         'trip_title' => $this->get_quick_plan_trip_title( $segment ),
                         'parser'     => (string) ( $parsed['parser'] ?? 'fallback' ),
+                        'parser_error' => $parsed['parser_error'] ?? [],
                     ] );
 
                     wp_safe_redirect( add_query_arg( 'quick_plan_draft', rawurlencode( $draft_key ), $redirect ) );
@@ -1439,6 +1440,24 @@ class App extends BaseApp {
             'ends_at'     => sanitize_text_field( (string) ( $data['ends_at'] ?? '' ) ),
             'segments'    => array_values( array_map( [ $this, 'normalize_segment' ], $segments ) ),
             'parser'      => sanitize_key( (string) ( $data['parser'] ?? 'fallback' ) ),
+            'parser_error' => $this->normalize_parser_error( $data['parser_error'] ?? [] ),
+        ];
+    }
+
+    private function normalize_parser_error( $error ): array {
+        if ( ! is_array( $error ) ) {
+            return [];
+        }
+
+        $code = sanitize_key( (string) ( $error['code'] ?? '' ) );
+        $message = sanitize_text_field( (string) ( $error['message'] ?? '' ) );
+        if ( '' === $code && '' === $message ) {
+            return [];
+        }
+
+        return [
+            'code'    => $code,
+            'message' => $message,
         ];
     }
 

@@ -7,7 +7,13 @@ class GenericParser {
         $parsed = ( new AiParser() )->parse( $text );
 
         if ( is_wp_error( $parsed ) ) {
-            return $this->fallback_parse( $text );
+            $fallback = $this->fallback_parse( $text );
+            $fallback['parser_error'] = [
+                'code'    => $parsed->get_error_code(),
+                'message' => $parsed->get_error_message(),
+            ];
+
+            return $fallback;
         }
 
         return $parsed;

@@ -1333,6 +1333,7 @@ class App extends BaseApp {
                     'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
                     'segments'  => [ $segment ],
                     'parser'    => 'quick-plan',
+                    'parser_error' => $parsed['parser_error'] ?? [],
                 ];
             }
         }

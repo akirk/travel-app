@@ -7,6 +7,7 @@ use WpApp\BaseApp;
 use WpApp\BaseStorage;
 use TravelApp\Parser\GenericParser;
 use TravelApp\Parser\IcsParser;
+use TravelApp\Parser\QuickPlanParser;
 
 class App extends BaseApp {
     private static $instance = null;
@@ -400,6 +401,15 @@ class App extends BaseApp {
         check_admin_referer( 'travel_app_import' );
 
         $redirect = home_url( '/' . $this->get_url_path() . '/' );
+        $draft_key = isset( $_POST['quick_plan_draft'] ) ? sanitize_key( wp_unslash( $_POST['quick_plan_draft'] ) ) : '';
+        if ( '' !== $draft_key ) {
+            $target = isset( $_POST['quick_plan_target'] ) ? sanitize_text_field( wp_unslash( $_POST['quick_plan_target'] ) ) : '';
+            if ( isset( $_POST['quick_plan_update_draft'] ) ) {
+                $this->update_quick_plan_draft_submission( $draft_key, $redirect );
+            }
+            $this->save_quick_plan_draft_submission( $draft_key, $target, $redirect );
+        }
+
         $text = isset( $_POST['itinerary_text'] ) ? (string) wp_unslash( $_POST['itinerary_text'] ) : '';
         $file_text = $this->get_uploaded_itinerary_text();
         if ( is_wp_error( $file_text ) ) {
@@ -416,6 +426,41 @@ class App extends BaseApp {
             exit;
         }
 
+        if ( '' === trim( $file_text ) && $this->is_quick_plan_text( $text ) ) {
+            $segment = $this->parse_quick_plan_text( $text );
+
+            if ( '' !== $segment['date'] ) {
+                $matches = $this->find_quick_plan_trip_matches( $segment, $text );
+                if ( ! empty( $matches ) ) {
+                    $draft_key = $this->store_quick_plan_draft( [
+                        'text'       => sanitize_text_field( wp_unslash( $text ) ),
+                        'segment'    => $segment,
+                        'matches'    => $matches,
+                        'trip_title' => $this->get_quick_plan_trip_title( $segment ),
+                    ] );
+
+                    wp_safe_redirect( add_query_arg( 'quick_plan_draft', rawurlencode( $draft_key ), $redirect ) );
+                    exit;
+                }
+
+                $trip_id = $this->save_trip( [
+                    'title'     => $this->get_quick_plan_trip_title( $segment ),
+                    'starts_at' => (string) $segment['date'],
+                    'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
+                    'segments'  => [ $segment ],
+                    'parser'    => 'quick-plan',
+                ], $text );
+
+                if ( is_wp_error( $trip_id ) ) {
+                    wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+                    exit;
+                }
+
+                wp_safe_redirect( add_query_arg( 'imported', rawurlencode( (string) $trip_id ), $redirect ) );
+                exit;
+            }
+        }
+
         $parsed = $this->parse_itinerary_text( $text );
         $trip_id = $this->save_trip( $parsed, $text );
 
@@ -425,6 +470,79 @@ class App extends BaseApp {
         }
 
         wp_safe_redirect( add_query_arg( 'imported', rawurlencode( (string) $trip_id ), $redirect ) );
+        exit;
+    }
+
+    private function update_quick_plan_draft_submission( string $draft_key, string $redirect ): void {
+        $draft = $this->get_quick_plan_draft( $draft_key );
+        if ( empty( $draft ) ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
+            exit;
+        }
+
+        $segment = $this->segment_from_request();
+        if ( empty( $segment ) || empty( $segment['date'] ) ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
+            exit;
+        }
+
+        $source_text = (string) ( $draft['text'] ?? '' );
+        $trip_title = isset( $_POST['quick_plan_trip_title'] ) ? sanitize_text_field( wp_unslash( $_POST['quick_plan_trip_title'] ) ) : '';
+        $draft['segment'] = $segment;
+        $draft['matches'] = $this->find_quick_plan_trip_matches( $segment, $source_text . ' ' . $segment['title'] . ' ' . $segment['location'] );
+        $draft['trip_title'] = '' !== trim( $trip_title ) ? $trip_title : $this->get_quick_plan_trip_title( $segment );
+        set_transient( $this->get_quick_plan_transient_name( $draft_key ), $draft, 15 * MINUTE_IN_SECONDS );
+
+        wp_safe_redirect( add_query_arg( 'quick_plan_draft', rawurlencode( $draft_key ), $redirect ) );
+        exit;
+    }
+
+    private function save_quick_plan_draft_submission( string $draft_key, string $target, string $redirect ): void {
+        $draft = $this->get_quick_plan_draft( $draft_key );
+
+        $segment = $this->segment_from_request();
+        if ( empty( $segment ) || empty( $segment['date'] ) ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
+            exit;
+        }
+
+        if ( 'new' === $target || '' === $target ) {
+            $trip_title = isset( $_POST['quick_plan_trip_title'] ) ? sanitize_text_field( wp_unslash( $_POST['quick_plan_trip_title'] ) ) : '';
+            $trip_id = $this->save_trip( [
+                'title'     => '' !== trim( $trip_title ) ? $trip_title : $this->get_quick_plan_trip_title( $segment ),
+                'starts_at' => (string) $segment['date'],
+                'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
+                'segments'  => [ $segment ],
+                'parser'    => 'quick-plan',
+            ], (string) ( $draft['text'] ?? '' ) );
+            $item_id = 0;
+        } else {
+            $trip_id = absint( $target );
+            $item_id = $this->add_user_trip_segment( $trip_id, $segment );
+        }
+
+        if ( '' !== $draft_key ) {
+            delete_transient( $this->get_quick_plan_transient_name( $draft_key ) );
+        }
+
+        if ( is_wp_error( $trip_id ) ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+            exit;
+        }
+
+        if ( is_wp_error( $item_id ) ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $item_id->get_error_code() ), $redirect ) );
+            exit;
+        }
+
+        $trip_url = home_url( '/' . $this->get_url_path() . '/trip/' . absint( $trip_id ) . '/' );
+        if ( $item_id ) {
+            $trip_url = add_query_arg( 'updated', rawurlencode( (string) $item_id ), $trip_url ) . '#segment-' . $item_id;
+        } else {
+            $trip_url = add_query_arg( 'imported', rawurlencode( (string) $trip_id ), $trip_url );
+        }
+
+        wp_safe_redirect( $trip_url );
         exit;
     }
 
@@ -877,6 +995,15 @@ class App extends BaseApp {
         return $item ? $this->format_segment_for_output( $item ) : null;
     }
 
+    public function get_quick_plan_draft( string $draft_key ): array {
+        if ( '' === $draft_key || ! is_user_logged_in() ) {
+            return [];
+        }
+
+        $draft = get_transient( $this->get_quick_plan_transient_name( $draft_key ) );
+        return is_array( $draft ) ? $draft : [];
+    }
+
     public function format_trip_for_output( $term, ?int $user_id = null ): array {
         if ( is_numeric( $term ) ) {
             $term = get_term( (int) $term, 'travel_app_trip' );
@@ -1199,6 +1326,97 @@ class App extends BaseApp {
             : ( new GenericParser() )->parse( $text );
 
         return $this->normalize_trip_data( $parsed );
+    }
+
+    public function parse_quick_plan_text( string $text ): array {
+        return $this->normalize_segment( ( new QuickPlanParser() )->parse( $text ) );
+    }
+
+    private function is_quick_plan_text( string $text ): bool {
+        return ( new QuickPlanParser() )->looks_like_quick_plan( $text );
+    }
+
+    private function find_quick_plan_trip_matches( array $segment, string $text ): array {
+        $date = (string) ( $segment['date'] ?? '' );
+        if ( '' === $date ) {
+            return [];
+        }
+
+        $matches = [];
+        foreach ( array_map( [ $this, 'format_trip_for_output' ], $this->get_user_trips() ) as $trip_data ) {
+            $starts = (string) ( $trip_data['starts_at'] ?? '' );
+            $ends = (string) ( $trip_data['ends_at'] ?? '' );
+            $date_matches = '' !== $starts && $starts <= $date && ( '' === $ends || $ends >= $date );
+            $location_matches = $this->quick_plan_text_matches_trip_location( $text, $segment, $trip_data );
+
+            if ( ! $date_matches ) {
+                continue;
+            }
+
+            $score = ( $date_matches ? 2 : 0 ) + ( $location_matches ? 1 : 0 );
+            $matches[] = [
+                'id'               => (int) ( $trip_data['id'] ?? 0 ),
+                'title'            => (string) ( $trip_data['title'] ?? '' ),
+                'starts_at'        => $starts,
+                'ends_at'          => $ends,
+                'date_matches'     => $date_matches,
+                'location_matches' => $location_matches,
+                'score'            => $score,
+            ];
+        }
+
+        usort( $matches, static function( array $a, array $b ): int {
+            return (int) $b['score'] <=> (int) $a['score'];
+        } );
+
+        return array_slice( $matches, 0, 5 );
+    }
+
+    private function quick_plan_text_matches_trip_location( string $text, array $segment, array $trip_data ): bool {
+        $needle_text = $this->normalize_quick_plan_match_text( $text . ' ' . (string) ( $segment['location'] ?? '' ) );
+        $trip_text = $this->normalize_quick_plan_match_text( (string) ( $trip_data['title'] ?? '' ) );
+
+        foreach ( (array) ( $trip_data['segments'] ?? [] ) as $trip_segment ) {
+            $trip_text .= ' ' . $this->normalize_quick_plan_match_text( (string) ( $trip_segment['location'] ?? '' ) );
+            $trip_text .= ' ' . $this->normalize_quick_plan_match_text( (string) ( $trip_segment['end_location'] ?? '' ) );
+        }
+
+        foreach ( preg_split( '/\s+/', $needle_text ) as $token ) {
+            if ( strlen( $token ) >= 4 && false !== strpos( ' ' . $trip_text . ' ', ' ' . $token . ' ' ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalize_quick_plan_match_text( string $text ): string {
+        $text = strtolower( remove_accents( $text ) );
+        $text = preg_replace( '/[^a-z0-9]+/', ' ', $text );
+
+        return trim( (string) $text );
+    }
+
+    private function store_quick_plan_draft( array $draft ): string {
+        $key = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : wp_generate_password( 20, false, false );
+        set_transient( $this->get_quick_plan_transient_name( $key ), $draft, 15 * MINUTE_IN_SECONDS );
+
+        return $key;
+    }
+
+    private function get_quick_plan_transient_name( string $key ): string {
+        return 'travel_app_quick_plan_' . get_current_user_id() . '_' . sanitize_key( $key );
+    }
+
+    private function get_quick_plan_trip_title( array $segment ): string {
+        $location = trim( (string) ( $segment['location'] ?? '' ) );
+        $date = trim( (string) ( $segment['date'] ?? '' ) );
+
+        if ( '' !== $location ) {
+            return $location;
+        }
+
+        return __( 'Quick Travel Plan', 'travel-app' );
     }
 
     private function normalize_trip_data( array $data ): array {

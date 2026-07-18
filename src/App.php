@@ -426,8 +426,10 @@ class App extends BaseApp {
             exit;
         }
 
-        if ( '' === trim( $file_text ) && $this->is_quick_plan_text( $text ) ) {
-            $segment = $this->parse_quick_plan_text( $text );
+        $parsed = $this->parse_itinerary_text( $text );
+
+        if ( '' === trim( $file_text ) && 'quick-plan' === (string) ( $parsed['parser'] ?? '' ) ) {
+            $segment = $parsed['segments'][0] ?? [];
 
             if ( '' !== $segment['date'] ) {
                 $matches = $this->find_quick_plan_trip_matches( $segment, $text );
@@ -443,13 +445,7 @@ class App extends BaseApp {
                     exit;
                 }
 
-                $trip_id = $this->save_trip( [
-                    'title'     => $this->get_quick_plan_trip_title( $segment ),
-                    'starts_at' => (string) $segment['date'],
-                    'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
-                    'segments'  => [ $segment ],
-                    'parser'    => 'quick-plan',
-                ], $text );
+                $trip_id = $this->save_trip( $parsed, $text );
 
                 if ( is_wp_error( $trip_id ) ) {
                     wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
@@ -460,8 +456,6 @@ class App extends BaseApp {
                 exit;
             }
         }
-
-        $parsed = $this->parse_itinerary_text( $text );
         $trip_id = $this->save_trip( $parsed, $text );
 
         if ( is_wp_error( $trip_id ) ) {
@@ -1321,9 +1315,23 @@ class App extends BaseApp {
 
     public function parse_itinerary_text( string $text ): array {
         $ics_parser = new IcsParser();
-        $parsed = $ics_parser->supports( $text )
-            ? $ics_parser->parse( $text )
-            : ( new GenericParser() )->parse( $text );
+        if ( $ics_parser->supports( $text ) ) {
+            return $this->normalize_trip_data( $ics_parser->parse( $text ) );
+        }
+
+        $parsed = ( new GenericParser() )->parse( $text );
+        if ( 'fallback' === (string) ( $parsed['parser'] ?? '' ) && $this->is_quick_plan_text( $text ) ) {
+            $segment = $this->parse_quick_plan_text( $text );
+            if ( '' !== $segment['date'] ) {
+                $parsed = [
+                    'title'     => $this->get_quick_plan_trip_title( $segment ),
+                    'starts_at' => (string) $segment['date'],
+                    'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
+                    'segments'  => [ $segment ],
+                    'parser'    => 'quick-plan',
+                ];
+            }
+        }
 
         return $this->normalize_trip_data( $parsed );
     }

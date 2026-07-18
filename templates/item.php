@@ -10,6 +10,8 @@ $trip       = $travel_app->get_user_trip( $trip_id );
 $trip_data  = $trip ? $travel_app->format_trip_for_output( $trip ) : null;
 $segment    = $trip ? $travel_app->get_user_trip_segment( $trip_id, $index ) : null;
 $updated    = isset( $_GET['updated'] );
+$attachment_uploaded = isset( $_GET['attachment_uploaded'] );
+$attachment_deleted = isset( $_GET['attachment_deleted'] );
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
 
 if ( ! $trip || ! $segment ) {
@@ -158,11 +160,64 @@ if ( ! $trip || ! $segment ) {
             gap: 12px;
         }
         .form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+        .attachment-list {
+            display: grid;
+            gap: 10px;
+            margin: 0 0 16px;
+            padding: 0;
+            list-style: none;
+        }
+        .attachment-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: center;
+            padding: 11px 12px;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            background: var(--wp-app-color-background);
+        }
+        .attachment-title {
+            font-weight: 750;
+            overflow-wrap: anywhere;
+        }
+        .attachment-meta {
+            color: var(--wp-app-color-muted);
+            font-size: 0.88rem;
+        }
+        .attachment-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .attachment-actions form { margin: 0; }
+        .attachment-upload {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+        }
         .danger-zone {
             margin-top: 28px;
             border-top: 1px solid var(--wp-app-color-border);
             padding-top: 18px;
             color: var(--wp-app-color-muted);
+        }
+        .ghost-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            box-sizing: border-box;
+            padding: 8px 12px;
+            border-radius: 6px;
+            color: var(--wp-app-color-text);
+            border: 1px solid var(--wp-app-color-border);
+            background: transparent;
+            font: inherit;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
         }
         .delete-button {
             background: transparent;
@@ -174,6 +229,9 @@ if ( ! $trip || ! $segment ) {
             .url-preview-card { grid-template-columns: 1fr; }
             .edit-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
+            .attachment-item,
+            .attachment-upload { grid-template-columns: 1fr; }
+            .attachment-actions { justify-content: flex-start; }
         }
     </style>
 </head>
@@ -187,6 +245,10 @@ if ( ! $trip || ! $segment ) {
 
         <?php if ( $updated ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Itinerary item saved.', 'travel-app' ); ?></div>
+        <?php elseif ( $attachment_uploaded ) : ?>
+            <div class="notice" role="status"><?php esc_html_e( 'Attachment uploaded.', 'travel-app' ); ?></div>
+        <?php elseif ( $attachment_deleted ) : ?>
+            <div class="notice" role="status"><?php esc_html_e( 'Attachment deleted.', 'travel-app' ); ?></div>
         <?php elseif ( $error ) : ?>
             <div class="notice error" role="alert"><?php esc_html_e( 'The requested change could not be saved.', 'travel-app' ); ?></div>
         <?php endif; ?>
@@ -242,6 +304,60 @@ if ( ! $trip || ! $segment ) {
             <section class="panel" aria-labelledby="edit-item-heading">
                 <h2 id="edit-item-heading"><?php esc_html_e( 'Edit Item', 'travel-app' ); ?></h2>
                 <?php require __DIR__ . '/partials/segment-form.php'; ?>
+            </section>
+
+            <section class="panel" aria-labelledby="attachments-heading">
+                <h2 id="attachments-heading"><?php esc_html_e( 'Attachments', 'travel-app' ); ?></h2>
+                <?php $attachments = isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
+                <?php if ( empty( $attachments ) ) : ?>
+                    <p class="empty"><?php esc_html_e( 'No files have been attached to this item yet.', 'travel-app' ); ?></p>
+                <?php else : ?>
+                    <ul class="attachment-list">
+                        <?php foreach ( $attachments as $attachment ) : ?>
+                            <?php
+                            $attachment_id = (int) ( $attachment['id'] ?? 0 );
+                            $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'travel-app' ) ) );
+                            $attachment_meta = array_filter( [
+                                (string) ( $attachment['mime'] ?? '' ),
+                                (string) ( $attachment['size'] ?? '' ),
+                            ] );
+                            ?>
+                            <li class="attachment-item">
+                                <div>
+                                    <div class="attachment-title"><?php echo esc_html( $attachment_label ); ?></div>
+                                    <?php if ( ! empty( $attachment_meta ) ) : ?>
+                                        <div class="attachment-meta"><?php echo esc_html( implode( ' · ', $attachment_meta ) ); ?></div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="attachment-actions">
+                                    <?php if ( ! empty( $attachment['url'] ) ) : ?>
+                                        <a class="ghost-button" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open', 'travel-app' ); ?></a>
+                                    <?php endif; ?>
+                                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo esc_js( __( 'Delete this attachment?', 'travel-app' ) ); ?>');">
+                                        <input type="hidden" name="action" value="travel_app_delete_item_attachment">
+                                        <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                                        <input type="hidden" name="segment_index" value="<?php echo esc_attr( (string) $index ); ?>">
+                                        <input type="hidden" name="attachment_id" value="<?php echo esc_attr( (string) $attachment_id ); ?>">
+                                        <?php wp_nonce_field( 'travel_app_delete_item_attachment_' . $trip_data['id'] . '_' . $index . '_' . $attachment_id ); ?>
+                                        <button class="delete-button" type="submit"><?php esc_html_e( 'Delete', 'travel-app' ); ?></button>
+                                    </form>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+
+                <form class="attachment-upload" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="travel_app_upload_item_attachment">
+                    <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                    <input type="hidden" name="segment_index" value="<?php echo esc_attr( (string) $index ); ?>">
+                    <?php wp_nonce_field( 'travel_app_upload_item_attachment_' . $trip_data['id'] . '_' . $index ); ?>
+                    <label>
+                        <?php esc_html_e( 'Upload Files', 'travel-app' ); ?>
+                        <input type="file" name="item_attachment[]" multiple>
+                    </label>
+                    <button type="submit"><?php esc_html_e( 'Upload', 'travel-app' ); ?></button>
+                </form>
             </section>
 
             <section class="danger-zone" aria-labelledby="delete-item-heading">

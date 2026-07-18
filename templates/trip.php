@@ -9,6 +9,8 @@ $trip_id    = isset( $wp_app_route['params']['id'] ) ? absint( $wp_app_route['pa
 $share_token = isset( $wp_app_route['params']['token'] ) ? sanitize_text_field( wp_unslash( $wp_app_route['params']['token'] ) ) : '';
 $is_shared_timeline = ! empty( $travel_app_shared_timeline ) || '' !== $share_token;
 $trip       = $is_shared_timeline ? $travel_app->get_public_trip_by_share_token( $trip_id, $share_token ) : $travel_app->get_user_trip( $trip_id );
+$share_mode = $is_shared_timeline ? $travel_app->get_trip_share_mode_by_token( $trip_id, $share_token ) : '';
+$show_private_share_details = ! $is_shared_timeline || 'fellow' === $share_mode;
 $updated    = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
 $trip_updated = isset( $_GET['trip_updated'] ) ? absint( $_GET['trip_updated'] ) : null;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
@@ -19,7 +21,8 @@ if ( ! $trip ) {
 
 $trip_data = $trip ? $travel_app->format_trip_for_output( $trip, $is_shared_timeline ? $travel_app->get_trip_owner_id( $trip_id ) : null ) : null;
 $segments  = $trip_data['segments'] ?? [];
-$share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'] ) : '';
+$fellow_share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
+$public_share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
 $timeline_segments = [];
 
 foreach ( $segments as $segment ) {
@@ -158,11 +161,18 @@ $get_google_maps_url = static function( string $address ): string {
         .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
         .share-link {
             display: grid;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .share-option {
+            display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             gap: 10px;
             align-items: end;
-            margin-bottom: 18px;
+            padding: 10px 0;
+            border-top: 1px solid var(--wp-app-color-border);
         }
+        .share-option:first-child { border-top: 0; padding-top: 0; }
         .share-link label { margin: 0; }
         .share-link input { color: var(--wp-app-color-muted); }
         .share-link .ghost-button {
@@ -345,6 +355,47 @@ $get_google_maps_url = static function( string $address ): string {
             font-size: 0.88rem;
             line-height: 1.42;
         }
+        .attachment-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--wp-app-color-border);
+        }
+        .attachment-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            max-width: 100%;
+            min-height: 30px;
+            box-sizing: border-box;
+            padding: 4px 8px;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 6px;
+            color: var(--wp-app-color-text);
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1.25;
+            text-decoration: none;
+        }
+        .attachment-download:hover,
+        .attachment-download:focus,
+        .attachment-download:focus-visible {
+            color: var(--wp-app-color-link);
+            border-color: var(--wp-app-color-link);
+            text-decoration: none;
+        }
+        .attachment-download:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
+        .attachment-download span:last-child {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .url-preview {
             display: grid;
             grid-template-columns: 72px minmax(0, 1fr);
@@ -472,11 +523,13 @@ $get_google_maps_url = static function( string $address ): string {
         .danger-zone h2 {
             color: var(--wp-app-color-text);
         }
+        .sharing-zone details summary,
         .danger-zone details summary {
             cursor: pointer;
             color: var(--wp-app-color-text);
             font-weight: 700;
         }
+        .sharing-zone details summary h2,
         .danger-zone details summary h2 {
             display: inline;
             margin: 0;
@@ -489,7 +542,7 @@ $get_google_maps_url = static function( string $address ): string {
         }
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
-            .timeline-item, .summary-grid, .edit-form, .share-link { grid-template-columns: 1fr; }
+            .timeline-item, .summary-grid, .edit-form, .share-option { grid-template-columns: 1fr; }
             .url-preview { grid-template-columns: 1fr; }
             .url-preview-image { width: 100%; }
             .trip-title-header { align-items: flex-start; }
@@ -645,9 +698,11 @@ $get_google_maps_url = static function( string $address ): string {
                                     <?php $segment_start_date = substr( trim( (string) ( $segment['date'] ?? '' ) ), 0, 10 ); ?>
                                     <?php $segment_end_date = substr( trim( (string) ( $segment['end_date'] ?? '' ) ), 0, 10 ); ?>
                                     <?php $show_url_preview = 'checkout' !== $timeline_kind; ?>
-                                    <?php $show_location = 'checkout' !== $timeline_kind; ?>
+                                    <?php $show_location = 'checkout' !== $timeline_kind && $show_private_share_details; ?>
+                                    <?php $show_attachments = 'checkout' !== $timeline_kind && $show_private_share_details; ?>
                                     <?php $type_label = 'checkout' === $timeline_kind ? __( 'Check out', 'travel-app' ) : ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ); ?>
                                     <?php $url_preview = isset( $segment['url_preview'] ) && is_array( $segment['url_preview'] ) ? $segment['url_preview'] : []; ?>
+                                    <?php $attachments = $show_attachments && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
                                     <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
                                         <div class="timeline-item" data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
@@ -694,6 +749,22 @@ $get_google_maps_url = static function( string $address ): string {
                                                 <?php if ( ! empty( $segment['details'] ) ) : ?>
                                                     <div class="detail"><?php echo esc_html( $segment['details'] ); ?></div>
                                                 <?php endif; ?>
+                                                <?php if ( ! empty( $attachments ) ) : ?>
+                                                    <div class="attachment-links" aria-label="<?php esc_attr_e( 'Attachments', 'travel-app' ); ?>">
+                                                        <?php foreach ( $attachments as $attachment ) : ?>
+                                                            <?php
+                                                            if ( empty( $attachment['url'] ) ) {
+                                                                continue;
+                                                            }
+                                                            $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'travel-app' ) ) );
+                                                            ?>
+                                                            <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>">
+                                                                <span aria-hidden="true">↓</span>
+                                                                <span><?php echo esc_html( $attachment_label ); ?></span>
+                                                            </a>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                <?php endif; ?>
                                                 <?php if ( $has_url_preview ) : ?>
                                                     <a class="url-preview" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer">
                                                         <?php if ( ! empty( $url_preview['image'] ) ) : ?>
@@ -728,35 +799,63 @@ $get_google_maps_url = static function( string $address ): string {
                     <div>
                         <?php foreach ( $unscheduled_segments as $segment ) : ?>
                             <?php $index = (int) $segment['_index']; ?>
-                            <?php if ( $is_shared_timeline ) : ?>
-                                <div class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>">
-                            <?php else : ?>
-                                <a class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
-                            <?php endif; ?>
-                                    <div class="summary-grid">
-                                        <span class="time"><?php echo esc_html( trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) ) ); ?></span>
-                                        <span>
-                                            <span class="type"><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span><br>
+                            <?php $attachments = $show_private_share_details && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
+                            <div class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>">
+                                <div class="summary-grid">
+                                    <span class="time"><?php echo esc_html( trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) ) ); ?></span>
+                                    <span>
+                                        <span class="type"><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span><br>
+                                        <?php if ( $is_shared_timeline ) : ?>
                                             <span class="title"><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
-                                            <?php if ( ! empty( $segment['end_date'] ) ) : ?>
-                                                <br><span class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></span>
-                                            <?php endif; ?>
-                                            <?php if ( ! empty( $segment['location'] ) ) : ?>
-                                                <br><span class="detail"><?php echo esc_html( $segment['location'] ); ?></span>
-                                            <?php endif; ?>
-                                            <?php if ( ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
-                                                <br><span class="detail"><?php echo esc_html( sprintf( __( 'To: %s', 'travel-app' ), $segment['end_location'] ) ); ?></span>
-                                            <?php endif; ?>
-                                        </span>
-                                        <?php if ( ! $is_shared_timeline ) : ?>
-                                            <span class="detail"><?php esc_html_e( 'Open', 'travel-app' ); ?></span>
+                                        <?php else : ?>
+                                            <a class="timeline-title-link title" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
+                                                <?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?>
+                                            </a>
                                         <?php endif; ?>
-                                    </div>
-                            <?php if ( $is_shared_timeline ) : ?>
+                                        <?php if ( ! empty( $segment['end_date'] ) ) : ?>
+                                            <br><span class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></span>
+                                        <?php endif; ?>
+                                        <?php if ( $show_private_share_details && ! empty( $segment['location'] ) ) : ?>
+                                            <?php $location = (string) $segment['location']; ?>
+                                            <br><span class="detail">
+                                                <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
+                                                    <span aria-hidden="true">&#x1F4CD;</span>
+                                                    <?php echo esc_html( $location ); ?>
+                                                </a>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if ( $show_private_share_details && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                                            <?php $end_location = (string) $segment['end_location']; ?>
+                                            <br><span class="detail">
+                                                <?php esc_html_e( 'To:', 'travel-app' ); ?>
+                                                <a href="<?php echo esc_url( $get_google_maps_url( $end_location ) ); ?>" target="_blank" rel="noopener noreferrer">
+                                                    <span aria-hidden="true">&#x1F4CD;</span>
+                                                    <?php echo esc_html( $end_location ); ?>
+                                                </a>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if ( ! empty( $attachments ) ) : ?>
+                                            <div class="attachment-links" aria-label="<?php esc_attr_e( 'Attachments', 'travel-app' ); ?>">
+                                                <?php foreach ( $attachments as $attachment ) : ?>
+                                                    <?php
+                                                    if ( empty( $attachment['url'] ) ) {
+                                                        continue;
+                                                    }
+                                                    $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'travel-app' ) ) );
+                                                    ?>
+                                                    <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>">
+                                                        <span aria-hidden="true">↓</span>
+                                                        <span><?php echo esc_html( $attachment_label ); ?></span>
+                                                    </a>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </span>
+                                    <?php if ( ! $is_shared_timeline ) : ?>
+                                        <a class="detail" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>"><?php esc_html_e( 'Open', 'travel-app' ); ?></a>
+                                    <?php endif; ?>
                                 </div>
-                            <?php else : ?>
-                                </a>
-                            <?php endif; ?>
+                            </div>
                         <?php endforeach; ?>
                     </div>
                 </section>
@@ -764,17 +863,32 @@ $get_google_maps_url = static function( string $address ): string {
 
             <?php if ( ! $is_shared_timeline ) : ?>
                 <section class="sharing-zone" aria-labelledby="sharing-heading" data-share-control data-trip-id="<?php echo esc_attr( (string) $trip_data['id'] ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'travel_app_share_link_' . $trip_data['id'] ) ); ?>" data-ajax-url="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
-                    <h2 id="sharing-heading"><?php esc_html_e( 'Sharing', 'travel-app' ); ?></h2>
-                    <div class="share-link" data-share-active data-share-url="<?php echo esc_attr( $share_url ); ?>">
-                        <span data-share-label>
-                            <?php echo esc_html( '' === $share_url ? __( 'Read-only timeline sharing is off.', 'travel-app' ) : __( 'Read-only timeline sharing is on.', 'travel-app' ) ); ?>
-                        </span>
-                        <div class="share-actions">
-                            <button class="ghost-button" type="button" data-share-copy><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
-                            <button class="ghost-button" type="button" data-share-remove <?php echo '' === $share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                    <details>
+                        <summary><h2 id="sharing-heading"><?php esc_html_e( 'Sharing', 'travel-app' ); ?></h2></summary>
+                        <div class="share-link">
+                            <div class="share-option">
+                                <span>
+                                    <strong><?php esc_html_e( 'Fellow travellers', 'travel-app' ); ?></strong><br>
+                                    <span class="empty"><?php esc_html_e( 'Includes addresses and attachments.', 'travel-app' ); ?></span>
+                                </span>
+                                <span class="share-actions">
+                                    <button class="ghost-button" type="button" data-share-copy data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                                    <button class="ghost-button" type="button" data-share-remove data-share-mode="fellow" <?php echo '' === $fellow_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                </span>
+                            </div>
+                            <div class="share-option">
+                                <span>
+                                    <strong><?php esc_html_e( 'Others', 'travel-app' ); ?></strong><br>
+                                    <span class="empty"><?php esc_html_e( 'Hides addresses and attachments.', 'travel-app' ); ?></span>
+                                </span>
+                                <span class="share-actions">
+                                    <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                                    <button class="ghost-button" type="button" data-share-remove data-share-mode="public" <?php echo '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                    <p class="empty" data-share-status aria-live="polite"></p>
+                        <p class="empty" data-share-status aria-live="polite"></p>
+                    </details>
                 </section>
             <?php endif; ?>
 
@@ -861,14 +975,12 @@ $get_google_maps_url = static function( string $address ): string {
                     return;
                 }
 
-                var active = control.querySelector('[data-share-active]');
-                var shareLabel = control.querySelector('[data-share-label]');
-                var removeButton = control.querySelector('[data-share-remove]');
                 var copyButtons = Array.prototype.slice.call(control.querySelectorAll('[data-share-copy]'));
+                var removeButtons = Array.prototype.slice.call(control.querySelectorAll('[data-share-remove]'));
                 var primaryCopyButton = copyButtons[0] || null;
                 var status = control.querySelector('[data-share-status]');
                 var defaultCopyText = primaryCopyButton ? primaryCopyButton.textContent : '';
-                var copyResetTimer = null;
+                var copyResetTimers = {};
 
                 function setStatus(message) {
                     if (status) {
@@ -877,65 +989,64 @@ $get_google_maps_url = static function( string $address ): string {
                 }
 
                 function setBusy(isBusy) {
-                    [removeButton].concat(copyButtons).forEach(function(button) {
+                    removeButtons.concat(copyButtons).forEach(function(button) {
                         if (button) {
                             button.disabled = isBusy;
                         }
                     });
                 }
 
-                function setShareUrl(url) {
-                    var hasUrl = !!url;
+                function setShareUrl(mode, url) {
+                    copyButtons.forEach(function(button) {
+                        if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
+                            button.setAttribute('data-share-url', url || '');
+                        }
+                    });
 
-                    if (active) {
-                        active.setAttribute('data-share-url', url || '');
-                    }
+                    removeButtons.forEach(function(button) {
+                        if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
+                            button.hidden = !url;
+                        }
+                    });
 
-                    if (shareLabel) {
-                        shareLabel.textContent = hasUrl ? '<?php echo esc_js( __( 'Read-only timeline sharing is on.', 'travel-app' ) ); ?>' : '<?php echo esc_js( __( 'Read-only timeline sharing is off.', 'travel-app' ) ); ?>';
-                    }
-
-                    if (removeButton) {
-                        removeButton.hidden = !hasUrl;
-                    }
-
-                    resetCopyButtons();
+                    resetCopyButton(mode);
                 }
 
-                function setCopyButtonsText(text) {
+                function resetCopyButton(mode) {
                     copyButtons.forEach(function(button) {
-                        button.textContent = text;
+                        if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
+                            button.textContent = defaultCopyText;
+                            button.classList.remove('copied');
+                        }
                     });
                 }
 
-                function resetCopyButtons() {
+                function confirmCopied(mode) {
                     copyButtons.forEach(function(button) {
-                        button.textContent = defaultCopyText;
-                        button.classList.remove('copied');
-                    });
-                }
-
-                function confirmCopied() {
-                    setCopyButtonsText('<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>');
-                    copyButtons.forEach(function(button) {
-                        button.classList.add('copied');
+                        if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
+                            button.textContent = '<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>';
+                            button.classList.add('copied');
+                        }
                     });
                     setStatus('<?php echo esc_js( __( 'Share link copied.', 'travel-app' ) ); ?>');
 
-                    if (copyResetTimer) {
-                        window.clearTimeout(copyResetTimer);
+                    if (copyResetTimers[mode]) {
+                        window.clearTimeout(copyResetTimers[mode]);
                     }
 
-                    copyResetTimer = window.setTimeout(function() {
-                        resetCopyButtons();
+                    copyResetTimers[mode] = window.setTimeout(function() {
+                        resetCopyButton(mode);
                     }, 1800);
                 }
 
-                function requestShareAction(action) {
+                function requestShareAction(action, mode) {
                     var body = new URLSearchParams();
                     body.set('action', action);
                     body.set('trip_id', control.getAttribute('data-trip-id') || '');
                     body.set('nonce', control.getAttribute('data-nonce') || '');
+                    if (mode) {
+                        body.set('share_mode', mode);
+                    }
 
                     setBusy(true);
                     setStatus('');
@@ -956,7 +1067,9 @@ $get_google_maps_url = static function( string $address ): string {
                             return data.data || {};
                         });
                     }).then(function(data) {
-                        setShareUrl(data.url || '');
+                        if (data.mode) {
+                            setShareUrl(data.mode, data.url || '');
+                        }
                         setStatus(data.message || '');
                         return data;
                     }).catch(function(error) {
@@ -967,44 +1080,47 @@ $get_google_maps_url = static function( string $address ): string {
                     });
                 }
 
-                if (removeButton) {
+                removeButtons.forEach(function(removeButton) {
                     removeButton.addEventListener('click', function() {
-                        requestShareAction('travel_app_remove_share_link');
+                        requestShareAction('travel_app_remove_share_link', removeButton.getAttribute('data-share-mode') || 'fellow');
                     });
-                }
+                });
 
-                function copyShareUrl(url) {
+                function copyShareUrl(url, mode) {
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         return navigator.clipboard.writeText(url).then(function() {
-                            confirmCopied();
+                            confirmCopied(mode);
                         }).catch(function() {
                             window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
+                            confirmCopied(mode);
                         });
                     }
 
                     window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
+                    confirmCopied(mode);
                     return Promise.resolve();
                 }
 
                 copyButtons.forEach(function(copyButton) {
                     copyButton.addEventListener('click', function() {
-                        var url = active.getAttribute('data-share-url') || '';
+                        var mode = copyButton.getAttribute('data-share-mode') || 'fellow';
+                        var url = copyButton.getAttribute('data-share-url') || '';
 
                         if (url) {
-                            copyShareUrl(url);
+                            copyShareUrl(url, mode);
                             return;
                         }
 
-                        setCopyButtonsText('<?php echo esc_js( __( 'Generating...', 'travel-app' ) ); ?>');
-                        requestShareAction('travel_app_generate_share_link').then(function(data) {
+                        copyButton.textContent = '<?php echo esc_js( __( 'Generating...', 'travel-app' ) ); ?>';
+                        requestShareAction('travel_app_generate_share_link', mode).then(function(data) {
                             if (data && data.url) {
-                                copyShareUrl(data.url);
+                                copyShareUrl(data.url, mode);
                                 return;
                             }
 
-                            resetCopyButtons();
+                            resetCopyButton(mode);
                         }).catch(function() {
-                            resetCopyButtons();
+                            resetCopyButton(mode);
                         });
                     });
                 });

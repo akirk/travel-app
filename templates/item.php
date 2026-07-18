@@ -78,6 +78,73 @@ if ( ! $trip || ! $segment ) {
             background: rgba(15, 107, 66, 0.08);
         }
         .notice.error { border-color: rgba(138, 75, 8, 0.28); background: rgba(138, 75, 8, 0.08); }
+        .url-preview-card {
+            display: grid;
+            grid-template-columns: minmax(180px, 34%) minmax(0, 1fr);
+            gap: 14px;
+            align-items: stretch;
+            color: inherit;
+            text-decoration: none;
+        }
+        .url-preview-card:hover,
+        .url-preview-card:focus,
+        .url-preview-card:focus-visible,
+        .url-preview-card:hover *,
+        .url-preview-card:focus *,
+        .url-preview-card:focus-visible * {
+            text-decoration: none;
+        }
+        .url-preview-card:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
+        .url-preview-image {
+            width: 100%;
+            height: 100%;
+            min-height: 140px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: var(--wp-app-color-background);
+        }
+        .url-preview-body {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            justify-content: center;
+            min-width: 0;
+        }
+        .url-preview-site,
+        .url-preview-description {
+            color: var(--wp-app-color-muted);
+            font-size: 0.9rem;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+        }
+        .url-preview-title {
+            font-size: 1.05rem;
+            font-weight: 750;
+            overflow-wrap: anywhere;
+        }
+        .preview-edit {
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            padding: 0;
+        }
+        .preview-edit summary {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            cursor: pointer;
+            padding: 11px 12px;
+            font-weight: 750;
+        }
+        .preview-edit summary span,
+        .preview-status {
+            color: var(--wp-app-color-muted);
+            font-size: 0.88rem;
+        }
+        .preview-edit label,
+        .preview-status { margin: 0 12px 12px; }
         .edit-form {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -104,6 +171,7 @@ if ( ! $trip || ! $segment ) {
         }
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
+            .url-preview-card { grid-template-columns: 1fr; }
             .edit-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
         }
@@ -143,8 +211,33 @@ if ( ! $trip || ! $segment ) {
                     <?php if ( ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
                         <span><?php echo esc_html( sprintf( __( 'To: %s', 'travel-app' ), $segment['end_location'] ) ); ?></span>
                     <?php endif; ?>
+                    <?php if ( ! empty( $segment['url'] ) ) : ?>
+                        <a href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open URL', 'travel-app' ); ?></a>
+                    <?php endif; ?>
                 </div>
             </header>
+
+            <?php $url_preview = isset( $segment['url_preview'] ) && is_array( $segment['url_preview'] ) ? $segment['url_preview'] : []; ?>
+            <?php if ( ! empty( $segment['url'] ) && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ) ) : ?>
+                <section class="panel" aria-label="<?php esc_attr_e( 'URL Preview', 'travel-app' ); ?>">
+                    <a class="url-preview-card" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer">
+                        <?php if ( ! empty( $url_preview['image'] ) ) : ?>
+                            <img class="url-preview-image" src="<?php echo esc_url( (string) $url_preview['image'] ); ?>" alt="" loading="lazy">
+                        <?php endif; ?>
+                        <div class="url-preview-body">
+                            <?php if ( ! empty( $url_preview['site_name'] ) ) : ?>
+                                <div class="url-preview-site"><?php echo esc_html( (string) $url_preview['site_name'] ); ?></div>
+                            <?php endif; ?>
+                            <?php if ( ! empty( $url_preview['title'] ) ) : ?>
+                                <div class="url-preview-title"><?php echo esc_html( (string) $url_preview['title'] ); ?></div>
+                            <?php endif; ?>
+                            <?php if ( ! empty( $url_preview['description'] ) ) : ?>
+                                <div class="url-preview-description"><?php echo esc_html( (string) $url_preview['description'] ); ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </a>
+                </section>
+            <?php endif; ?>
 
             <section class="panel" aria-labelledby="edit-item-heading">
                 <h2 id="edit-item-heading"><?php esc_html_e( 'Edit Item', 'travel-app' ); ?></h2>

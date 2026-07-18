@@ -15,6 +15,39 @@
             <?php endforeach; ?>
         </select>
     </label>
+    <label class="field-wide">
+        <?php esc_html_e( 'URL', 'travel-app' ); ?>
+        <input type="url" name="segment_url" value="<?php echo esc_attr( (string) ( $segment['url'] ?? '' ) ); ?>">
+    </label>
+    <?php
+    $url_preview = isset( $segment['url_preview'] ) && is_array( $segment['url_preview'] ) ? $segment['url_preview'] : [];
+    $url_preview_debug = isset( $segment['url_preview_debug'] ) && is_array( $segment['url_preview_debug'] ) ? $segment['url_preview_debug'] : [];
+    $preview_status = ! empty( $url_preview_debug['status'] )
+        ? (string) $url_preview_debug['status']
+        : ( ! empty( $url_preview ) ? __( 'saved', 'travel-app' ) : __( 'not fetched yet', 'travel-app' ) );
+    $preview_message = ! empty( $url_preview_debug['message'] )
+        ? (string) $url_preview_debug['message']
+        : __( 'Save this item to fetch preview metadata, or enter preview fields manually.', 'travel-app' );
+    ?>
+    <details class="field-wide preview-edit">
+        <summary>
+            <?php esc_html_e( 'URL Preview', 'travel-app' ); ?>
+            <span><?php echo esc_html( $preview_status ); ?></span>
+        </summary>
+        <p class="preview-status"><?php echo esc_html( $preview_message ); ?></p>
+        <label>
+            <?php esc_html_e( 'Preview Title', 'travel-app' ); ?>
+            <input name="segment_url_preview_title" value="<?php echo esc_attr( (string) ( $url_preview['title'] ?? '' ) ); ?>">
+        </label>
+        <label>
+            <?php esc_html_e( 'Preview Image URL', 'travel-app' ); ?>
+            <input type="url" name="segment_url_preview_image" value="<?php echo esc_attr( (string) ( $url_preview['image'] ?? '' ) ); ?>">
+        </label>
+        <label>
+            <?php esc_html_e( 'Preview Description', 'travel-app' ); ?>
+            <textarea name="segment_url_preview_description"><?php echo esc_textarea( (string) ( $url_preview['description'] ?? '' ) ); ?></textarea>
+        </label>
+    </details>
     <label>
         <?php esc_html_e( 'Location', 'travel-app' ); ?>
         <input name="segment_location" value="<?php echo esc_attr( (string) ( $segment['location'] ?? '' ) ); ?>">

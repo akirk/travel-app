@@ -214,38 +214,63 @@ $demo_start_time = $demo_start . 'T12:00';
             border: 2px solid var(--wp-app-color-border);
         }
         .timeline-day.current .day-heading::before { border-color: var(--wp-app-color-link); background: var(--wp-app-color-link); }
+        .timeline-item-wrap {
+            margin-bottom: 10px;
+        }
         .timeline-item {
             display: grid;
             grid-template-columns: 74px minmax(0, 1fr);
             gap: 12px;
             padding: 12px;
-            margin-bottom: 10px;
             border: 1px solid var(--wp-app-color-border);
             border-radius: 8px;
             background: var(--wp-app-color-background);
             color: inherit;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        .timeline-item:hover,
-        .timeline-item:focus,
-        .timeline-item:focus-visible,
-        .timeline-item:hover *,
-        .timeline-item:focus *,
-        .timeline-item:focus-visible * {
-            text-decoration: none;
-        }
-        .timeline-item:hover {
-            border-color: var(--wp-app-color-link);
-            background: var(--wp-app-color-surface);
-        }
-        .timeline-item:focus-visible {
-            outline: 2px solid var(--wp-app-color-link);
-            outline-offset: 2px;
         }
         .timeline-item.current {
             outline: 2px solid var(--wp-app-color-link);
             outline-offset: 1px;
+        }
+        .timeline-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .timeline-title-link {
+            color: inherit;
+            text-decoration: none;
+        }
+        .timeline-title-link:hover,
+        .timeline-title-link:focus,
+        .timeline-title-link:focus-visible {
+            color: var(--wp-app-color-link);
+            text-decoration: none;
+        }
+        .timeline-title-link:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
+        .timeline-url-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            color: var(--wp-app-color-link);
+            font-weight: 750;
+            text-decoration: none;
+        }
+        .timeline-url-link:hover,
+        .timeline-url-link:focus,
+        .timeline-url-link:focus-visible {
+            background: var(--wp-app-color-surface);
+            text-decoration: none;
+        }
+        .timeline-url-link:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
         }
         .time { color: var(--wp-app-color-muted); font-weight: 750; }
         .type { color: var(--wp-app-color-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0; }
@@ -255,6 +280,48 @@ $demo_start_time = $demo_start . 'T12:00';
         .summary-grid .detail {
             font-size: 0.88rem;
             line-height: 1.42;
+        }
+        .url-preview {
+            display: grid;
+            grid-template-columns: 72px minmax(0, 1fr);
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--wp-app-color-border);
+            color: inherit;
+            text-decoration: none;
+        }
+        .url-preview:hover,
+        .url-preview:focus,
+        .url-preview:focus-visible,
+        .url-preview:hover *,
+        .url-preview:focus *,
+        .url-preview:focus-visible * {
+            text-decoration: none;
+        }
+        .url-preview:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
+        .url-preview-image {
+            width: 72px;
+            aspect-ratio: 16 / 10;
+            object-fit: cover;
+            border-radius: 6px;
+            background: var(--wp-app-color-surface);
+        }
+        .url-preview-title {
+            font-size: 0.92rem;
+            font-weight: 750;
+            overflow-wrap: anywhere;
+        }
+        .url-preview-meta,
+        .url-preview-description {
+            color: var(--wp-app-color-muted);
+            font-size: 0.82rem;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
         }
         .timeline-header {
             display: flex;
@@ -344,6 +411,8 @@ $demo_start_time = $demo_start . 'T12:00';
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
             .timeline-item, .summary-grid, .edit-form { grid-template-columns: 1fr; }
+            .url-preview { grid-template-columns: 1fr; }
+            .url-preview-image { width: 100%; }
             .trip-title-header { align-items: flex-start; }
             .trip-title-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
@@ -430,6 +499,10 @@ $demo_start_time = $demo_start . 'T12:00';
                             <?php endforeach; ?>
                         </select>
                     </label>
+                    <label class="field-wide">
+                        <?php esc_html_e( 'URL', 'travel-app' ); ?>
+                        <input type="url" name="segment_url">
+                    </label>
                     <label>
                         <?php esc_html_e( 'Location', 'travel-app' ); ?>
                         <input name="segment_location">
@@ -480,25 +553,61 @@ $demo_start_time = $demo_start . 'T12:00';
                                     <?php $timeline_kind = (string) ( $segment['_timeline_kind'] ?? 'start' ); ?>
                                     <?php $segment_anchor = 'segment-' . $index . ( 'checkout' === $timeline_kind ? '-checkout' : '' ); ?>
                                     <?php $segment_datetime = trim( (string) ( $segment['date'] ?? '' ) . 'T' . ( (string) ( $segment['time'] ?? '' ) ?: '00:00' ) ); ?>
-                                    <a class="timeline-item" id="<?php echo esc_attr( $segment_anchor ); ?>" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>" data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
+                                    <?php $segment_start_date = substr( trim( (string) ( $segment['date'] ?? '' ) ), 0, 10 ); ?>
+                                    <?php $segment_end_date = substr( trim( (string) ( $segment['end_date'] ?? '' ) ), 0, 10 ); ?>
+                                    <?php $show_url_preview = 'checkout' !== $timeline_kind; ?>
+                                    <?php $show_location = 'checkout' !== $timeline_kind; ?>
+                                    <?php $url_preview = isset( $segment['url_preview'] ) && is_array( $segment['url_preview'] ) ? $segment['url_preview'] : []; ?>
+                                    <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
+                                    <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
+                                        <div class="timeline-item" data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
                                             <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
                                             <div>
                                                 <div class="type"><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></div>
-                                                <div class="title"><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></div>
-                                                <?php if ( ! empty( $segment['end_date'] ) ) : ?>
+                                                <div class="timeline-title-row title">
+                                                    <a class="timeline-title-link" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
+                                                        <?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?>
+                                                    </a>
+                                                    <?php if ( $show_url_preview && ! $has_url_preview && ! empty( $segment['url'] ) ) : ?>
+                                                        <a class="timeline-url-link" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer" title="<?php esc_attr_e( 'Open item URL', 'travel-app' ); ?>">
+                                                            <span aria-hidden="true">↗</span>
+                                                            <span class="screen-reader-text"><?php esc_html_e( 'Open item URL', 'travel-app' ); ?></span>
+                                                        </a>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <?php if ( '' !== $segment_end_date && $segment_end_date !== $segment_start_date ) : ?>
                                                     <div class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></div>
                                                 <?php endif; ?>
-                                                <?php if ( ! empty( $segment['location'] ) ) : ?>
+                                                <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
                                                     <div class="detail"><?php echo esc_html( $segment['location'] ); ?></div>
                                                 <?php endif; ?>
-                                                <?php if ( ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                                                <?php if ( $show_location && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
                                                     <div class="detail"><?php echo esc_html( sprintf( __( 'To: %s', 'travel-app' ), $segment['end_location'] ) ); ?></div>
                                                 <?php endif; ?>
                                                 <?php if ( ! empty( $segment['details'] ) ) : ?>
                                                     <div class="detail"><?php echo esc_html( $segment['details'] ); ?></div>
                                                 <?php endif; ?>
+                                                <?php if ( $has_url_preview ) : ?>
+                                                    <a class="url-preview" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer">
+                                                        <?php if ( ! empty( $url_preview['image'] ) ) : ?>
+                                                            <img class="url-preview-image" src="<?php echo esc_url( (string) $url_preview['image'] ); ?>" alt="" loading="lazy">
+                                                        <?php endif; ?>
+                                                        <div>
+                                                            <?php if ( ! empty( $url_preview['site_name'] ) ) : ?>
+                                                                <div class="url-preview-meta"><?php echo esc_html( (string) $url_preview['site_name'] ); ?></div>
+                                                            <?php endif; ?>
+                                                            <?php if ( ! empty( $url_preview['title'] ) ) : ?>
+                                                                <div class="url-preview-title"><?php echo esc_html( (string) $url_preview['title'] ); ?></div>
+                                                            <?php endif; ?>
+                                                            <?php if ( ! empty( $url_preview['description'] ) ) : ?>
+                                                                <div class="url-preview-description"><?php echo esc_html( (string) $url_preview['description'] ); ?></div>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </a>
+                                                <?php endif; ?>
                                             </div>
-                                    </a>
+                                        </div>
+                                    </div>
                                 <?php endforeach; ?>
                             </section>
                         <?php endforeach; ?>

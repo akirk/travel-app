@@ -18,7 +18,7 @@ class GenericParser {
             return new \WP_Error( 'ai_client_unavailable', __( 'WordPress AI Client is unavailable.', 'travel-app' ) );
         }
 
-        $prompt = 'Extract this travel itinerary into strict JSON only. Use this shape: {"title":"","starts_at":"","ends_at":"","segments":[{"type":"flight|lodging|train|car|activity|other","title":"","date":"","end_date":"","time":"","end_time":"","location":"","end_location":"","details":""}]}.' . "\n\n" . $text;
+        $prompt = 'Extract this travel itinerary into strict JSON only. Use this shape: {"title":"","starts_at":"","ends_at":"","segments":[{"type":"flight|lodging|train|car|activity|other","title":"","date":"","end_date":"","time":"","end_time":"","location":"","end_location":"","url":"","details":""}]}.' . "\n\n" . $text;
         $builder = wp_ai_client_prompt( $prompt );
 
         if ( is_wp_error( $builder ) ) {

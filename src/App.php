@@ -50,10 +50,13 @@ class App extends BaseApp {
         add_action( 'admin_post_travel_app_update_trip', [ $this, 'handle_update_trip' ] );
         add_action( 'wp_ajax_travel_app_generate_share_link', [ $this, 'handle_generate_share_link' ] );
         add_action( 'wp_ajax_travel_app_remove_share_link', [ $this, 'handle_remove_share_link' ] );
+        add_action( 'wp_ajax_travel_app_clear_share_cache', [ $this, 'handle_clear_share_cache' ] );
         add_action( 'admin_post_travel_app_delete', [ $this, 'handle_delete' ] );
         add_action( 'admin_post_travel_app_update_segment', [ $this, 'handle_update_segment' ] );
         add_action( 'admin_post_travel_app_add_segment', [ $this, 'handle_add_segment' ] );
         add_action( 'admin_post_travel_app_delete_segment', [ $this, 'handle_delete_segment' ] );
+        add_action( 'admin_post_travel_app_upload_item_attachment', [ $this, 'handle_upload_item_attachment' ] );
+        add_action( 'admin_post_travel_app_delete_item_attachment', [ $this, 'handle_delete_item_attachment' ] );
         // add_action( 'wp_dashboard_setup', [ $this, 'register_dashboard_widgets' ] );
         add_action( 'wp_abilities_api_categories_init', [ $this, 'register_ability_category' ] );
         add_action( 'wp_abilities_api_init', [ $this, 'register_abilities' ] );
@@ -572,6 +575,10 @@ class App extends BaseApp {
             return;
         }
 
+        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+            define( 'DONOTCACHEPAGE', true );
+        }
+
         global $wp_app_route;
         $wp_app_route = [
             'app_path' => $this->get_url_path(),
@@ -622,6 +629,8 @@ class App extends BaseApp {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be shared.', 'travel-app' ) ], 404 );
         }
 
+        $this->clear_trip_public_cache( $trip_id );
+
         wp_send_json_success( [
             'url'     => $this->get_trip_share_url( $trip_id ),
             'message' => __( 'Read-only timeline share link generated.', 'travel-app' ),
@@ -640,11 +649,32 @@ class App extends BaseApp {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be updated.', 'travel-app' ) ], 404 );
         }
 
+        $this->clear_trip_public_cache( $trip_id );
         delete_term_meta( $trip_id, '_travel_app_share_token' );
 
         wp_send_json_success( [
             'url'     => '',
             'message' => __( 'Read-only timeline share link removed.', 'travel-app' ),
+        ] );
+    }
+
+    public function handle_clear_share_cache(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to refresh shared travel plans.', 'travel-app' ) ], 403 );
+        }
+
+        $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
+
+        if ( ! $this->get_user_trip( $trip_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be refreshed.', 'travel-app' ) ], 404 );
+        }
+
+        $this->clear_trip_public_cache( $trip_id );
+
+        wp_send_json_success( [
+            'url'     => $this->get_trip_share_url( $trip_id ),
+            'message' => __( 'Read-only timeline cache refreshed.', 'travel-app' ),
         ] );
     }
 
@@ -727,12 +757,59 @@ class App extends BaseApp {
         exit;
     }
 
+    public function handle_upload_item_attachment(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_die( esc_html__( 'You must be logged in to upload itinerary item attachments.', 'travel-app' ), 403 );
+        }
+
+        $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        $index = isset( $_POST['segment_index'] ) ? absint( $_POST['segment_index'] ) : 0;
+        check_admin_referer( 'travel_app_upload_item_attachment_' . $trip_id . '_' . $index );
+
+        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $index . '/' );
+        $uploaded = $this->upload_user_trip_item_attachments( $trip_id, $index );
+
+        if ( is_wp_error( $uploaded ) ) {
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $uploaded->get_error_code() ), $redirect );
+        } else {
+            $redirect = add_query_arg( 'attachment_uploaded', rawurlencode( (string) $uploaded ), $redirect );
+        }
+
+        wp_safe_redirect( $redirect );
+        exit;
+    }
+
+    public function handle_delete_item_attachment(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_die( esc_html__( 'You must be logged in to delete itinerary item attachments.', 'travel-app' ), 403 );
+        }
+
+        $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        $index = isset( $_POST['segment_index'] ) ? absint( $_POST['segment_index'] ) : 0;
+        $attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
+        check_admin_referer( 'travel_app_delete_item_attachment_' . $trip_id . '_' . $index . '_' . $attachment_id );
+
+        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $index . '/' );
+        $deleted = $this->delete_user_trip_item_attachment( $trip_id, $index, $attachment_id );
+
+        if ( is_wp_error( $deleted ) ) {
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $deleted->get_error_code() ), $redirect );
+        } else {
+            $redirect = add_query_arg( 'attachment_deleted', rawurlencode( (string) $attachment_id ), $redirect );
+        }
+
+        wp_safe_redirect( $redirect );
+        exit;
+    }
+
     private function delete_user_trip( int $trip_id ) {
         $term = $this->get_user_trip( $trip_id );
 
         if ( ! $term ) {
             return new \WP_Error( 'delete_forbidden', __( 'This travel plan cannot be deleted.', 'travel-app' ) );
         }
+
+        $this->clear_trip_public_cache( $trip_id );
 
         foreach ( $this->get_trip_item_posts( $trip_id ) as $item ) {
             wp_trash_post( $item->ID );
@@ -763,6 +840,8 @@ class App extends BaseApp {
             return $updated;
         }
 
+        $this->clear_trip_public_cache( $trip_id );
+
         return true;
     }
 
@@ -789,6 +868,7 @@ class App extends BaseApp {
 
         $this->update_item_meta( $item->ID, $segment );
         $this->update_trip_bounds_from_items( $trip_id );
+        $this->clear_trip_public_cache( $trip_id );
 
         return true;
     }
@@ -804,6 +884,7 @@ class App extends BaseApp {
         }
 
         $this->update_trip_bounds_from_items( $trip_id );
+        $this->clear_trip_public_cache( $trip_id );
 
         return $item_id;
     }
@@ -824,8 +905,156 @@ class App extends BaseApp {
         }
 
         $this->update_trip_bounds_from_items( $trip_id );
+        $this->clear_trip_public_cache( $trip_id );
 
         return true;
+    }
+
+    private function upload_user_trip_item_attachments( int $trip_id, int $index ) {
+        $item = $this->get_user_trip_item_post( $trip_id, $index );
+        if ( ! $item ) {
+            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
+        }
+
+        if ( empty( $_FILES['item_attachment'] ) || ! is_array( $_FILES['item_attachment'] ) ) {
+            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'travel-app' ) );
+        }
+
+        $files = $this->normalize_uploaded_files( $_FILES['item_attachment'] );
+        if ( empty( $files ) ) {
+            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'travel-app' ) );
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+
+        $uploaded = 0;
+        $original_file = $_FILES['item_attachment'];
+
+        foreach ( $files as $file ) {
+            $error = isset( $file['error'] ) ? (int) $file['error'] : UPLOAD_ERR_NO_FILE;
+            if ( UPLOAD_ERR_NO_FILE === $error ) {
+                continue;
+            }
+
+            if ( UPLOAD_ERR_OK !== $error ) {
+                $_FILES['item_attachment'] = $original_file;
+                return new \WP_Error( 'attachment_upload_failed', __( 'The attachment could not be uploaded.', 'travel-app' ) );
+            }
+
+            $size = isset( $file['size'] ) ? (int) $file['size'] : 0;
+            if ( $size > 15 * 1024 * 1024 ) {
+                $_FILES['item_attachment'] = $original_file;
+                return new \WP_Error( 'attachment_too_large', __( 'Attachments must be 15 MB or smaller.', 'travel-app' ) );
+            }
+
+            $_FILES['item_attachment'] = $file;
+            $attachment_id = media_handle_upload( 'item_attachment', $item->ID );
+
+            if ( is_wp_error( $attachment_id ) ) {
+                $_FILES['item_attachment'] = $original_file;
+                return $attachment_id;
+            }
+
+            wp_update_post( [
+                'ID'          => (int) $attachment_id,
+                'post_author' => get_current_user_id(),
+            ] );
+            $uploaded++;
+        }
+
+        $_FILES['item_attachment'] = $original_file;
+
+        if ( 0 === $uploaded ) {
+            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'travel-app' ) );
+        }
+
+        $this->clear_trip_public_cache( $trip_id );
+
+        return $uploaded;
+    }
+
+    private function delete_user_trip_item_attachment( int $trip_id, int $index, int $attachment_id ) {
+        $attachment = $this->get_user_trip_item_attachment( $trip_id, $index, $attachment_id );
+        if ( ! $attachment ) {
+            return new \WP_Error( 'attachment_not_found', __( 'This attachment could not be found.', 'travel-app' ) );
+        }
+
+        $deleted = wp_delete_attachment( $attachment->ID );
+        if ( ! $deleted ) {
+            return new \WP_Error( 'attachment_delete_failed', __( 'This attachment could not be deleted.', 'travel-app' ) );
+        }
+
+        $this->clear_trip_public_cache( $trip_id );
+
+        return true;
+    }
+
+    private function clear_trip_public_cache( int $trip_id ): void {
+        if ( $trip_id <= 0 || '' === (string) get_term_meta( $trip_id, '_travel_app_share_token', true ) ) {
+            return;
+        }
+
+        if ( ! $this->load_wp_super_cache_functions() ) {
+            return;
+        }
+
+        if ( function_exists( 'wp_cache_clear_cache' ) ) {
+            wp_cache_clear_cache( get_current_blog_id() );
+            return;
+        }
+
+        if ( function_exists( 'wp_cache_clean_cache' ) ) {
+            global $file_prefix;
+            wp_cache_clean_cache( isset( $file_prefix ) ? (string) $file_prefix : 'wp-cache-' );
+        }
+    }
+
+    private function load_wp_super_cache_functions(): bool {
+        if ( function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' ) ) {
+            return true;
+        }
+
+        $config_file = WP_CONTENT_DIR . '/wp-cache-config.php';
+        if ( is_readable( $config_file ) ) {
+            require_once $config_file;
+        }
+
+        $phase2_file = WP_CONTENT_DIR . '/plugins/wp-super-cache/wp-cache-phase2.php';
+        if ( is_readable( $phase2_file ) ) {
+            require_once $phase2_file;
+        }
+
+        if ( function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' ) ) {
+            return true;
+        }
+
+        $plugin_file = WP_CONTENT_DIR . '/plugins/wp-super-cache/wp-cache.php';
+        if ( ! function_exists( 'wp_cache_clean_cache' ) && is_readable( $plugin_file ) ) {
+            require_once $plugin_file;
+        }
+
+        return function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' );
+    }
+
+    private function normalize_uploaded_files( array $file ): array {
+        if ( ! isset( $file['name'] ) || ! is_array( $file['name'] ) ) {
+            return [ $file ];
+        }
+
+        $files = [];
+        foreach ( array_keys( $file['name'] ) as $index ) {
+            $files[] = [
+                'name'     => $file['name'][ $index ] ?? '',
+                'type'     => $file['type'][ $index ] ?? '',
+                'tmp_name' => $file['tmp_name'][ $index ] ?? '',
+                'error'    => $file['error'][ $index ] ?? UPLOAD_ERR_NO_FILE,
+                'size'     => $file['size'][ $index ] ?? 0,
+            ];
+        }
+
+        return $files;
     }
 
     private function segment_from_request(): array {
@@ -1271,6 +1500,24 @@ class App extends BaseApp {
         return $post;
     }
 
+    private function get_user_trip_item_attachment( int $trip_id, int $item_id, int $attachment_id ) {
+        $item = $this->get_user_trip_item_post( $trip_id, $item_id );
+        if ( ! $item || $attachment_id <= 0 ) {
+            return null;
+        }
+
+        $attachment = get_post( $attachment_id );
+        if ( ! $attachment || 'attachment' !== $attachment->post_type ) {
+            return null;
+        }
+
+        if ( (int) $attachment->post_parent !== (int) $item->ID || (int) $attachment->post_author !== get_current_user_id() ) {
+            return null;
+        }
+
+        return $attachment;
+    }
+
     private function get_trip_item_posts( int $trip_id, ?int $user_id = null ): array {
         $user_id = $user_id ?? get_current_user_id();
 
@@ -1313,8 +1560,38 @@ class App extends BaseApp {
             'url'      => (string) get_post_meta( $post->ID, '_travel_app_url', true ),
             'url_preview' => $this->get_url_preview_service()->get_item_preview( $post->ID ),
             'url_preview_debug' => $this->get_url_preview_service()->get_item_preview_debug( $post->ID ),
+            'attachments' => $this->get_item_attachments_for_output( $post->ID ),
             'details'  => (string) $post->post_content,
         ];
+    }
+
+    private function get_item_attachments_for_output( int $item_id ): array {
+        $attachments = get_children( [
+            'post_parent'    => $item_id,
+            'post_type'      => 'attachment',
+            'post_status'    => 'inherit',
+            'posts_per_page' => -1,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ] );
+
+        if ( empty( $attachments ) || ! is_array( $attachments ) ) {
+            return [];
+        }
+
+        return array_values( array_map( static function( \WP_Post $attachment ): array {
+            $file = get_attached_file( $attachment->ID );
+            $size = $file && file_exists( $file ) ? size_format( filesize( $file ) ) : '';
+
+            return [
+                'id'       => (int) $attachment->ID,
+                'title'    => (string) get_the_title( $attachment ),
+                'filename' => wp_basename( (string) get_attached_file( $attachment->ID ) ),
+                'mime'     => (string) get_post_mime_type( $attachment ),
+                'size'     => $size,
+                'url'      => (string) wp_get_attachment_url( $attachment->ID ),
+            ];
+        }, $attachments ) );
     }
 
     public function parse_itinerary_text( string $text ): array {

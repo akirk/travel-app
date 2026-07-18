@@ -100,6 +100,15 @@ $get_google_maps_route_url = static function( array $locations ): string {
     return add_query_arg( $args, 'https://www.google.com/maps/dir/' );
 };
 
+$is_transport_segment = static function( array $segment ): bool {
+    $type = (string) ( $segment['type'] ?? '' );
+    if ( in_array( $type, [ 'flight', 'train' ], true ) ) {
+        return true;
+    }
+
+    return 1 === preg_match( '/\bbus(?:ses|es)?\b/i', (string) ( $segment['title'] ?? '' ) . ' ' . (string) ( $segment['details'] ?? '' ) );
+};
+
 $route_locations = [];
 foreach ( $segments as $segment ) {
     foreach ( [ 'location', 'end_location' ] as $location_key ) {
@@ -758,7 +767,7 @@ if ( count( $route_locations ) >= 2 ) {
                                     <?php $segment_start_date = substr( trim( (string) ( $segment['date'] ?? '' ) ), 0, 10 ); ?>
                                     <?php $segment_end_date = substr( trim( (string) ( $segment['end_date'] ?? '' ) ), 0, 10 ); ?>
                                     <?php $show_url_preview = 'checkout' !== $timeline_kind; ?>
-                                    <?php $show_location = 'checkout' !== $timeline_kind && $show_private_share_details; ?>
+                                    <?php $show_location = 'checkout' !== $timeline_kind && ( $show_private_share_details || $is_transport_segment( $segment ) ); ?>
                                     <?php $show_attachments = 'checkout' !== $timeline_kind && $show_private_share_details; ?>
                                     <?php $type_label = 'checkout' === $timeline_kind ? __( 'Check out', 'travel-app' ) : ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ); ?>
                                     <?php $url_preview = isset( $segment['url_preview'] ) && is_array( $segment['url_preview'] ) ? $segment['url_preview'] : []; ?>
@@ -859,6 +868,7 @@ if ( count( $route_locations ) >= 2 ) {
                     <div>
                         <?php foreach ( $unscheduled_segments as $segment ) : ?>
                             <?php $index = (int) $segment['_index']; ?>
+                            <?php $show_location = $show_private_share_details || $is_transport_segment( $segment ); ?>
                             <?php $attachments = $show_private_share_details && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
                             <div class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>">
                                 <div class="summary-grid">
@@ -875,7 +885,7 @@ if ( count( $route_locations ) >= 2 ) {
                                         <?php if ( ! empty( $segment['end_date'] ) ) : ?>
                                             <br><span class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></span>
                                         <?php endif; ?>
-                                        <?php if ( $show_private_share_details && ! empty( $segment['location'] ) ) : ?>
+                                        <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
                                             <?php $location = (string) $segment['location']; ?>
                                             <br><span class="detail">
                                                 <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
@@ -884,7 +894,7 @@ if ( count( $route_locations ) >= 2 ) {
                                                 </a>
                                             </span>
                                         <?php endif; ?>
-                                        <?php if ( $show_private_share_details && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                                        <?php if ( $show_location && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
                                             <?php $end_location = (string) $segment['end_location']; ?>
                                             <br><span class="detail">
                                                 <?php esc_html_e( 'To:', 'travel-app' ); ?>
@@ -961,7 +971,7 @@ if ( count( $route_locations ) >= 2 ) {
                             <div class="share-option">
                                 <span>
                                     <strong><?php esc_html_e( 'Others', 'travel-app' ); ?></strong><br>
-                                    <span class="empty"><?php esc_html_e( 'Hides addresses and attachments.', 'travel-app' ); ?></span>
+                                    <span class="empty"><?php esc_html_e( 'Shows transport start and end locations; hides other addresses and attachments.', 'travel-app' ); ?></span>
                                 </span>
                                 <span class="share-actions">
                                     <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>

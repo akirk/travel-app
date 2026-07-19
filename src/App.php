@@ -48,6 +48,7 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_travel_app_import', [ $this, 'handle_import' ] );
         add_action( 'admin_post_travel_app_update_trip', [ $this, 'handle_update_trip' ] );
+        add_action( 'admin_post_travel_app_download_trip_html', [ $this, 'handle_download_trip_html' ] );
         add_action( 'wp_ajax_travel_app_generate_share_link', [ $this, 'handle_generate_share_link' ] );
         add_action( 'wp_ajax_travel_app_remove_share_link', [ $this, 'handle_remove_share_link' ] );
         add_action( 'wp_ajax_travel_app_clear_share_cache', [ $this, 'handle_clear_share_cache' ] );
@@ -89,6 +90,10 @@ class App extends BaseApp {
         $enabled = defined( 'TRAVEL_APP_DEMO_MODE' ) && TRAVEL_APP_DEMO_MODE;
 
         return (bool) apply_filters( 'travel_app_demo_mode_enabled', $enabled );
+    }
+
+    public function is_playground(): bool {
+        return function_exists( __NAMESPACE__ . '\is_playground' ) && is_playground();
     }
 
     private function get_url_preview_service(): UrlPreviewService {
@@ -1103,6 +1108,39 @@ class App extends BaseApp {
         exit;
     }
 
+    public function handle_download_trip_html(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_die( esc_html__( 'You must be logged in to download travel plans.', 'travel-app' ), 403 );
+        }
+
+        $trip_id = isset( $_GET['trip_id'] ) ? absint( $_GET['trip_id'] ) : 0;
+        check_admin_referer( 'travel_app_download_trip_html_' . $trip_id );
+
+        $trip = $this->get_user_trip( $trip_id );
+        if ( ! $trip ) {
+            wp_die( esc_html__( 'This travel plan could not be found.', 'travel-app' ), 404 );
+        }
+
+        $mode = isset( $_GET['share_mode'] ) ? sanitize_key( wp_unslash( $_GET['share_mode'] ) ) : 'fellow';
+        $mode = $this->normalize_share_mode( $mode );
+        $html = $this->render_static_trip_html( $trip_id, $mode );
+        $filename = sanitize_title( (string) $trip->name );
+        if ( '' === $filename ) {
+            $filename = 'travel-plan-' . $trip_id;
+        }
+        if ( 'public' === $mode ) {
+            $filename .= '-public';
+        }
+
+        nocache_headers();
+        header( 'Content-Type: text/html; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '.html"' );
+        header( 'Content-Length: ' . strlen( $html ) );
+
+        echo $html;
+        exit;
+    }
+
     public function handle_generate_share_link(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
             wp_send_json_error( [ 'message' => __( 'You must be logged in to share travel plans.', 'travel-app' ) ], 403 );
@@ -1729,6 +1767,53 @@ class App extends BaseApp {
         return (int) get_term_meta( $trip_id, '_travel_app_user_id', true );
     }
 
+    public function get_trip_html_download_url( int $trip_id, string $mode = 'fellow' ): string {
+        if ( $trip_id <= 0 ) {
+            return '';
+        }
+
+        $mode = $this->normalize_share_mode( $mode );
+
+        return wp_nonce_url(
+            admin_url( 'admin-post.php?action=travel_app_download_trip_html&trip_id=' . $trip_id . '&share_mode=' . $mode ),
+            'travel_app_download_trip_html_' . $trip_id
+        );
+    }
+
+    public function get_static_timeline_script(): string {
+        $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
+
+        return is_readable( $script_path ) ? (string) file_get_contents( $script_path ) : '';
+    }
+
+    private function render_static_trip_html( int $trip_id, string $mode = 'fellow' ): string {
+        global $wp_app_route;
+
+        $previous_route = $wp_app_route ?? null;
+        $wp_app_route = [
+            'app_path' => $this->get_url_path(),
+            'pattern'  => 'trip/{id}',
+            'template' => 'trip.php',
+            'params'   => [
+                'id' => (string) $trip_id,
+            ],
+        ];
+
+        $travel_app_static_download = true;
+        $travel_app_static_share_mode = $this->normalize_share_mode( $mode );
+        ob_start();
+        include $this->get_template_dir() . '/trip.php';
+        $html = (string) ob_get_clean();
+
+        if ( null === $previous_route ) {
+            unset( $wp_app_route );
+        } else {
+            $wp_app_route = $previous_route;
+        }
+
+        return $html;
+    }
+
     public function get_user_trip_segment( int $trip_id, int $index ) {
         $item = $this->get_user_trip_item_post( $trip_id, $index );
 
@@ -1815,7 +1900,7 @@ class App extends BaseApp {
         return 'public' === $this->normalize_share_mode( $mode ) ? '_travel_app_public_share_token' : '_travel_app_share_token';
     }
 
-    public function get_trip_summary_parts( array $trip_data, ?string $today = null ): array {
+    public function get_trip_summary_parts( array $trip_data, ?string $today = null, bool $include_relative = true ): array {
         $today = $today ?: current_time( 'Y-m-d' );
         $parts = [];
 
@@ -1824,9 +1909,11 @@ class App extends BaseApp {
             $parts[] = $date_range;
         }
 
-        $relative_label = $this->get_trip_relative_label( $trip_data, $today );
-        if ( '' !== $relative_label ) {
-            $parts[] = $relative_label;
+        if ( $include_relative ) {
+            $relative_label = $this->get_trip_relative_label( $trip_data, $today );
+            if ( '' !== $relative_label ) {
+                $parts[] = $relative_label;
+            }
         }
 
         $duration_label = $this->get_trip_duration_label( $trip_data );
@@ -1835,6 +1922,18 @@ class App extends BaseApp {
         }
 
         return $parts;
+    }
+
+    public function is_trip_active( array $trip_data, ?string $today = null ): bool {
+        $today = $today ?: current_time( 'Y-m-d' );
+        $starts = (string) ( $trip_data['starts_at'] ?? '' );
+        $ends = (string) ( $trip_data['ends_at'] ?? '' );
+
+        if ( '' === $starts ) {
+            return false;
+        }
+
+        return $starts <= $today && ( '' === $ends || $ends >= $today );
     }
 
     public function get_trip_date_range_label( array $trip_data ): string {

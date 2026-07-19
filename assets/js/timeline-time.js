@@ -388,11 +388,31 @@
         });
     }
 
+    function updateStandaloneTimelines() {
+        var controlledIds = {};
+        document.querySelectorAll('[data-demo-controls]').forEach(function(control) {
+            controlledIds[control.getAttribute('data-demo-controls')] = true;
+        });
+
+        var value = currentDateTimeValue();
+        var currentTime = parseDateTime(value);
+        var dateValue = value ? value.slice(0, 10) : '';
+
+        document.querySelectorAll('.timeline').forEach(function(target) {
+            var id = target.getAttribute('data-demo-target') || '';
+            if (!controlledIds[id]) {
+                updateTimelineTarget(target, value, dateValue, currentTime);
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('[data-demo-controls]').forEach(initControl);
+        updateStandaloneTimelines();
         updateStandalonePreviews();
         window.setInterval(function() {
             document.querySelectorAll('[data-demo-controls]').forEach(updateControl);
+            updateStandaloneTimelines();
             updateStandalonePreviews();
         }, 60000);
     });

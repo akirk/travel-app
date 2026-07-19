@@ -7,10 +7,12 @@ $travel_app = App::get_instance();
 $demo_mode_enabled = $travel_app->is_demo_mode_enabled();
 $trip_id    = isset( $wp_app_route['params']['id'] ) ? absint( $wp_app_route['params']['id'] ) : absint( get_query_var( 'id' ) );
 $share_token = isset( $wp_app_route['params']['token'] ) ? sanitize_text_field( wp_unslash( $wp_app_route['params']['token'] ) ) : '';
+$is_static_download = ! empty( $travel_app_static_download );
 $is_shared_timeline = ! empty( $travel_app_shared_timeline ) || '' !== $share_token;
+$is_readonly_timeline = $is_shared_timeline || $is_static_download;
 $trip       = $is_shared_timeline ? $travel_app->get_public_trip_by_share_token( $trip_id, $share_token ) : $travel_app->get_user_trip( $trip_id );
-$share_mode = $is_shared_timeline ? $travel_app->get_trip_share_mode_by_token( $trip_id, $share_token ) : '';
-$show_private_share_details = ! $is_shared_timeline || 'fellow' === $share_mode;
+$share_mode = $is_static_download ? ( isset( $travel_app_static_share_mode ) ? (string) $travel_app_static_share_mode : 'fellow' ) : ( $is_shared_timeline ? $travel_app->get_trip_share_mode_by_token( $trip_id, $share_token ) : '' );
+$show_private_share_details = ( ! $is_shared_timeline && ! $is_static_download ) || 'fellow' === $share_mode;
 $updated    = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
 $trip_updated = isset( $_GET['trip_updated'] ) ? absint( $_GET['trip_updated'] ) : null;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
@@ -21,6 +23,7 @@ if ( ! $trip ) {
 
 $trip_data = $trip ? $travel_app->format_trip_for_output( $trip, $is_shared_timeline ? $travel_app->get_trip_owner_id( $trip_id ) : null ) : null;
 $segments  = $trip_data['segments'] ?? [];
+$is_trip_active = $trip_data ? $travel_app->is_trip_active( $trip_data ) : false;
 $fellow_share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
 $public_share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
 $timeline_segments = [];
@@ -128,7 +131,7 @@ $trip_route_links = [];
 $trip_direct_map_url = '';
 if ( count( $route_locations ) >= 2 ) {
     $trip_route_links['google'] = $get_google_maps_route_url( $route_locations );
-    $trip_direct_map_url = home_url( '/travel-app/trip/' . (int) $trip_data['id'] . '/map/' );
+    $trip_direct_map_url = $is_static_download ? '' : home_url( '/travel-app/trip/' . (int) $trip_data['id'] . '/map/' );
 }
 ?>
 <!DOCTYPE html>
@@ -138,9 +141,33 @@ if ( count( $route_locations ) >= 2 ) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo wp_app_title( $trip_data ? $trip_data['title'] : __( 'Travel Plan', 'travel-app' ) ); ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
-    <?php wp_app_head(); ?>
+    <?php if ( ! $is_static_download ) : ?>
+        <?php wp_app_head(); ?>
+    <?php endif; ?>
     <style>
-        :root { color-scheme: light dark; }
+        :root {
+            color-scheme: light dark;
+            <?php if ( $is_static_download ) : ?>
+                --wp-app-color-background: #f8fafc;
+                --wp-app-color-surface: #fff;
+                --wp-app-color-text: #17202a;
+                --wp-app-color-muted: #5f6b7a;
+                --wp-app-color-border: #d8dee8;
+                --wp-app-color-link: #0b6bcb;
+            <?php endif; ?>
+        }
+        <?php if ( $is_static_download ) : ?>
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --wp-app-color-background: #111418;
+                    --wp-app-color-surface: #191e24;
+                    --wp-app-color-text: #f1f5f9;
+                    --wp-app-color-muted: #a7b0bd;
+                    --wp-app-color-border: #303844;
+                    --wp-app-color-link: #7ab7ff;
+                }
+            }
+        <?php endif; ?>
         body {
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
@@ -154,6 +181,17 @@ if ( count( $route_locations ) >= 2 ) {
         h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.04; margin-bottom: 12px; letter-spacing: 0; }
         h2 { font-size: 1.15rem; margin-bottom: 14px; }
         h3 { font-size: 1rem; margin-bottom: 5px; }
+        .screen-reader-text {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            word-wrap: normal;
+            border: 0;
+        }
         label { display: block; font-weight: 650; margin-bottom: 5px; }
         input, select, textarea {
             box-sizing: border-box;
@@ -294,16 +332,6 @@ if ( count( $route_locations ) >= 2 ) {
             height: 0;
             border-top: 2px solid #c62828;
             pointer-events: none;
-        }
-        .time-marker::before {
-            content: "";
-            position: absolute;
-            left: -33px;
-            top: -6px;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #c62828;
         }
         .time-marker span {
             position: absolute;
@@ -622,20 +650,22 @@ if ( count( $route_locations ) >= 2 ) {
     </style>
 </head>
 <body>
-    <?php wp_app_body_open(); ?>
+    <?php if ( ! $is_static_download ) : ?>
+        <?php wp_app_body_open(); ?>
+    <?php endif; ?>
 
     <main>
-        <?php if ( ! $is_shared_timeline ) : ?>
+        <?php if ( ! $is_readonly_timeline ) : ?>
             <div class="topbar">
                 <a href="<?php echo esc_url( home_url( '/travel-app/' ) ); ?>"><?php esc_html_e( 'Back to Travel App', 'travel-app' ); ?></a>
             </div>
         <?php endif; ?>
 
-        <?php if ( ! $is_shared_timeline && null !== $trip_updated ) : ?>
+        <?php if ( ! $is_readonly_timeline && null !== $trip_updated ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Travel plan updated.', 'travel-app' ); ?></div>
-        <?php elseif ( ! $is_shared_timeline && null !== $updated ) : ?>
+        <?php elseif ( ! $is_readonly_timeline && null !== $updated ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Itinerary item updated.', 'travel-app' ); ?></div>
-        <?php elseif ( ! $is_shared_timeline && $error ) : ?>
+        <?php elseif ( ! $is_readonly_timeline && $error ) : ?>
             <div class="notice error" role="alert"><?php esc_html_e( 'The requested change could not be saved.', 'travel-app' ); ?></div>
         <?php endif; ?>
 
@@ -648,14 +678,14 @@ if ( count( $route_locations ) >= 2 ) {
             <header>
                 <div class="trip-title-header">
                     <h1><?php echo esc_html( $trip_data['title'] ); ?></h1>
-                    <?php if ( ! $is_shared_timeline ) : ?>
+                    <?php if ( ! $is_readonly_timeline ) : ?>
                         <button class="trip-title-edit-button" type="button" data-trip-title-edit aria-controls="trip-title-form" aria-expanded="false" title="<?php esc_attr_e( 'Edit travel plan title', 'travel-app' ); ?>">
                             <span aria-hidden="true">✎</span>
                             <span class="screen-reader-text"><?php esc_html_e( 'Edit travel plan title', 'travel-app' ); ?></span>
                         </button>
                     <?php endif; ?>
                 </div>
-                <?php if ( ! $is_shared_timeline ) : ?>
+                <?php if ( ! $is_readonly_timeline ) : ?>
                     <form class="trip-title-form" id="trip-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
                         <input type="hidden" name="action" value="travel_app_update_trip">
                         <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
@@ -668,7 +698,7 @@ if ( count( $route_locations ) >= 2 ) {
                     </form>
                 <?php endif; ?>
                 <div class="meta">
-                    <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data ) as $summary_part ) : ?>
+                    <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, null, ! $is_static_download ) as $summary_part ) : ?>
                         <span><?php echo esc_html( $summary_part ); ?></span>
                     <?php endforeach; ?>
                     <span><?php echo esc_html( sprintf( _n( '%d item', '%d items', count( $segments ), 'travel-app' ), count( $segments ) ) ); ?></span>
@@ -678,7 +708,7 @@ if ( count( $route_locations ) >= 2 ) {
             <section class="panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
                 <div class="timeline-header">
                     <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
-                    <?php if ( ! $is_shared_timeline ) : ?>
+                    <?php if ( ! $is_readonly_timeline ) : ?>
                         <button class="add-item-button" type="button" data-add-item-toggle aria-controls="add-item-form" aria-expanded="false">
                             <?php esc_html_e( '+ Add Item', 'travel-app' ); ?>
                         </button>
@@ -687,12 +717,12 @@ if ( count( $route_locations ) >= 2 ) {
                 <?php
                 $demo_control_id = 'trip-' . (string) $trip_data['id'];
                 $demo_control_value = $demo_start_time;
-                if ( ! $is_shared_timeline && $demo_mode_enabled ) {
+                if ( ! $is_readonly_timeline && $demo_mode_enabled && ! $is_trip_active ) {
                     require __DIR__ . '/partials/demo-controls.php';
                 }
                 ?>
 
-                <?php if ( ! $is_shared_timeline ) : ?>
+                <?php if ( ! $is_readonly_timeline ) : ?>
                     <form class="edit-form add-item-form" id="add-item-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
                         <input type="hidden" name="action" value="travel_app_add_segment">
                         <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
@@ -779,7 +809,7 @@ if ( count( $route_locations ) >= 2 ) {
                                             <div>
                                                 <div class="type"><?php echo esc_html( $type_label ); ?></div>
                                                 <div class="timeline-title-row title">
-                                                    <?php if ( $is_shared_timeline ) : ?>
+                                                    <?php if ( $is_readonly_timeline ) : ?>
                                                         <span><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
                                                     <?php else : ?>
                                                         <a class="timeline-title-link" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
@@ -815,7 +845,7 @@ if ( count( $route_locations ) >= 2 ) {
                                                         </a>
                                                     </div>
                                                 <?php endif; ?>
-                                                <?php if ( ! empty( $segment['details'] ) ) : ?>
+                                                <?php if ( $show_private_share_details && ! empty( $segment['details'] ) ) : ?>
                                                     <div class="detail"><?php echo esc_html( $segment['details'] ); ?></div>
                                                 <?php endif; ?>
                                                 <?php if ( ! empty( $attachments ) ) : ?>
@@ -875,7 +905,7 @@ if ( count( $route_locations ) >= 2 ) {
                                     <span class="time"><?php echo esc_html( trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) ) ); ?></span>
                                     <span>
                                         <span class="type"><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span><br>
-                                        <?php if ( $is_shared_timeline ) : ?>
+                                        <?php if ( $is_readonly_timeline ) : ?>
                                             <span class="title"><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
                                         <?php else : ?>
                                             <a class="timeline-title-link title" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
@@ -921,7 +951,7 @@ if ( count( $route_locations ) >= 2 ) {
                                             </div>
                                         <?php endif; ?>
                                     </span>
-                                    <?php if ( ! $is_shared_timeline ) : ?>
+                                    <?php if ( ! $is_readonly_timeline ) : ?>
                                         <a class="detail" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>"><?php esc_html_e( 'Open', 'travel-app' ); ?></a>
                                     <?php endif; ?>
                                 </div>
@@ -953,7 +983,7 @@ if ( count( $route_locations ) >= 2 ) {
                 </section>
             <?php endif; ?>
 
-            <?php if ( ! $is_shared_timeline ) : ?>
+            <?php if ( ! $is_readonly_timeline ) : ?>
                 <section class="sharing-zone" aria-labelledby="sharing-heading" data-share-control data-trip-id="<?php echo esc_attr( (string) $trip_data['id'] ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'travel_app_share_link_' . $trip_data['id'] ) ); ?>" data-ajax-url="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
                     <details>
                         <summary><h2 id="sharing-heading"><?php esc_html_e( 'Sharing', 'travel-app' ); ?></h2></summary>
@@ -964,8 +994,13 @@ if ( count( $route_locations ) >= 2 ) {
                                     <span class="empty"><?php esc_html_e( 'Includes addresses and attachments.', 'travel-app' ); ?></span>
                                 </span>
                                 <span class="share-actions">
-                                    <button class="ghost-button" type="button" data-share-copy data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
-                                    <button class="ghost-button" type="button" data-share-remove data-share-mode="fellow" <?php echo '' === $fellow_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                    <a class="ghost-button" href="<?php echo esc_url( $travel_app->get_trip_html_download_url( (int) $trip_data['id'], 'fellow' ) ); ?>">
+                                        <?php esc_html_e( 'Download', 'travel-app' ); ?>
+                                    </a>
+                                    <?php if ( ! $travel_app->is_playground() ) : ?>
+                                        <button class="ghost-button" type="button" data-share-copy data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                                        <button class="ghost-button" type="button" data-share-remove data-share-mode="fellow" <?php echo '' === $fellow_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                    <?php endif; ?>
                                 </span>
                             </div>
                             <div class="share-option">
@@ -974,17 +1009,24 @@ if ( count( $route_locations ) >= 2 ) {
                                     <span class="empty"><?php esc_html_e( 'Shows transport start and end locations; hides other addresses and attachments.', 'travel-app' ); ?></span>
                                 </span>
                                 <span class="share-actions">
-                                    <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
-                                    <button class="ghost-button" type="button" data-share-remove data-share-mode="public" <?php echo '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                    <a class="ghost-button" href="<?php echo esc_url( $travel_app->get_trip_html_download_url( (int) $trip_data['id'], 'public' ) ); ?>">
+                                        <?php esc_html_e( 'Download', 'travel-app' ); ?>
+                                    </a>
+                                    <?php if ( ! $travel_app->is_playground() ) : ?>
+                                        <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
+                                        <button class="ghost-button" type="button" data-share-remove data-share-mode="public" <?php echo '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                    <?php endif; ?>
                                 </span>
                             </div>
                         </div>
-                        <p class="empty" data-share-status aria-live="polite"></p>
+                        <?php if ( ! $travel_app->is_playground() ) : ?>
+                            <p class="empty" data-share-status aria-live="polite"></p>
+                        <?php endif; ?>
                     </details>
                 </section>
             <?php endif; ?>
 
-            <?php if ( ! $is_shared_timeline ) : ?>
+            <?php if ( ! $is_readonly_timeline ) : ?>
                 <section class="danger-zone" aria-labelledby="delete-heading">
                     <details>
                         <summary><h2 id="delete-heading"><?php esc_html_e( 'Delete Travel Plan', 'travel-app' ); ?></h2></summary>
@@ -1001,7 +1043,7 @@ if ( count( $route_locations ) >= 2 ) {
         <?php endif; ?>
     </main>
 
-    <?php if ( ! $is_shared_timeline ) : ?>
+    <?php if ( ! $is_readonly_timeline ) : ?>
         <script>
             (function() {
                 var button = document.querySelector('[data-trip-title-edit]');
@@ -1220,6 +1262,15 @@ if ( count( $route_locations ) >= 2 ) {
         </script>
     <?php endif; ?>
 
-    <?php wp_app_body_close(); ?>
+    <?php if ( $is_static_download ) : ?>
+        <?php $static_timeline_script = $travel_app->get_static_timeline_script(); ?>
+        <?php if ( '' !== $static_timeline_script ) : ?>
+            <script>
+                <?php echo $static_timeline_script; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+            </script>
+        <?php endif; ?>
+    <?php else : ?>
+        <?php wp_app_body_close(); ?>
+    <?php endif; ?>
 </body>
 </html>

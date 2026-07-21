@@ -430,6 +430,9 @@ if ( count( $route_locations ) >= 2 ) {
         }
         .time { color: var(--wp-app-color-muted); font-weight: 750; }
         .type { color: var(--wp-app-color-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0; }
+        .timeline-meta {
+            min-width: 0;
+        }
         .title { font-weight: 750; overflow-wrap: anywhere; }
         .detail { color: var(--wp-app-color-muted); overflow-wrap: anywhere; }
         .detail a {
@@ -655,6 +658,11 @@ if ( count( $route_locations ) >= 2 ) {
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
             .timeline-item, .summary-grid, .edit-form, .share-option { grid-template-columns: 1fr; }
+            .timeline-meta {
+                display: flex;
+                align-items: baseline;
+                gap: 8px;
+            }
             .url-preview { grid-template-columns: 1fr; }
             .url-preview-image { width: 100%; }
             .trip-title-header { align-items: flex-start; }
@@ -820,9 +828,11 @@ if ( count( $route_locations ) >= 2 ) {
                                     <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
                                         <div class="timeline-item" data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
-                                            <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
-                                            <div>
+                                            <div class="timeline-meta">
+                                                <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
                                                 <div class="type"><?php echo esc_html( $type_label ); ?></div>
+                                            </div>
+                                            <div>
                                                 <div class="timeline-title-row title">
                                                     <?php if ( $is_readonly_timeline ) : ?>
                                                         <span><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>

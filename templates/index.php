@@ -68,6 +68,8 @@ usort( $current_trips, $sort_asc );
 usort( $upcoming_trips, $sort_asc );
 usort( $past_trips, $sort_desc );
 
+$quick_plan_selectable_trips = array_values( array_merge( $current_trips, $upcoming_trips ) );
+
 $past_trips_by_year = [];
 foreach ( $past_trips as $trip_data ) {
     $year = substr( (string) ( ( $trip_data['ends_at'] ?? '' ) ?: ( $trip_data['starts_at'] ?? '' ) ), 0, 4 );
@@ -344,6 +346,8 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
         @media (max-width: 880px) {
             .app-header, .dashboard, .mini-timeline, .quick-plan-fields { grid-template-columns: 1fr; }
             .status-stack { justify-content: flex-start; }
+            .dashboard-import-confirm .trip-sections { order: 2; }
+            .dashboard-import-confirm .import-panel { order: 1; }
             button { width: 100%; }
         }
     </style>
@@ -383,8 +387,8 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             ?>
         <?php endif; ?>
 
-        <div class="dashboard">
-            <div>
+        <div class="dashboard <?php echo ! empty( $quick_plan_segment ) ? 'dashboard-import-confirm' : ''; ?>">
+            <div class="trip-sections">
                 <?php if ( empty( $trips ) ) : ?>
                     <section class="panel">
                         <div class="empty"><?php esc_html_e( 'No travel plans yet. Import a confirmation or calendar file to build your first itinerary.', 'travel-app' ); ?></div>
@@ -501,7 +505,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                             <input type="hidden" name="quick_plan_draft" value="<?php echo esc_attr( $quick_plan_draft_key ); ?>">
                             <?php wp_nonce_field( 'travel_app_import' ); ?>
                             <p class="quick-plan-confirm">
-                                <?php esc_html_e( 'Review the parsed fields, update matches if needed, then choose where to save it.', 'travel-app' ); ?>
+                                <?php esc_html_e( 'Review the parsed fields, then choose where to save it.', 'travel-app' ); ?>
                                 <?php
                                 printf(
                                     /* translators: %s: parser source label. */
@@ -588,9 +592,30 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                         <input type="text" name="quick_plan_trip_title" value="<?php echo esc_attr( $quick_plan_trip_title ); ?>" aria-label="<?php esc_attr_e( 'New travel plan title', 'travel-app' ); ?>">
                                     </span>
                                 </label>
+                                <?php if ( count( $quick_plan_selectable_trips ) > 1 ) : ?>
+                                    <label class="quick-plan-choice">
+                                        <input type="radio" name="quick_plan_target" value="existing">
+                                        <span>
+                                            <strong><?php esc_html_e( 'Choose a current or upcoming trip', 'travel-app' ); ?></strong>
+                                            <select name="quick_plan_existing_trip" data-quick-plan-existing-trip aria-label="<?php esc_attr_e( 'Current or upcoming trip', 'travel-app' ); ?>">
+                                                <?php foreach ( $quick_plan_selectable_trips as $trip_data ) : ?>
+                                                    <option value="<?php echo esc_attr( (string) ( $trip_data['id'] ?? 0 ) ); ?>">
+                                                        <?php
+                                                        echo esc_html(
+                                                            trim(
+                                                                (string) ( $trip_data['title'] ?? __( 'Travel plan', 'travel-app' ) ) . ' - ' .
+                                                                $travel_app->format_date_range_label( (string) ( $trip_data['starts_at'] ?? '' ), (string) ( $trip_data['ends_at'] ?? '' ) )
+                                                            )
+                                                        );
+                                                        ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </span>
+                                    </label>
+                                <?php endif; ?>
                             </div>
                             <div class="quick-plan-actions">
-                                <button class="ghost-button" type="submit" name="quick_plan_update_draft" value="1"><?php esc_html_e( 'Update Matches', 'travel-app' ); ?></button>
                                 <button type="submit"><?php esc_html_e( 'Add Plan', 'travel-app' ); ?></button>
                             </div>
                         </form>
@@ -615,6 +640,24 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
 
     <?php wp_app_body_close(); ?>
     <script>
+        (function() {
+            var tripSelect = document.querySelector('[data-quick-plan-existing-trip]');
+            if (!tripSelect) {
+                return;
+            }
+
+            function selectExistingTripOption() {
+                var choice = tripSelect.closest('.quick-plan-choice');
+                var radio = choice ? choice.querySelector('input[type="radio"]') : null;
+                if (radio) {
+                    radio.checked = true;
+                }
+            }
+
+            tripSelect.addEventListener('focus', selectExistingTripOption);
+            tripSelect.addEventListener('change', selectExistingTripOption);
+        }());
+
         (function() {
             var dropZone = document.getElementById('itinerary_drop_zone');
             var fileInput = document.getElementById('itinerary_file');

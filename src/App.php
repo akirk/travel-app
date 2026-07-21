@@ -894,13 +894,18 @@ class App extends BaseApp {
 
         check_admin_referer( 'travel_app_import' );
 
-        $redirect = home_url( '/' . $this->get_url_path() . '/' );
+        $import_trip_id = isset( $_POST['import_trip_id'] ) ? absint( $_POST['import_trip_id'] ) : 0;
+        $redirect = $import_trip_id
+            ? home_url( '/' . $this->get_url_path() . '/trip/' . $import_trip_id . '/' )
+            : home_url( '/' . $this->get_url_path() . '/' );
+        if ( $import_trip_id && ! $this->get_user_trip( $import_trip_id ) ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'edit_forbidden', home_url( '/' . $this->get_url_path() . '/' ) ) );
+            exit;
+        }
+
         $draft_key = isset( $_POST['quick_plan_draft'] ) ? sanitize_key( wp_unslash( $_POST['quick_plan_draft'] ) ) : '';
         if ( '' !== $draft_key ) {
             $target = isset( $_POST['quick_plan_target'] ) ? sanitize_text_field( wp_unslash( $_POST['quick_plan_target'] ) ) : '';
-            if ( isset( $_POST['quick_plan_update_draft'] ) ) {
-                $this->update_quick_plan_draft_submission( $draft_key, $redirect );
-            }
             $this->save_quick_plan_draft_submission( $draft_key, $target, $redirect );
         }
 
@@ -921,6 +926,27 @@ class App extends BaseApp {
         }
 
         $parsed = $this->parse_itinerary_text( $text );
+
+        if ( $import_trip_id ) {
+            $segment = 1 === count( $parsed['segments'] ?? [] ) ? ( $parsed['segments'][0] ?? [] ) : [];
+            if ( empty( $segment ) || empty( $segment['date'] ) ) {
+                wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
+                exit;
+            }
+
+            $draft_key = $this->store_quick_plan_draft( [
+                'text'       => sanitize_text_field( wp_unslash( $text ) ),
+                'segment'    => $segment,
+                'matches'    => [],
+                'trip_title' => $this->get_quick_plan_trip_title( $segment ),
+                'parser'     => (string) ( $parsed['parser'] ?? 'fallback' ),
+                'parser_error' => $parsed['parser_error'] ?? [],
+                'target_trip_id' => $import_trip_id,
+            ] );
+
+            wp_safe_redirect( add_query_arg( 'quick_plan_draft', rawurlencode( $draft_key ), $redirect ) );
+            exit;
+        }
 
         if ( '' === trim( $file_text ) && 1 === count( $parsed['segments'] ?? [] ) ) {
             $segment = $parsed['segments'][0] ?? [];
@@ -965,7 +991,7 @@ class App extends BaseApp {
         exit;
     }
 
-    private function update_quick_plan_draft_submission( string $draft_key, string $redirect ): void {
+    private function save_quick_plan_draft_submission( string $draft_key, string $target, string $redirect ): void {
         $draft = $this->get_quick_plan_draft( $draft_key );
         if ( empty( $draft ) ) {
             wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
@@ -978,24 +1004,12 @@ class App extends BaseApp {
             exit;
         }
 
-        $source_text = (string) ( $draft['text'] ?? '' );
-        $trip_title = isset( $_POST['quick_plan_trip_title'] ) ? sanitize_text_field( wp_unslash( $_POST['quick_plan_trip_title'] ) ) : '';
-        $draft['segment'] = $segment;
-        $draft['matches'] = $this->find_quick_plan_trip_matches( $segment, $source_text . ' ' . $segment['title'] . ' ' . $segment['location'] );
-        $draft['trip_title'] = '' !== trim( $trip_title ) ? $trip_title : $this->get_quick_plan_trip_title( $segment );
-        set_transient( $this->get_quick_plan_transient_name( $draft_key ), $draft, 15 * MINUTE_IN_SECONDS );
-
-        wp_safe_redirect( add_query_arg( 'quick_plan_draft', rawurlencode( $draft_key ), $redirect ) );
-        exit;
-    }
-
-    private function save_quick_plan_draft_submission( string $draft_key, string $target, string $redirect ): void {
-        $draft = $this->get_quick_plan_draft( $draft_key );
-
-        $segment = $this->segment_from_request();
-        if ( empty( $segment ) || empty( $segment['date'] ) ) {
-            wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
-            exit;
+        if ( 'existing' === $target ) {
+            $target = isset( $_POST['quick_plan_existing_trip'] ) ? (string) absint( $_POST['quick_plan_existing_trip'] ) : '';
+            if ( '' === $target || '0' === $target ) {
+                wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
+                exit;
+            }
         }
 
         if ( 'new' === $target || '' === $target ) {

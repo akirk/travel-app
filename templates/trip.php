@@ -457,6 +457,9 @@ if ( count( $route_locations ) >= 2 ) {
             font-size: 0.88rem;
             line-height: 1.42;
         }
+        .timeline-item .timeline-note {
+            font-size: 0.8rem;
+        }
         .attachment-links {
             display: flex;
             flex-wrap: wrap;
@@ -657,6 +660,14 @@ if ( count( $route_locations ) >= 2 ) {
         }
         .empty { color: var(--wp-app-color-muted); }
         @media (max-width: 680px) {
+            .timeline-panel {
+                background: transparent;
+                border: 0;
+                padding: 0;
+            }
+            .timeline-item {
+                background: var(--wp-app-color-surface);
+            }
             .timeline-item, .summary-grid, .edit-form, .share-option { grid-template-columns: 1fr; }
             .timeline-meta {
                 display: flex;
@@ -728,7 +739,7 @@ if ( count( $route_locations ) >= 2 ) {
                 </div>
             </header>
 
-            <section class="panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
+            <section class="panel timeline-panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
                 <div class="timeline-header">
                     <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
                     <?php if ( ! $is_readonly_timeline ) : ?>
@@ -871,7 +882,7 @@ if ( count( $route_locations ) >= 2 ) {
                                                     </div>
                                                 <?php endif; ?>
                                                 <?php if ( $show_private_share_details && ! empty( $segment['details'] ) ) : ?>
-                                                    <div class="detail"><?php echo esc_html( $segment['details'] ); ?></div>
+                                                    <div class="detail timeline-note"><?php echo esc_html( $segment['details'] ); ?></div>
                                                 <?php endif; ?>
                                                 <?php if ( ! empty( $attachments ) ) : ?>
                                                     <div class="attachment-links" aria-label="<?php esc_attr_e( 'Attachments', 'travel-app' ); ?>">

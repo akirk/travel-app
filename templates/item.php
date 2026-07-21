@@ -250,7 +250,7 @@ if ( ! $trip || ! $segment ) {
         <?php elseif ( $attachment_deleted ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Attachment deleted.', 'travel-app' ); ?></div>
         <?php elseif ( $error ) : ?>
-            <div class="notice error" role="alert"><?php esc_html_e( 'The requested change could not be saved.', 'travel-app' ); ?></div>
+            <div class="notice error" role="alert"><?php echo esc_html( $travel_app->get_error_notice_message( $error ) ); ?></div>
         <?php endif; ?>
 
         <?php if ( ! $trip_data || ! $segment ) : ?>

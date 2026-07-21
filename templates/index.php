@@ -376,7 +376,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
         <?php elseif ( $deleted ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Travel plan deleted.', 'travel-app' ); ?></div>
         <?php elseif ( $error ) : ?>
-            <div class="notice error" role="alert"><?php esc_html_e( 'The itinerary could not be imported.', 'travel-app' ); ?></div>
+            <div class="notice error" role="alert"><?php echo esc_html( $travel_app->get_error_notice_message( $error, __( 'The itinerary could not be imported.', 'travel-app' ) ) ); ?></div>
         <?php endif; ?>
 
         <?php if ( $demo_mode_enabled && ! empty( $trips ) ) : ?>

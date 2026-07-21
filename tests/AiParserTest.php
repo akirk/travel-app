@@ -44,6 +44,22 @@ final class AiParserTest extends TestCase {
         );
     }
 
+    public function test_prompt_keeps_details_overview_focused(): void {
+        $GLOBALS['travel_app_generic_parser_response'] = json_encode( [
+            'title'     => 'Overview Trip',
+            'starts_at' => '',
+            'ends_at'   => '',
+            'segments'  => [],
+        ] );
+
+        ( new AiParser() )->parse( 'Hotel confirmation ABC123' );
+
+        self::assertStringContainsString( 'Keep details short and itinerary-focused', $GLOBALS['travel_app_generic_parser_last_prompt'] );
+        self::assertStringContainsString( 'Do not put confirmation codes', $GLOBALS['travel_app_generic_parser_last_prompt'] );
+        self::assertStringContainsString( 'Admission Tickets (4 Persons)', $GLOBALS['travel_app_generic_parser_last_prompt'] );
+        self::assertStringContainsString( 'leave title empty', $GLOBALS['travel_app_generic_parser_last_prompt'] );
+    }
+
     public function test_extracts_json_object_from_wrapped_ai_text(): void {
         $GLOBALS['travel_app_generic_parser_response'] = 'Here is the parsed trip: ' . json_encode( [
             'title'     => 'Wrapped AI Trip',

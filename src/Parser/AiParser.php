@@ -11,6 +11,9 @@ class AiParser {
         $prompt = implode( "\n", [
             'Extract this travel itinerary into strict JSON only.',
             'Use this shape: {"title":"","starts_at":"","ends_at":"","segments":[{"type":"flight|lodging|train|car|activity|other","title":"","date":"","end_date":"","time":"","end_time":"","location":"","end_location":"","url":"","details":""}]}.',
+            'If the source does not contain a meaningful itinerary item title, leave title empty. Generic labels such as "Admission Tickets (4 Persons)", "Booking Confirmation", "Reservation", or "Tickets" are not meaningful titles unless the attraction, venue, carrier, hotel, or activity name is also known.',
+            'Keep details short and itinerary-focused. Include only overview-useful notes such as terminal, platform, address context, pickup instructions, or important timing instructions.',
+            'Do not put confirmation codes, booking references, reservation numbers, ticket numbers, order numbers, PINs, loyalty numbers, prices, payment text, cancellation policy text, or generic email boilerplate in details.',
             'Current date and time: ' . $this->get_current_datetime_context() . '. Use this when the source omits a year or uses relative dates.',
             '',
             $text,
@@ -22,7 +25,7 @@ class AiParser {
         }
 
         if ( method_exists( $builder, 'using_system_instruction' ) ) {
-            $builder = $builder->using_system_instruction( 'You extract pasted travel confirmations. Return JSON only. Do not wrap the JSON in Markdown.' );
+            $builder = $builder->using_system_instruction( 'You extract pasted travel confirmations for a compact itinerary overview. Return JSON only. Do not wrap the JSON in Markdown.' );
         }
 
         if ( method_exists( $builder, 'using_max_tokens' ) ) {

@@ -86,6 +86,50 @@ class App extends BaseApp {
         );
     }
 
+    public function get_error_notice_message( string $error_code, string $fallback = '' ): string {
+        $error_code = sanitize_key( $error_code );
+        if ( '' === $error_code ) {
+            return '' !== $fallback ? $fallback : __( 'The requested change could not be saved.', 'travel-app' );
+        }
+
+        $messages = [
+            'attachment_delete_failed' => __( 'The attachment could not be deleted.', 'travel-app' ),
+            'attachment_missing'       => __( 'Choose a file to upload.', 'travel-app' ),
+            'attachment_not_found'     => __( 'This attachment could not be found.', 'travel-app' ),
+            'attachment_too_large'     => __( 'Attachments must be 15 MB or smaller.', 'travel-app' ),
+            'attachment_upload_failed' => __( 'The attachment could not be uploaded.', 'travel-app' ),
+            'delete_failed'            => __( 'The travel plan could not be deleted.', 'travel-app' ),
+            'delete_forbidden'         => __( 'This travel plan cannot be deleted.', 'travel-app' ),
+            'edit_forbidden'           => __( 'This travel plan cannot be edited.', 'travel-app' ),
+            'empty'                    => __( 'Paste itinerary text or upload a file to import.', 'travel-app' ),
+            'empty_title'              => __( 'Travel plan title cannot be empty.', 'travel-app' ),
+            'missing_itinerary_text'   => __( 'Paste itinerary text to import.', 'travel-app' ),
+            'quick_plan_invalid'       => __( 'Review the parsed fields and choose where to save the item.', 'travel-app' ),
+            'segment_delete_failed'    => __( 'This itinerary item could not be deleted.', 'travel-app' ),
+            'segment_not_found'        => __( 'This itinerary item could not be found.', 'travel-app' ),
+            'trip_not_found'           => __( 'This travel plan could not be found.', 'travel-app' ),
+            'upload_failed'            => __( 'The itinerary file could not be uploaded.', 'travel-app' ),
+            'upload_invalid'           => __( 'The itinerary file upload was invalid.', 'travel-app' ),
+            'upload_read_failed'       => __( 'The itinerary file could not be read.', 'travel-app' ),
+            'upload_too_large'         => __( 'The itinerary file is too large.', 'travel-app' ),
+        ];
+
+        if ( isset( $messages[ $error_code ] ) ) {
+            return $messages[ $error_code ];
+        }
+
+        if ( '' === $fallback ) {
+            $fallback = __( 'The requested change could not be saved.', 'travel-app' );
+        }
+
+        return sprintf(
+            /* translators: 1: generic error notice, 2: technical error code. */
+            __( '%1$s Error code: %2$s.', 'travel-app' ),
+            $fallback,
+            $error_code
+        );
+    }
+
     public function is_demo_mode_enabled(): bool {
         $enabled = defined( 'TRAVEL_APP_DEMO_MODE' ) && TRAVEL_APP_DEMO_MODE;
 
@@ -284,6 +328,8 @@ class App extends BaseApp {
                     'ends_at'     => [ 'type' => 'string' ],
                     'segments'    => [ 'type' => 'array' ],
                     'parser'      => [ 'type' => 'string' ],
+                    'parser_error' => [ 'type' => 'object' ],
+                    'missing_fields' => [ 'type' => 'array' ],
                     'url'         => [ 'type' => 'string' ],
                 ],
             ],
@@ -293,7 +339,7 @@ class App extends BaseApp {
             },
             'meta'                => [
                 'annotations' => [
-                    'instructions' => 'After importing, summarize the created travel plan and include the app URL for review. Ask for missing dates or locations only if the saved data is clearly incomplete.',
+                    'instructions' => 'After importing, summarize the created travel plan and include the app URL for review. If missing_fields or parser_error is present, report which fields were not filled and why.',
                     'readonly'     => false,
                     'destructive'  => false,
                     'idempotent'   => false,
@@ -327,6 +373,8 @@ class App extends BaseApp {
                     'segments'      => [ 'type' => 'array' ],
                     'url'           => [ 'type' => 'string' ],
                     'share_urls'    => [ 'type' => 'object' ],
+                    'parser_error'  => [ 'type' => 'object' ],
+                    'missing_fields' => [ 'type' => 'array' ],
                 ],
             ],
             'execute_callback'    => [ $this, 'get_ability_trip' ],
@@ -336,6 +384,46 @@ class App extends BaseApp {
             'meta'                => [
                 'annotations' => [
                     'instructions' => 'Use this before editing or deleting itinerary items so item IDs and current values are known. When summarizing, group items by date and call out missing dates, times, or locations.',
+                    'readonly'     => true,
+                    'destructive'  => false,
+                    'idempotent'   => true,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'travel-app/review-trip-fields', [
+            'label'               => __( 'Review Missing Itinerary Fields', 'travel-app' ),
+            'description'         => 'Reports blank itinerary fields for a saved travel plan, including parser error details when available.',
+            'category'            => 'travel-app',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'id' => [
+                        'type'        => 'integer',
+                        'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
+                    ],
+                ],
+                'required'             => [ 'id' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'id'             => [ 'type' => 'integer' ],
+                    'title'          => [ 'type' => 'string' ],
+                    'parser'         => [ 'type' => 'string' ],
+                    'parser_error'   => [ 'type' => 'object' ],
+                    'missing_fields' => [ 'type' => 'array' ],
+                    'url'            => [ 'type' => 'string' ],
+                ],
+            ],
+            'execute_callback'    => [ $this, 'review_ability_trip_fields' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Report each missing field with the itinerary item it belongs to and the reason returned by the ability. Include the Travel App URL for review.',
                     'readonly'     => true,
                     'destructive'  => false,
                     'idempotent'   => true,
@@ -664,7 +752,7 @@ class App extends BaseApp {
                 ],
                 'details' => [
                     'type'        => 'string',
-                    'description' => 'Additional reservation details, confirmation numbers, notes, or instructions.',
+                    'description' => 'Short overview-useful notes such as terminal, platform, address context, pickup instructions, or important timing instructions. Avoid confirmation codes, booking references, ticket numbers, prices, payment text, and generic email boilerplate.',
                 ],
             ],
             'additionalProperties' => false,
@@ -701,13 +789,15 @@ class App extends BaseApp {
 
     public function get_ai_assistant_ability_instructions( string $instructions, string $ability_id, $args, $result ): string {
         if ( 'travel-app/import-itinerary' === $ability_id && ! empty( $result['id'] ) ) {
-            $instructions = 'Tell the user the travel plan was saved. Summarize title, dates, and travel segments, then link to the Travel App URL if present.';
+            $instructions = 'Tell the user the travel plan was saved. Summarize title, dates, and travel segments, then link to the Travel App URL if present. If missing_fields or parser_error is present, report which fields were not filled and why.';
         } elseif ( in_array( $ability_id, [ 'travel-app/add-itinerary-item', 'travel-app/update-itinerary-item', 'travel-app/delete-itinerary-item', 'travel-app/update-travel-plan' ], true ) && ! empty( $result['trip']['url'] ) ) {
             $instructions = 'Tell the user what changed and include the Travel App URL for review.';
         } elseif ( 'travel-app/create-share-link' === $ability_id && ! empty( $result['url'] ) ) {
             $instructions = 'Tell the user the read-only travel timeline share link is ready and include the URL.';
         } elseif ( 'travel-app/get-trip' === $ability_id && ! empty( $result['id'] ) ) {
-            $instructions = 'Summarize the travel plan by date. Mention any itinerary items missing dates, times, locations, or confirmation details.';
+            $instructions = 'Summarize the travel plan by date. Use missing_fields and parser_error to mention which itinerary fields are blank and why.';
+        } elseif ( 'travel-app/review-trip-fields' === $ability_id && ! empty( $result['id'] ) ) {
+            $instructions = 'Report each missing itinerary field with the item it belongs to and the reason returned by the ability. If no missing fields are returned, say the saved fields look complete.';
         }
 
         return $instructions;
@@ -737,10 +827,7 @@ class App extends BaseApp {
             return $trip_id;
         }
 
-        $output = $this->format_trip_for_output( get_term( $trip_id, 'travel_app_trip' ) );
-        $output['url'] = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
-
-        return $output;
+        return $this->format_trip_for_ability_output( $trip_id );
     }
 
     public function get_ability_trip( $input ) {
@@ -753,6 +840,22 @@ class App extends BaseApp {
         }
 
         return $this->format_trip_for_ability_output( $term );
+    }
+
+    public function review_ability_trip_fields( $input ) {
+        $trip = $this->get_ability_trip( $input );
+        if ( is_wp_error( $trip ) ) {
+            return $trip;
+        }
+
+        return [
+            'id'             => (int) ( $trip['id'] ?? 0 ),
+            'title'          => (string) ( $trip['title'] ?? '' ),
+            'parser'         => (string) ( $trip['parser'] ?? '' ),
+            'parser_error'   => isset( $trip['parser_error'] ) && is_array( $trip['parser_error'] ) ? $trip['parser_error'] : [],
+            'missing_fields' => isset( $trip['missing_fields'] ) && is_array( $trip['missing_fields'] ) ? $trip['missing_fields'] : [],
+            'url'            => (string) ( $trip['url'] ?? '' ),
+        ];
     }
 
     public function update_ability_trip( $input ) {
@@ -1862,6 +1965,7 @@ class App extends BaseApp {
             'segments'      => $segments,
             'segment_count' => count( $segments ),
             'parser'        => (string) get_term_meta( $term->term_id, '_travel_app_parser', true ),
+            'parser_error'  => $this->normalize_parser_error( get_term_meta( $term->term_id, '_travel_app_parser_error', true ) ),
         ];
     }
 
@@ -1877,8 +1981,73 @@ class App extends BaseApp {
             'fellow' => $this->get_trip_share_url( $trip_id, 'fellow' ),
             'public' => $this->get_trip_share_url( $trip_id, 'public' ),
         ];
+        $trip['missing_fields'] = $this->get_missing_field_report( $trip );
 
         return $trip;
+    }
+
+    private function get_missing_field_report( array $trip ): array {
+        $parser = (string) ( $trip['parser'] ?? '' );
+        $parser_error = isset( $trip['parser_error'] ) && is_array( $trip['parser_error'] ) ? $trip['parser_error'] : [];
+        $parser_error_code = (string) ( $parser_error['code'] ?? '' );
+        $parser_error_message = (string) ( $parser_error['message'] ?? '' );
+        $reason = __( 'No value is saved for this field.', 'travel-app' );
+
+        if ( '' !== $parser ) {
+            $reason = __( 'The parser did not find a value for this field in the imported text.', 'travel-app' );
+        }
+
+        if ( '' !== $parser_error_code || '' !== $parser_error_message ) {
+            $reason = trim(
+                sprintf(
+                    /* translators: 1: parser error code, 2: parser error message. */
+                    __( 'The parser reported %1$s %2$s, and no value was saved for this field.', 'travel-app' ),
+                    $parser_error_code,
+                    $parser_error_message
+                )
+            );
+        }
+
+        $field_labels = [
+            'title'        => __( 'Title', 'travel-app' ),
+            'date'         => __( 'Start Date', 'travel-app' ),
+            'time'         => __( 'Start Time', 'travel-app' ),
+            'location'     => __( 'Location', 'travel-app' ),
+            'end_location' => __( 'End Location', 'travel-app' ),
+        ];
+        $report = [];
+
+        foreach ( (array) ( $trip['segments'] ?? [] ) as $segment ) {
+            if ( ! is_array( $segment ) ) {
+                continue;
+            }
+
+            $fields = [ 'title', 'date', 'time', 'location' ];
+            if ( in_array( (string) ( $segment['type'] ?? '' ), [ 'flight', 'train', 'car' ], true ) ) {
+                $fields[] = 'end_location';
+            }
+
+            foreach ( $fields as $field ) {
+                $value = trim( (string) ( $segment[ $field ] ?? '' ) );
+                if ( 'title' === $field && __( 'Untitled item', 'travel-app' ) === $value ) {
+                    $value = '';
+                }
+
+                if ( '' !== $value ) {
+                    continue;
+                }
+
+                $report[] = [
+                    'item_id'    => (int) ( $segment['id'] ?? 0 ),
+                    'item_title' => (string) ( $segment['title'] ?? '' ),
+                    'field'      => $field,
+                    'label'      => (string) ( $field_labels[ $field ] ?? $field ),
+                    'reason'     => $reason,
+                ];
+            }
+        }
+
+        return $report;
     }
 
     private function get_trip_share_token( int $trip_id, string $mode = 'fellow' ): string {
@@ -2367,7 +2536,7 @@ class App extends BaseApp {
             'title'       => sanitize_text_field( (string) ( $data['title'] ?? __( 'Imported Travel Plan', 'travel-app' ) ) ),
             'starts_at'   => sanitize_text_field( (string) ( $data['starts_at'] ?? '' ) ),
             'ends_at'     => sanitize_text_field( (string) ( $data['ends_at'] ?? '' ) ),
-            'segments'    => array_values( array_map( [ $this, 'normalize_segment' ], $segments ) ),
+            'segments'    => array_values( array_map( [ $this, 'normalize_imported_segment' ], $segments ) ),
             'parser'      => sanitize_key( (string) ( $data['parser'] ?? 'fallback' ) ),
             'parser_error' => $this->normalize_parser_error( $data['parser_error'] ?? [] ),
         ];
@@ -2414,6 +2583,69 @@ class App extends BaseApp {
             'url_preview' => $this->get_url_preview_service()->normalize_preview( $segment['url_preview'] ?? [] ),
             'details'  => sanitize_textarea_field( (string) ( $segment['details'] ?? '' ) ),
         ];
+    }
+
+    private function normalize_imported_segment( $segment ): array {
+        $normalized = $this->normalize_segment( $segment );
+        $normalized['details'] = $this->clean_imported_segment_details( $normalized['details'], $normalized );
+
+        return $normalized;
+    }
+
+    private function clean_imported_segment_details( string $details, array $segment ): string {
+        $details = trim( $details );
+        if ( '' === $details ) {
+            return '';
+        }
+
+        $title = trim( (string) ( $segment['title'] ?? '' ) );
+        $date = trim( (string) ( $segment['date'] ?? '' ) );
+        $time = trim( (string) ( $segment['time'] ?? '' ) );
+        $location = trim( (string) ( $segment['location'] ?? '' ) );
+        $overview_parts = array_filter( [ $title, $date, $time, $location ], static function( string $part ): bool {
+            return '' !== $part;
+        } );
+
+        if ( $this->normalize_detail_comparison_text( $details ) === $this->normalize_detail_comparison_text( implode( ' ', $overview_parts ) ) ) {
+            return '';
+        }
+
+        $lines = preg_split( '/\R+/', $details );
+        $kept = [];
+        foreach ( is_array( $lines ) ? $lines : [ $details ] as $line ) {
+            $line = trim( (string) $line );
+            if ( '' === $line || $this->is_low_value_import_detail_line( $line ) ) {
+                continue;
+            }
+
+            $kept[] = $line;
+        }
+
+        return implode( "\n", $kept );
+    }
+
+    private function is_low_value_import_detail_line( string $line ): bool {
+        $patterns = [
+            '/\b(?:confirmation|confirm(?:ation)? code|booking(?: reference| number| no\.?)?|reservation(?: number| no\.?)?|reference(?: number| no\.?)?|order(?: number| no\.?)?|ticket(?: number| no\.?)?|e-?ticket|pnr|pin|voucher|invoice|receipt|loyalty|member number)\b/i',
+            '/\b(?:payment|paid|total|subtotal|tax|fee|refund|cancell?ation policy|terms and conditions|privacy policy)\b/i',
+            '/\b(?:do not reply|unsubscribe|manage booking|view booking|view reservation|download app|add to calendar)\b/i',
+            '/^\s*(?:[A-Z0-9]{5,}[-\s]?){1,4}\s*$/i',
+        ];
+
+        foreach ( $patterns as $pattern ) {
+            if ( preg_match( $pattern, $line ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalize_detail_comparison_text( string $text ): string {
+        $text = strtolower( $text );
+        $text = preg_replace( '/[^a-z0-9]+/', ' ', $text );
+
+        return trim( (string) $text );
     }
 
     private function create_trip_item( int $trip_id, array $segment ) {
@@ -2477,6 +2709,7 @@ class App extends BaseApp {
         update_term_meta( $trip_id, '_travel_app_starts_at', $parsed['starts_at'] );
         update_term_meta( $trip_id, '_travel_app_ends_at', $parsed['ends_at'] );
         update_term_meta( $trip_id, '_travel_app_parser', $parsed['parser'] );
+        update_term_meta( $trip_id, '_travel_app_parser_error', $parsed['parser_error'] ?? [] );
         update_term_meta( $trip_id, '_travel_app_source_text', $source_text );
 
         $created_items = [];

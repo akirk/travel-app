@@ -14,6 +14,14 @@ $has_ai     = function_exists( 'wp_ai_client_prompt' );
 $has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\AI_Assistant' );
 $demo_mode_enabled = $travel_app->is_demo_mode_enabled();
 $today      = current_time( 'Y-m-d' );
+$segment_type_labels = [
+    'flight'   => __( 'Flight', 'travel-app' ),
+    'lodging'  => __( 'Lodging', 'travel-app' ),
+    'train'    => __( 'Train', 'travel-app' ),
+    'car'      => __( 'Rental car', 'travel-app' ),
+    'activity' => __( 'Activity', 'travel-app' ),
+    'other'    => __( 'Other', 'travel-app' ),
+];
 $front_demo_control_id = 'front-page-demo';
 $demo_seed_trip = null;
 
@@ -533,7 +541,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     <?php esc_html_e( 'Type', 'travel-app' ); ?>
                                     <select name="segment_type">
                                         <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
-                                            <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $quick_plan_segment['type'] ?? 'activity', $type ); ?>><?php echo esc_html( ucfirst( $type ) ); ?></option>
+                                            <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $quick_plan_segment['type'] ?? 'activity', $type ); ?>><?php echo esc_html( $segment_type_labels[ $type ] ?? ucfirst( $type ) ); ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </label>

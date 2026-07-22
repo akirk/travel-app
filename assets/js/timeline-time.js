@@ -304,8 +304,13 @@
 
         var targetRect = target.getBoundingClientRect();
         var top = null;
+        var dateValue = value ? value.slice(0, 10) : '';
+        var currentDay = getTimelineDay(target, dateValue);
+        var currentDayIsEmpty = currentDay && !currentDay.querySelector('.timeline-item');
 
-        if (currentItem && nextItem) {
+        if (currentDayIsEmpty) {
+            top = getTimeMarkerDayTop(currentDay, targetRect, currentTime);
+        } else if (currentItem && nextItem) {
             var currentRect = currentItem.getBoundingClientRect();
             var nextRect = nextItem.getBoundingClientRect();
             var currentValue = parseDateTime(currentItem.getAttribute('data-datetime') || '');
@@ -319,6 +324,10 @@
             top = currentItem.getBoundingClientRect().bottom - targetRect.top + 8;
         }
 
+        if (top === null && currentDay) {
+            top = getTimeMarkerDayTop(currentDay, targetRect, currentTime);
+        }
+
         if (top === null) {
             marker.style.display = 'none';
             return;
@@ -327,6 +336,34 @@
         marker.style.top = Math.max(0, top) + 'px';
         marker.style.display = 'block';
         markerLabel.textContent = value.slice(11, 16);
+    }
+
+    function getTimelineDay(target, dateValue) {
+        if (!dateValue) {
+            return null;
+        }
+
+        var days = Array.prototype.slice.call(target.querySelectorAll('.timeline-day'));
+        return days.find(function(day) {
+            return day.getAttribute('data-date') === dateValue;
+        }) || null;
+    }
+
+    function getTimeMarkerDayTop(day, targetRect, currentTime) {
+        var dayRect = day.getBoundingClientRect();
+        var heading = day.querySelector('.day-heading');
+        var headingRect = heading ? heading.getBoundingClientRect() : null;
+        var start = (headingRect ? headingRect.bottom : dayRect.top) - targetRect.top + 10;
+        var end = dayRect.bottom - targetRect.top - 10;
+        var date = new Date(currentTime);
+        var minutes = date.getHours() * 60 + date.getMinutes();
+        var ratio = minutes / 1439;
+
+        if (end <= start) {
+            return dayRect.top - targetRect.top;
+        }
+
+        return start + (end - start) * ratio;
     }
 
     function initControl(control) {

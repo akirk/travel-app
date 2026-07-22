@@ -64,6 +64,12 @@ foreach ( $timeline_segments as $segment ) {
 $unscheduled_segments = $segments_by_day['unscheduled'] ?? [];
 unset( $segments_by_day['unscheduled'] );
 
+$today = current_time( 'Y-m-d' );
+if ( $is_trip_active && '' !== $today && ! isset( $segments_by_day[ $today ] ) ) {
+    $segments_by_day[ $today ] = [];
+    ksort( $segments_by_day );
+}
+
 $demo_start = $trip_data['starts_at'] ?? '';
 if ( '' === $demo_start ) {
     $demo_start = gmdate( 'Y-m-d' );
@@ -327,6 +333,7 @@ if ( count( $route_locations ) >= 2 ) {
         }
         .timeline { position: relative; display: grid; gap: 0; }
         .timeline-day { position: relative; padding-left: 26px; border-left: 2px solid var(--wp-app-color-border); }
+        .timeline-day.empty { min-height: 96px; }
         .timeline-day.current { border-left-color: var(--wp-app-color-link); }
         .timeline-day.past { opacity: 0.62; }
         .time-marker {
@@ -906,7 +913,7 @@ if ( count( $route_locations ) >= 2 ) {
                     <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>">
                         <div class="time-marker"><span class="time-marker-label"></span></div>
                         <?php foreach ( $segments_by_day as $day => $day_segments ) : ?>
-                            <section class="timeline-day" data-date="<?php echo esc_attr( $day ); ?>">
+                            <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" data-date="<?php echo esc_attr( $day ); ?>">
                                 <h3 class="day-heading"><?php echo esc_html( $travel_app->format_date_label( $day ) ); ?></h3>
                                 <?php foreach ( $day_segments as $segment ) : ?>
                                     <?php $index = (int) $segment['_index']; ?>

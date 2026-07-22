@@ -1,14 +1,24 @@
 <?php
 use TravelApp\App;
+use TravelApp\ItineraryItem;
+use TravelApp\Trip;
 
 global $wp_app_route;
 
 $travel_app = App::get_instance();
 $trip_id    = isset( $wp_app_route['params']['id'] ) ? absint( $wp_app_route['params']['id'] ) : absint( get_query_var( 'id' ) );
 $index      = isset( $wp_app_route['params']['item_id'] ) ? absint( $wp_app_route['params']['item_id'] ) : absint( get_query_var( 'item_id' ) );
-$trip       = $travel_app->get_user_trip( $trip_id );
-$trip_data  = $trip ? $travel_app->format_trip_for_output( $trip ) : null;
-$segment    = $trip ? $travel_app->get_user_trip_segment( $trip_id, $index ) : null;
+$trip       = Trip::get( $trip_id );
+if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
+    wp_die(
+        esc_html__( 'This travel plan could not be found.', 'travel-app' ),
+        esc_html__( 'Travel plan not found', 'travel-app' ),
+        [ 'response' => 404 ]
+    );
+}
+$trip_data  = $trip->to_array();
+$item       = ItineraryItem::get_user_item( $trip_id, $index );
+$segment    = $item ? $item->to_array() : null;
 $updated    = isset( $_GET['updated'] );
 $attachment_uploaded = isset( $_GET['attachment_uploaded'] );
 $attachment_deleted = isset( $_GET['attachment_deleted'] );
@@ -22,8 +32,12 @@ $segment_type_labels = [
     'other'    => __( 'Other', 'travel-app' ),
 ];
 
-if ( ! $trip || ! $segment ) {
-    status_header( 404 );
+if ( ! $segment ) {
+    wp_die(
+        esc_html__( 'This itinerary item could not be found.', 'travel-app' ),
+        esc_html__( 'Itinerary item not found', 'travel-app' ),
+        [ 'response' => 404 ]
+    );
 }
 ?>
 <!DOCTYPE html>
@@ -31,7 +45,7 @@ if ( ! $trip || ! $segment ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( $segment ? ( $segment['title'] ?: __( 'Itinerary Item', 'travel-app' ) ) : __( 'Itinerary Item', 'travel-app' ) ); ?></title>
+    <title><?php echo wp_app_title( $segment['title'] ?: __( 'Itinerary Item', 'travel-app' ) ); ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <?php wp_app_head(); ?>
     <style>

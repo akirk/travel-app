@@ -1,5 +1,6 @@
 <?php
 use TravelApp\App;
+use TravelApp\Trip;
 
 global $wp_app_route;
 
@@ -10,7 +11,14 @@ $share_token = isset( $wp_app_route['params']['token'] ) ? sanitize_text_field( 
 $is_static_download = ! empty( $travel_app_static_download );
 $is_shared_timeline = ! empty( $travel_app_shared_timeline ) || '' !== $share_token;
 $is_readonly_timeline = $is_shared_timeline || $is_static_download;
-$trip       = $is_shared_timeline ? $travel_app->get_public_trip_by_share_token( $trip_id, $share_token ) : $travel_app->get_user_trip( $trip_id );
+$trip       = Trip::get( $trip_id );
+if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
+    wp_die(
+        esc_html__( 'This travel plan could not be found.', 'travel-app' ),
+        esc_html__( 'Travel plan not found', 'travel-app' ),
+        [ 'response' => 404 ]
+    );
+}
 $share_mode = $is_static_download ? ( isset( $travel_app_static_share_mode ) ? (string) $travel_app_static_share_mode : 'fellow' ) : ( $is_shared_timeline ? $travel_app->get_trip_share_mode_by_token( $trip_id, $share_token ) : '' );
 $show_private_share_details = ( ! $is_shared_timeline && ! $is_static_download ) || 'fellow' === $share_mode;
 $updated    = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
@@ -23,15 +31,15 @@ $quick_plan_segment = $quick_plan_draft_target === $trip_id && isset( $quick_pla
     ? $quick_plan_draft['segment']
     : [];
 
-if ( ! $trip ) {
-    status_header( 404 );
+$segments_user_id = null;
+if ( $is_shared_timeline ) {
+    $segments_user_id = Trip::get_owner_id( $trip_id );
 }
-
-$trip_data = $trip ? $travel_app->format_trip_for_output( $trip, $is_shared_timeline ? $travel_app->get_trip_owner_id( $trip_id ) : null ) : null;
+$trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
 $segments  = $trip_data['segments'] ?? [];
-$is_trip_active = $trip_data ? $travel_app->is_trip_active( $trip_data ) : false;
-$fellow_share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
-$public_share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
+$is_trip_active = $travel_app->is_trip_active( $trip_data );
+$fellow_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
+$public_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
 $segment_type_labels = [
     'flight'   => __( 'Flight', 'travel-app' ),
     'lodging'  => __( 'Lodging', 'travel-app' ),

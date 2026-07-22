@@ -1,8 +1,11 @@
 <?php
 use TravelApp\App;
+use TravelApp\Trip;
 
 $travel_app = App::get_instance();
-$trips      = array_map( [ $travel_app, 'format_trip_for_output' ], $travel_app->get_user_trips() );
+$trips      = array_map( static function( Trip $trip ): array {
+    return $trip->to_array();
+}, Trip::for_current_user() );
 $imported   = isset( $_GET['imported'] ) ? absint( $_GET['imported'] ) : 0;
 $deleted    = isset( $_GET['deleted'] ) ? absint( $_GET['deleted'] ) : 0;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';

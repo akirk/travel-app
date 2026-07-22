@@ -1,17 +1,21 @@
 <?php
 use TravelApp\App;
+use TravelApp\Trip;
 
 global $wp_app_route;
 
 $travel_app = App::get_instance();
 $trip_id    = isset( $wp_app_route['params']['id'] ) ? absint( $wp_app_route['params']['id'] ) : absint( get_query_var( 'id' ) );
-$trip       = $travel_app->get_user_trip( $trip_id );
-
-if ( ! $trip ) {
-    status_header( 404 );
+$trip       = Trip::get( $trip_id );
+if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
+    wp_die(
+        esc_html__( 'This travel plan could not be found.', 'travel-app' ),
+        esc_html__( 'Travel plan not found', 'travel-app' ),
+        [ 'response' => 404 ]
+    );
 }
 
-$trip_data = $trip ? $travel_app->format_trip_for_output( $trip ) : null;
+$trip_data = $trip->to_array();
 $segments  = $trip_data['segments'] ?? [];
 $route_locations = [];
 $route_entries = [];
@@ -45,7 +49,7 @@ foreach ( $segments as $segment ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( $trip_data ? sprintf( __( '%s Route Map', 'travel-app' ), $trip_data['title'] ) : __( 'Route Map', 'travel-app' ) ); ?></title>
+    <title><?php echo wp_app_title( sprintf( __( '%s Route Map', 'travel-app' ), $trip_data['title'] ) ); ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <?php wp_app_head(); ?>

@@ -32,6 +32,14 @@ $segments  = $trip_data['segments'] ?? [];
 $is_trip_active = $trip_data ? $travel_app->is_trip_active( $trip_data ) : false;
 $fellow_share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
 $public_share_url = $trip_data && ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
+$segment_type_labels = [
+    'flight'   => __( 'Flight', 'travel-app' ),
+    'lodging'  => __( 'Lodging', 'travel-app' ),
+    'train'    => __( 'Train', 'travel-app' ),
+    'car'      => __( 'Rental car', 'travel-app' ),
+    'activity' => __( 'Activity', 'travel-app' ),
+    'other'    => __( 'Other', 'travel-app' ),
+];
 $timeline_segments = [];
 
 foreach ( $segments as $segment ) {
@@ -48,6 +56,19 @@ foreach ( $segments as $segment ) {
         $checkout_segment['_timeline_kind'] = 'checkout';
         $checkout_segment['_sort'] = trim( $checkout_segment['date'] . ' ' . $checkout_segment['time'] );
         $timeline_segments[] = $checkout_segment;
+    }
+
+    if ( 'car' === ( $segment['type'] ?? '' ) && ! empty( $segment['end_date'] ) ) {
+        $return_segment = $segment;
+        $return_segment['date'] = (string) $segment['end_date'];
+        $return_segment['time'] = (string) ( $segment['end_time'] ?? '' );
+        $return_segment['title'] = (string) ( $segment['title'] ?: __( 'Rental car', 'travel-app' ) );
+        $return_segment['location'] = (string) ( ( $segment['end_location'] ?? '' ) ?: ( $segment['location'] ?? '' ) );
+        $return_segment['end_date'] = '';
+        $return_segment['end_location'] = '';
+        $return_segment['_timeline_kind'] = 'return';
+        $return_segment['_sort'] = trim( $return_segment['date'] . ' ' . $return_segment['time'] );
+        $timeline_segments[] = $return_segment;
     }
 }
 
@@ -860,7 +881,7 @@ if ( count( $route_locations ) >= 2 ) {
                                 <?php esc_html_e( 'Type', 'travel-app' ); ?>
                                 <select name="segment_type">
                                     <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
-                                        <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $quick_plan_segment['type'] ?? 'activity', $type ); ?>><?php echo esc_html( ucfirst( $type ) ); ?></option>
+                                        <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $quick_plan_segment['type'] ?? 'activity', $type ); ?>><?php echo esc_html( $segment_type_labels[ $type ] ?? ucfirst( $type ) ); ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </label>
@@ -918,14 +939,26 @@ if ( count( $route_locations ) >= 2 ) {
                                 <?php foreach ( $day_segments as $segment ) : ?>
                                     <?php $index = (int) $segment['_index']; ?>
                                     <?php $timeline_kind = (string) ( $segment['_timeline_kind'] ?? 'start' ); ?>
-                                    <?php $segment_anchor = 'segment-' . $index . ( 'checkout' === $timeline_kind ? '-checkout' : '' ); ?>
+                                    <?php $segment_anchor_suffix = in_array( $timeline_kind, [ 'checkout', 'return' ], true ) ? '-' . $timeline_kind : ''; ?>
+                                    <?php $segment_anchor = 'segment-' . $index . $segment_anchor_suffix; ?>
                                     <?php $segment_datetime = trim( (string) ( $segment['date'] ?? '' ) . 'T' . ( (string) ( $segment['time'] ?? '' ) ?: '00:00' ) ); ?>
                                     <?php $segment_start_date = substr( trim( (string) ( $segment['date'] ?? '' ) ), 0, 10 ); ?>
                                     <?php $segment_end_date = substr( trim( (string) ( $segment['end_date'] ?? '' ) ), 0, 10 ); ?>
-                                    <?php $show_url_preview = 'checkout' !== $timeline_kind; ?>
+                                    <?php $is_end_timeline_entry = in_array( $timeline_kind, [ 'checkout', 'return' ], true ); ?>
+                                    <?php $show_url_preview = ! $is_end_timeline_entry; ?>
                                     <?php $show_location = 'checkout' !== $timeline_kind && ( $show_private_share_details || $is_transport_segment( $segment ) ); ?>
-                                    <?php $show_attachments = 'checkout' !== $timeline_kind && $show_private_share_details; ?>
-                                    <?php $type_label = 'checkout' === $timeline_kind ? __( 'Check out', 'travel-app' ) : ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ); ?>
+                                    <?php $show_attachments = ! $is_end_timeline_entry && $show_private_share_details; ?>
+                                    <?php
+                                    if ( 'checkout' === $timeline_kind ) {
+                                        $type_label = __( 'Check out', 'travel-app' );
+                                    } elseif ( 'return' === $timeline_kind ) {
+                                        $type_label = __( 'Return car', 'travel-app' );
+                                    } elseif ( 'car' === ( $segment['type'] ?? '' ) ) {
+                                        $type_label = __( 'Rental car', 'travel-app' );
+                                    } else {
+                                        $type_label = $segment_type_labels[ $segment['type'] ?? 'other' ] ?? ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) );
+                                    }
+                                    ?>
                                     <?php $url_preview = isset( $segment['url_preview'] ) && is_array( $segment['url_preview'] ) ? $segment['url_preview'] : []; ?>
                                     <?php $attachments = $show_attachments && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
                                     <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
@@ -1032,7 +1065,7 @@ if ( count( $route_locations ) >= 2 ) {
                                 <div class="summary-grid">
                                     <span class="time"><?php echo esc_html( trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) ) ); ?></span>
                                     <span>
-                                        <span class="type"><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span><br>
+                                        <span class="type"><?php echo esc_html( $segment_type_labels[ $segment['type'] ?? 'other' ] ?? ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span><br>
                                         <?php if ( $is_readonly_timeline ) : ?>
                                             <span class="title"><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
                                         <?php else : ?>

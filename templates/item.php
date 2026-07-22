@@ -13,6 +13,14 @@ $updated    = isset( $_GET['updated'] );
 $attachment_uploaded = isset( $_GET['attachment_uploaded'] );
 $attachment_deleted = isset( $_GET['attachment_deleted'] );
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
+$segment_type_labels = [
+    'flight'   => __( 'Flight', 'travel-app' ),
+    'lodging'  => __( 'Lodging', 'travel-app' ),
+    'train'    => __( 'Train', 'travel-app' ),
+    'car'      => __( 'Rental car', 'travel-app' ),
+    'activity' => __( 'Activity', 'travel-app' ),
+    'other'    => __( 'Other', 'travel-app' ),
+];
 
 if ( ! $trip || ! $segment ) {
     status_header( 404 );
@@ -263,7 +271,7 @@ if ( ! $trip || ! $segment ) {
                 <h1><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></h1>
                 <div class="meta">
                     <span><?php echo esc_html( $trip_data['title'] ); ?></span>
-                    <span><?php echo esc_html( ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span>
+                    <span><?php echo esc_html( $segment_type_labels[ $segment['type'] ?? 'other' ] ?? ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span>
                     <?php if ( $segment['date'] || $segment['end_date'] || $segment['time'] || $segment['end_time'] ) : ?>
                         <span><?php echo esc_html( $travel_app->get_segment_date_time_range_label( $segment ) ); ?></span>
                     <?php endif; ?>

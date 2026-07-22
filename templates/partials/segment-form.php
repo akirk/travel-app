@@ -10,8 +10,18 @@
     <label class="field-wide">
         <?php esc_html_e( 'Type', 'travel-app' ); ?>
         <select name="segment_type">
+            <?php
+            $segment_type_labels = [
+                'flight'   => __( 'Flight', 'travel-app' ),
+                'lodging'  => __( 'Lodging', 'travel-app' ),
+                'train'    => __( 'Train', 'travel-app' ),
+                'car'      => __( 'Rental car', 'travel-app' ),
+                'activity' => __( 'Activity', 'travel-app' ),
+                'other'    => __( 'Other', 'travel-app' ),
+            ];
+            ?>
             <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
-                <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $segment['type'] ?? 'other', $type ); ?>><?php echo esc_html( ucfirst( $type ) ); ?></option>
+                <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $segment['type'] ?? 'other', $type ); ?>><?php echo esc_html( $segment_type_labels[ $type ] ?? ucfirst( $type ) ); ?></option>
             <?php endforeach; ?>
         </select>
     </label>

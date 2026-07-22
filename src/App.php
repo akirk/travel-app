@@ -64,6 +64,7 @@ class App extends BaseApp {
         add_filter( 'ai_assistant_ability_domains', [ $this, 'register_ai_assistant_ability_domains' ] );
         add_filter( 'ai_assistant_ability_instructions', [ $this, 'get_ai_assistant_ability_instructions' ], 10, 4 );
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'register_ai_assistant_welcome_tips' ], 10, 2 );
+        add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
         add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_timeline' ], 0 );
     }
@@ -228,6 +229,43 @@ class App extends BaseApp {
         ] );
     }
 
+    public function map_trip_meta_cap( array $caps, string $cap, int $user_id, array $args ): array {
+        if ( ! in_array( $cap, [ 'read_travel_app_trip', 'edit_travel_app_trip', 'delete_travel_app_trip' ], true ) ) {
+            return $caps;
+        }
+
+        $trip_id = isset( $args[0] ) ? absint( $args[0] ) : 0;
+        if ( $trip_id <= 0 ) {
+            return [ 'do_not_allow' ];
+        }
+
+        $trip = Trip::get( $trip_id );
+        if ( ! $trip ) {
+            return [ 'do_not_allow' ];
+        }
+
+        if ( 'read_travel_app_trip' === $cap && $this->request_has_trip_share_token( $trip_id ) ) {
+            return [ 'exist' ];
+        }
+
+        if ( $trip->owner_id() !== $user_id ) {
+            return [ 'do_not_allow' ];
+        }
+
+        return [ 'read' ];
+    }
+
+    private function request_has_trip_share_token( int $trip_id ): bool {
+        $shared_trip_id = isset( $_GET['travel_app_share'] ) ? absint( $_GET['travel_app_share'] ) : 0;
+        if ( $shared_trip_id !== $trip_id ) {
+            return false;
+        }
+
+        $token = isset( $_GET['travel_app_token'] ) ? sanitize_text_field( wp_unslash( $_GET['travel_app_token'] ) ) : '';
+
+        return '' !== $this->get_trip_share_mode_by_token( $trip_id, $token );
+    }
+
     public function register_dashboard_widgets(): void {
         /*
          * Register dashboard widgets here. This method runs on
@@ -322,15 +360,17 @@ class App extends BaseApp {
             'output_schema'       => [
                 'type'       => 'object',
                 'properties' => [
-                    'id'          => [ 'type' => 'integer' ],
-                    'title'       => [ 'type' => 'string' ],
-                    'starts_at'   => [ 'type' => 'string' ],
-                    'ends_at'     => [ 'type' => 'string' ],
-                    'segments'    => [ 'type' => 'array' ],
-                    'parser'      => [ 'type' => 'string' ],
-                    'parser_error' => [ 'type' => 'object' ],
-                    'missing_fields' => [ 'type' => 'array' ],
-                    'url'         => [ 'type' => 'string' ],
+                    'id'             => [ 'type' => 'integer' ],
+                    'title'          => [ 'type' => 'string' ],
+                    'starts_at'      => [ 'type' => 'string' ],
+                    'ends_at'        => [ 'type' => 'string' ],
+                    'segment_count'  => [ 'type' => 'integer' ],
+                    'segments'       => ItineraryItem::array_schema(),
+                    'parser'         => [ 'type' => 'string' ],
+                    'parser_error'   => Trip::parser_error_schema(),
+                    'missing_fields' => Trip::missing_fields_schema(),
+                    'url'            => [ 'type' => 'string' ],
+                    'share_urls'     => Trip::share_urls_schema(),
                 ],
             ],
             'execute_callback'    => [ $this, 'import_ability_itinerary' ],
@@ -370,11 +410,12 @@ class App extends BaseApp {
                     'starts_at'     => [ 'type' => 'string' ],
                     'ends_at'       => [ 'type' => 'string' ],
                     'segment_count' => [ 'type' => 'integer' ],
-                    'segments'      => [ 'type' => 'array' ],
+                    'segments'      => ItineraryItem::array_schema(),
                     'url'           => [ 'type' => 'string' ],
-                    'share_urls'    => [ 'type' => 'object' ],
-                    'parser_error'  => [ 'type' => 'object' ],
-                    'missing_fields' => [ 'type' => 'array' ],
+                    'share_urls'    => Trip::share_urls_schema(),
+                    'parser'        => [ 'type' => 'string' ],
+                    'parser_error'  => Trip::parser_error_schema(),
+                    'missing_fields' => Trip::missing_fields_schema(),
                 ],
             ],
             'execute_callback'    => [ $this, 'get_ability_trip' ],
@@ -384,6 +425,46 @@ class App extends BaseApp {
             'meta'                => [
                 'annotations' => [
                     'instructions' => 'Use this before editing or deleting itinerary items so item IDs and current values are known. When summarizing, group items by date and call out missing dates, times, or locations.',
+                    'readonly'     => true,
+                    'destructive'  => false,
+                    'idempotent'   => true,
+                ],
+            ],
+        ] );
+
+        wp_register_ability( 'travel-app/get-itinerary-item', [
+            'label'               => __( 'Get Itinerary Item', 'travel-app' ),
+            'description'         => 'Returns one structured itinerary item owned by the current user, including item URLs, attachments, and fields useful for cross-app handoff.',
+            'category'            => 'travel-app',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'trip_id' => [
+                        'type'        => 'integer',
+                        'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
+                    ],
+                    'item_id' => [
+                        'type'        => 'integer',
+                        'description' => 'Itinerary item ID from the trip segments returned by travel-app/get-trip.',
+                    ],
+                ],
+                'required'             => [ 'trip_id', 'item_id' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'trip_id' => [ 'type' => 'integer' ],
+                    'item'    => ItineraryItem::schema(),
+                ],
+            ],
+            'execute_callback'    => [ $this, 'get_ability_segment' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Use this when the user refers to one itinerary item and another app needs its structured fields. For flights, map title to flight-log/save-flight flightnr, location to from, end_location to to, and date/time to date.',
                     'readonly'     => true,
                     'destructive'  => false,
                     'idempotent'   => true,
@@ -412,8 +493,8 @@ class App extends BaseApp {
                     'id'             => [ 'type' => 'integer' ],
                     'title'          => [ 'type' => 'string' ],
                     'parser'         => [ 'type' => 'string' ],
-                    'parser_error'   => [ 'type' => 'object' ],
-                    'missing_fields' => [ 'type' => 'array' ],
+                    'parser_error'   => Trip::parser_error_schema(),
+                    'missing_fields' => Trip::missing_fields_schema(),
                     'url'            => [ 'type' => 'string' ],
                 ],
             ],
@@ -454,7 +535,7 @@ class App extends BaseApp {
                 'type'       => 'object',
                 'properties' => [
                     'updated' => [ 'type' => 'boolean' ],
-                    'trip'    => [ 'type' => 'object' ],
+                    'trip'    => Trip::schema(),
                 ],
             ],
             'execute_callback'    => [ $this, 'update_ability_trip' ],
@@ -481,7 +562,8 @@ class App extends BaseApp {
                 'properties' => [
                     'added'   => [ 'type' => 'boolean' ],
                     'item_id' => [ 'type' => 'integer' ],
-                    'trip'    => [ 'type' => 'object' ],
+                    'item'    => ItineraryItem::schema(),
+                    'trip'    => Trip::schema(),
                     'url'     => [ 'type' => 'string' ],
                 ],
             ],
@@ -509,7 +591,8 @@ class App extends BaseApp {
                 'properties' => [
                     'updated' => [ 'type' => 'boolean' ],
                     'item_id' => [ 'type' => 'integer' ],
-                    'trip'    => [ 'type' => 'object' ],
+                    'item'    => ItineraryItem::schema(),
+                    'trip'    => Trip::schema(),
                     'url'     => [ 'type' => 'string' ],
                 ],
             ],
@@ -551,7 +634,7 @@ class App extends BaseApp {
                 'properties' => [
                     'deleted' => [ 'type' => 'boolean' ],
                     'item_id' => [ 'type' => 'integer' ],
-                    'trip'    => [ 'type' => 'object' ],
+                    'trip'    => Trip::schema(),
                 ],
             ],
             'execute_callback'    => [ $this, 'delete_ability_segment' ],
@@ -693,71 +776,13 @@ class App extends BaseApp {
 
     public function list_ability_items( $input ): array {
         return [
-            'trips' => array_map( [ $this, 'format_trip_for_output' ], $this->get_user_trips() ),
+            'trips' => array_map( static function( Trip $trip ): array {
+                return $trip->to_array();
+            }, Trip::for_current_user() ),
         ];
     }
 
     private function get_itinerary_item_ability_input_schema( bool $creating ): array {
-        $segment = [
-            'type'                 => 'object',
-            'properties'           => [
-                'type' => [
-                    'type'        => 'string',
-                    'enum'        => [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ],
-                    'description' => 'Kind of itinerary item.',
-                ],
-                'title' => [
-                    'type'        => 'string',
-                    'description' => 'Short user-visible item title, such as a flight number, hotel name, or activity name.',
-                ],
-                'date' => [
-                    'type'        => 'string',
-                    'description' => 'Start date in YYYY-MM-DD format.',
-                ],
-                'end_date' => [
-                    'type'        => 'string',
-                    'description' => 'End date in YYYY-MM-DD format, when different from date.',
-                ],
-                'time' => [
-                    'type'        => 'string',
-                    'description' => 'Start time in 24-hour HH:MM format when known.',
-                ],
-                'end_time' => [
-                    'type'        => 'string',
-                    'description' => 'End time in 24-hour HH:MM format when known.',
-                ],
-                'starts_at_utc' => [
-                    'type'        => 'string',
-                    'description' => 'Optional UTC start timestamp from a booking or calendar source.',
-                ],
-                'ends_at_utc' => [
-                    'type'        => 'string',
-                    'description' => 'Optional UTC end timestamp from a booking or calendar source.',
-                ],
-                'timezone' => [
-                    'type'        => 'string',
-                    'description' => 'IANA timezone when known, such as Europe/Berlin.',
-                ],
-                'location' => [
-                    'type'        => 'string',
-                    'description' => 'Start location, hotel, venue, airport, station, or city.',
-                ],
-                'end_location' => [
-                    'type'        => 'string',
-                    'description' => 'Destination location for transport items.',
-                ],
-                'url' => [
-                    'type'        => 'string',
-                    'description' => 'Booking, map, or reference URL.',
-                ],
-                'details' => [
-                    'type'        => 'string',
-                    'description' => 'Short overview-useful notes such as terminal, platform, address context, pickup instructions, or important timing instructions. Avoid confirmation codes, booking references, ticket numbers, prices, payment text, and generic email boilerplate.',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
-
         $schema = [
             'type'                 => 'object',
             'properties'           => [
@@ -765,7 +790,7 @@ class App extends BaseApp {
                     'type'        => 'integer',
                     'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
                 ],
-                'segment' => $segment,
+                'segment' => ItineraryItem::input_schema(),
             ],
             'required'             => [ 'trip_id', 'segment' ],
             'additionalProperties' => false,
@@ -827,19 +852,37 @@ class App extends BaseApp {
             return $trip_id;
         }
 
-        return $this->format_trip_for_ability_output( $trip_id );
+        $trip = Trip::from_term( $trip_id );
+        return $trip ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [];
     }
 
     public function get_ability_trip( $input ) {
         $input = is_array( $input ) ? $input : [];
         $trip_id = isset( $input['id'] ) ? absint( $input['id'] ) : 0;
-        $term = $this->get_user_trip( $trip_id );
+        $term = Trip::get( $trip_id );
 
-        if ( ! $term ) {
+        if ( ! $term || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
             return new \WP_Error( 'trip_not_found', __( 'This travel plan could not be found.', 'travel-app' ) );
         }
 
-        return $this->format_trip_for_ability_output( $term );
+        return $term->to_ability_array( [ $this, 'get_trip_share_url' ] );
+    }
+
+    public function get_ability_segment( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $trip_id = isset( $input['trip_id'] ) ? absint( $input['trip_id'] ) : 0;
+        $item_id = isset( $input['item_id'] ) ? absint( $input['item_id'] ) : 0;
+        $item = ItineraryItem::get_user_item( $trip_id, $item_id );
+        $segment = $item ? $item->to_array() : null;
+
+        if ( ! $segment ) {
+            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
+        }
+
+        return [
+            'trip_id' => $trip_id,
+            'item'    => $segment,
+        ];
     }
 
     public function review_ability_trip_fields( $input ) {
@@ -870,7 +913,7 @@ class App extends BaseApp {
 
         return [
             'updated' => true,
-            'trip'    => $this->format_trip_for_ability_output( $trip_id ),
+            'trip'    => ( $trip = Trip::from_term( $trip_id ) ) ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [],
         ];
     }
 
@@ -887,7 +930,8 @@ class App extends BaseApp {
         return [
             'added'   => true,
             'item_id' => (int) $item_id,
-            'trip'    => $this->format_trip_for_ability_output( $trip_id ),
+            'item'    => ( $item = ItineraryItem::get_user_item( $trip_id, (int) $item_id ) ) ? $item->to_array() : [],
+            'trip'    => ( $trip = Trip::from_term( $trip_id ) ) ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [],
             'url'     => home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . (int) $item_id . '/' ),
         ];
     }
@@ -896,7 +940,8 @@ class App extends BaseApp {
         $input = is_array( $input ) ? $input : [];
         $trip_id = isset( $input['trip_id'] ) ? absint( $input['trip_id'] ) : 0;
         $item_id = isset( $input['item_id'] ) ? absint( $input['item_id'] ) : 0;
-        $current = $this->get_user_trip_segment( $trip_id, $item_id );
+        $current_item = ItineraryItem::get_user_item( $trip_id, $item_id );
+        $current = $current_item ? $current_item->to_array() : null;
 
         if ( ! $current ) {
             return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
@@ -913,7 +958,8 @@ class App extends BaseApp {
         return [
             'updated' => true,
             'item_id' => $item_id,
-            'trip'    => $this->format_trip_for_ability_output( $trip_id ),
+            'item'    => ( $item = ItineraryItem::get_user_item( $trip_id, $item_id ) ) ? $item->to_array() : [],
+            'trip'    => ( $trip = Trip::from_term( $trip_id ) ) ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [],
             'url'     => home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $item_id . '/' ),
         ];
     }
@@ -931,7 +977,7 @@ class App extends BaseApp {
         return [
             'deleted' => true,
             'item_id' => $item_id,
-            'trip'    => $this->format_trip_for_ability_output( $trip_id ),
+            'trip'    => ( $trip = Trip::from_term( $trip_id ) ) ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [],
         ];
     }
 
@@ -960,7 +1006,7 @@ class App extends BaseApp {
         $trip_id = isset( $input['id'] ) ? absint( $input['id'] ) : 0;
         $mode = isset( $input['mode'] ) ? (string) $input['mode'] : 'fellow';
 
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             return new \WP_Error( 'share_forbidden', __( 'This travel plan cannot be updated.', 'travel-app' ) );
         }
 
@@ -1001,7 +1047,7 @@ class App extends BaseApp {
         $redirect = $import_trip_id
             ? home_url( '/' . $this->get_url_path() . '/trip/' . $import_trip_id . '/' )
             : home_url( '/' . $this->get_url_path() . '/' );
-        if ( $import_trip_id && ! $this->get_user_trip( $import_trip_id ) ) {
+        if ( $import_trip_id && ! current_user_can( 'edit_travel_app_trip', $import_trip_id ) ) {
             wp_safe_redirect( add_query_arg( 'travel_app_error', 'edit_forbidden', home_url( '/' . $this->get_url_path() . '/' ) ) );
             exit;
         }
@@ -1101,7 +1147,7 @@ class App extends BaseApp {
             exit;
         }
 
-        $segment = $this->segment_from_request();
+        $segment = ItineraryItem::from_request();
         if ( empty( $segment ) || empty( $segment['date'] ) ) {
             wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
             exit;
@@ -1233,15 +1279,19 @@ class App extends BaseApp {
         $trip_id = isset( $_GET['trip_id'] ) ? absint( $_GET['trip_id'] ) : 0;
         check_admin_referer( 'travel_app_download_trip_html_' . $trip_id );
 
-        $trip = $this->get_user_trip( $trip_id );
-        if ( ! $trip ) {
-            wp_die( esc_html__( 'This travel plan could not be found.', 'travel-app' ), 404 );
+        $trip = Trip::get( $trip_id );
+        if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
+            wp_die(
+                esc_html__( 'This travel plan could not be found.', 'travel-app' ),
+                esc_html__( 'Travel plan not found', 'travel-app' ),
+                [ 'response' => 404 ]
+            );
         }
 
         $mode = isset( $_GET['share_mode'] ) ? sanitize_key( wp_unslash( $_GET['share_mode'] ) ) : 'fellow';
         $mode = $this->normalize_share_mode( $mode );
         $html = $this->render_static_trip_html( $trip_id, $mode );
-        $filename = sanitize_title( (string) $trip->name );
+        $filename = sanitize_title( $trip->title );
         if ( '' === $filename ) {
             $filename = 'travel-plan-' . $trip_id;
         }
@@ -1289,7 +1339,7 @@ class App extends BaseApp {
         $mode = isset( $_POST['share_mode'] ) ? sanitize_key( wp_unslash( $_POST['share_mode'] ) ) : 'fellow';
         check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
 
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be updated.', 'travel-app' ) ], 404 );
         }
 
@@ -1311,7 +1361,7 @@ class App extends BaseApp {
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
 
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be refreshed.', 'travel-app' ) ], 404 );
         }
 
@@ -1336,19 +1386,7 @@ class App extends BaseApp {
         check_admin_referer( 'travel_app_update_segment_' . $trip_id . '_' . $index );
 
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $index . '/' );
-        $segment = [
-            'type'     => isset( $_POST['segment_type'] ) ? sanitize_key( wp_unslash( $_POST['segment_type'] ) ) : 'other',
-            'title'    => isset( $_POST['segment_title'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_title'] ) ) : '',
-            'date'     => isset( $_POST['segment_date'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_date'] ) ) : '',
-            'end_date' => isset( $_POST['segment_end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_date'] ) ) : '',
-            'time'     => isset( $_POST['segment_time'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_time'] ) ) : '',
-            'end_time' => isset( $_POST['segment_end_time'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_time'] ) ) : '',
-            'location' => isset( $_POST['segment_location'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_location'] ) ) : '',
-            'end_location' => isset( $_POST['segment_end_location'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_location'] ) ) : '',
-            'url'      => isset( $_POST['segment_url'] ) ? esc_url_raw( wp_unslash( $_POST['segment_url'] ) ) : '',
-            'url_preview' => $this->url_preview_from_request(),
-            'details'  => isset( $_POST['segment_details'] ) ? sanitize_textarea_field( wp_unslash( $_POST['segment_details'] ) ) : '',
-        ];
+        $segment = ItineraryItem::from_request();
 
         $updated = $this->update_user_trip_segment( $trip_id, $index, $segment );
         if ( is_wp_error( $updated ) ) {
@@ -1369,7 +1407,7 @@ class App extends BaseApp {
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         check_admin_referer( 'travel_app_add_segment_' . $trip_id );
 
-        $segment = $this->segment_from_request();
+        $segment = ItineraryItem::from_request();
         $added_item_id = $this->add_user_trip_segment( $trip_id, $segment );
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
 
@@ -1451,16 +1489,16 @@ class App extends BaseApp {
     }
 
     private function delete_user_trip( int $trip_id ) {
-        $term = $this->get_user_trip( $trip_id );
+        $term = Trip::get( $trip_id );
 
-        if ( ! $term ) {
+        if ( ! $term || ! current_user_can( 'delete_travel_app_trip', $trip_id ) ) {
             return new \WP_Error( 'delete_forbidden', __( 'This travel plan cannot be deleted.', 'travel-app' ) );
         }
 
         $this->clear_trip_public_cache( $trip_id );
 
-        foreach ( $this->get_trip_item_posts( $trip_id ) as $item ) {
-            wp_trash_post( $item->ID );
+        foreach ( ItineraryItem::get_for_trip( $trip_id ) as $item ) {
+            wp_trash_post( $item->id );
         }
 
         $deleted = wp_delete_term( $trip_id, 'travel_app_trip' );
@@ -1476,7 +1514,7 @@ class App extends BaseApp {
             return new \WP_Error( 'empty_title', __( 'Travel plan title cannot be empty.', 'travel-app' ) );
         }
 
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
@@ -1494,18 +1532,18 @@ class App extends BaseApp {
     }
 
     private function update_user_trip_segment( int $trip_id, int $index, array $segment ) {
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
-        $item = $this->get_user_trip_item_post( $trip_id, $index );
+        $item = ItineraryItem::get_user_item( $trip_id, $index );
         if ( ! $item ) {
             return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
         }
 
-        $segment = $this->normalize_segment( $segment );
+        $segment = ItineraryItem::normalize( $segment );
         $updated = wp_update_post( [
-            'ID'           => $item->ID,
+            'ID'           => $item->id,
             'post_title'   => $segment['title'] ?: __( 'Untitled item', 'travel-app' ),
             'post_content' => $segment['details'],
         ], true );
@@ -1514,7 +1552,7 @@ class App extends BaseApp {
             return $updated;
         }
 
-        $this->update_item_meta( $item->ID, $segment );
+        $this->update_item_meta( $item->id, $segment );
         $this->update_trip_bounds_from_items( $trip_id );
         $this->clear_trip_public_cache( $trip_id );
 
@@ -1522,7 +1560,7 @@ class App extends BaseApp {
     }
 
     private function add_user_trip_segment( int $trip_id, array $segment ) {
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
@@ -1538,16 +1576,16 @@ class App extends BaseApp {
     }
 
     private function delete_user_trip_segment( int $trip_id, int $index ) {
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
-        $item = $this->get_user_trip_item_post( $trip_id, $index );
+        $item = ItineraryItem::get_user_item( $trip_id, $index );
         if ( ! $item ) {
             return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
         }
 
-        $deleted = wp_trash_post( $item->ID );
+        $deleted = wp_trash_post( $item->id );
         if ( ! $deleted ) {
             return new \WP_Error( 'segment_delete_failed', __( 'This itinerary item could not be deleted.', 'travel-app' ) );
         }
@@ -1559,7 +1597,7 @@ class App extends BaseApp {
     }
 
     private function upload_user_trip_item_attachments( int $trip_id, int $index ) {
-        $item = $this->get_user_trip_item_post( $trip_id, $index );
+        $item = ItineraryItem::get_user_item( $trip_id, $index );
         if ( ! $item ) {
             return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
         }
@@ -1598,7 +1636,7 @@ class App extends BaseApp {
             }
 
             $_FILES['item_attachment'] = $file;
-            $attachment_id = media_handle_upload( 'item_attachment', $item->ID );
+            $attachment_id = media_handle_upload( 'item_attachment', $item->id );
 
             if ( is_wp_error( $attachment_id ) ) {
                 $_FILES['item_attachment'] = $original_file;
@@ -1624,7 +1662,7 @@ class App extends BaseApp {
     }
 
     private function delete_user_trip_item_attachment( int $trip_id, int $index, int $attachment_id ) {
-        $attachment = $this->get_user_trip_item_attachment( $trip_id, $index, $attachment_id );
+        $attachment = ItineraryItem::get_user_attachment( $trip_id, $index, $attachment_id );
         if ( ! $attachment ) {
             return new \WP_Error( 'attachment_not_found', __( 'This attachment could not be found.', 'travel-app' ) );
         }
@@ -1711,33 +1749,10 @@ class App extends BaseApp {
         return $files;
     }
 
-    private function segment_from_request(): array {
-        return [
-            'type'     => isset( $_POST['segment_type'] ) ? sanitize_key( wp_unslash( $_POST['segment_type'] ) ) : 'other',
-            'title'    => isset( $_POST['segment_title'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_title'] ) ) : '',
-            'date'     => isset( $_POST['segment_date'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_date'] ) ) : '',
-            'end_date' => isset( $_POST['segment_end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_date'] ) ) : '',
-            'time'     => isset( $_POST['segment_time'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_time'] ) ) : '',
-            'end_time' => isset( $_POST['segment_end_time'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_time'] ) ) : '',
-            'location' => isset( $_POST['segment_location'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_location'] ) ) : '',
-            'end_location' => isset( $_POST['segment_end_location'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_end_location'] ) ) : '',
-            'url'      => isset( $_POST['segment_url'] ) ? esc_url_raw( wp_unslash( $_POST['segment_url'] ) ) : '',
-            'url_preview' => $this->url_preview_from_request(),
-            'details'  => isset( $_POST['segment_details'] ) ? sanitize_textarea_field( wp_unslash( $_POST['segment_details'] ) ) : '',
-        ];
-    }
-
-    private function url_preview_from_request(): array {
-        return [
-            'title'       => isset( $_POST['segment_url_preview_title'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_url_preview_title'] ) ) : '',
-            'description' => isset( $_POST['segment_url_preview_description'] ) ? sanitize_text_field( wp_unslash( $_POST['segment_url_preview_description'] ) ) : '',
-            'image'       => isset( $_POST['segment_url_preview_image'] ) ? esc_url_raw( wp_unslash( $_POST['segment_url_preview_image'] ) ) : '',
-        ];
-    }
-
     private function update_trip_bounds_from_items( int $trip_id ): void {
         $dates = [];
-        foreach ( $this->get_trip_segments( $trip_id ) as $segment ) {
+        foreach ( ItineraryItem::get_for_trip( $trip_id ) as $item ) {
+            $segment = $item->to_array();
             if ( ! empty( $segment['date'] ) ) {
                 $dates[] = (string) $segment['date'];
             }
@@ -1785,54 +1800,6 @@ class App extends BaseApp {
         return (string) $contents;
     }
 
-    public function get_user_trips(): array {
-        if ( ! is_user_logged_in() ) {
-            return [];
-        }
-
-        $terms = get_terms( [
-            'taxonomy'   => 'travel_app_trip',
-            'hide_empty' => false,
-            'number'     => 50,
-            'meta_query' => [
-                [
-                    'key'   => '_travel_app_user_id',
-                    'value' => (string) get_current_user_id(),
-                ],
-            ],
-        ] );
-
-        if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
-            return [];
-        }
-
-        usort( $terms, static function( \WP_Term $a, \WP_Term $b ): int {
-            $a_start = (string) get_term_meta( $a->term_id, '_travel_app_starts_at', true );
-            $b_start = (string) get_term_meta( $b->term_id, '_travel_app_starts_at', true );
-            return strcmp( $b_start, $a_start );
-        } );
-
-        return $terms;
-    }
-
-    public function get_user_trip( int $trip_id ) {
-        if ( ! is_user_logged_in() || $trip_id <= 0 ) {
-            return null;
-        }
-
-        $term = get_term( $trip_id, 'travel_app_trip' );
-        if ( ! $term || is_wp_error( $term ) ) {
-            return null;
-        }
-
-        $user_id = (int) get_term_meta( $trip_id, '_travel_app_user_id', true );
-        if ( $user_id !== get_current_user_id() ) {
-            return null;
-        }
-
-        return $term;
-    }
-
     public function get_trip_share_url( int $trip_id, string $mode = 'fellow' ): string {
         $token = $this->get_trip_share_token( $trip_id, $mode );
         if ( '' === $token ) {
@@ -1848,25 +1815,8 @@ class App extends BaseApp {
         );
     }
 
-    public function get_public_trip_by_share_token( int $trip_id, string $token ) {
-        if ( $trip_id <= 0 || '' === $token ) {
-            return null;
-        }
-
-        if ( '' === $this->get_trip_share_mode_by_token( $trip_id, $token ) ) {
-            return null;
-        }
-
-        $term = get_term( $trip_id, 'travel_app_trip' );
-        if ( ! $term || is_wp_error( $term ) ) {
-            return null;
-        }
-
-        return $term;
-    }
-
     public function get_trip_share_mode_by_token( int $trip_id, string $token ): string {
-        if ( $trip_id <= 0 || '' === $token ) {
+        if ( ! Trip::get( $trip_id ) || '' === $token ) {
             return '';
         }
 
@@ -1878,10 +1828,6 @@ class App extends BaseApp {
         }
 
         return '';
-    }
-
-    public function get_trip_owner_id( int $trip_id ): int {
-        return (int) get_term_meta( $trip_id, '_travel_app_user_id', true );
     }
 
     public function get_trip_html_download_url( int $trip_id, string $mode = 'fellow' ): string {
@@ -1931,12 +1877,6 @@ class App extends BaseApp {
         return $html;
     }
 
-    public function get_user_trip_segment( int $trip_id, int $index ) {
-        $item = $this->get_user_trip_item_post( $trip_id, $index );
-
-        return $item ? $this->format_segment_for_output( $item ) : null;
-    }
-
     public function get_quick_plan_draft( string $draft_key ): array {
         if ( '' === $draft_key || ! is_user_logged_in() ) {
             return [];
@@ -1946,112 +1886,8 @@ class App extends BaseApp {
         return is_array( $draft ) ? $draft : [];
     }
 
-    public function format_trip_for_output( $term, ?int $user_id = null ): array {
-        if ( is_numeric( $term ) ) {
-            $term = get_term( (int) $term, 'travel_app_trip' );
-        }
-
-        if ( ! $term || is_wp_error( $term ) ) {
-            return [];
-        }
-
-        $segments = $this->get_trip_segments( (int) $term->term_id, $user_id );
-
-        return [
-            'id'            => (int) $term->term_id,
-            'title'         => (string) $term->name,
-            'starts_at'     => (string) get_term_meta( $term->term_id, '_travel_app_starts_at', true ),
-            'ends_at'       => (string) get_term_meta( $term->term_id, '_travel_app_ends_at', true ),
-            'segments'      => $segments,
-            'segment_count' => count( $segments ),
-            'parser'        => (string) get_term_meta( $term->term_id, '_travel_app_parser', true ),
-            'parser_error'  => $this->normalize_parser_error( get_term_meta( $term->term_id, '_travel_app_parser_error', true ) ),
-        ];
-    }
-
-    private function format_trip_for_ability_output( $term ): array {
-        $trip = $this->format_trip_for_output( $term );
-        if ( empty( $trip['id'] ) ) {
-            return [];
-        }
-
-        $trip_id = (int) $trip['id'];
-        $trip['url'] = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
-        $trip['share_urls'] = [
-            'fellow' => $this->get_trip_share_url( $trip_id, 'fellow' ),
-            'public' => $this->get_trip_share_url( $trip_id, 'public' ),
-        ];
-        $trip['missing_fields'] = $this->get_missing_field_report( $trip );
-
-        return $trip;
-    }
-
-    private function get_missing_field_report( array $trip ): array {
-        $parser = (string) ( $trip['parser'] ?? '' );
-        $parser_error = isset( $trip['parser_error'] ) && is_array( $trip['parser_error'] ) ? $trip['parser_error'] : [];
-        $parser_error_code = (string) ( $parser_error['code'] ?? '' );
-        $parser_error_message = (string) ( $parser_error['message'] ?? '' );
-        $reason = __( 'No value is saved for this field.', 'travel-app' );
-
-        if ( '' !== $parser ) {
-            $reason = __( 'The parser did not find a value for this field in the imported text.', 'travel-app' );
-        }
-
-        if ( '' !== $parser_error_code || '' !== $parser_error_message ) {
-            $reason = trim(
-                sprintf(
-                    /* translators: 1: parser error code, 2: parser error message. */
-                    __( 'The parser reported %1$s %2$s, and no value was saved for this field.', 'travel-app' ),
-                    $parser_error_code,
-                    $parser_error_message
-                )
-            );
-        }
-
-        $field_labels = [
-            'title'        => __( 'Title', 'travel-app' ),
-            'date'         => __( 'Start Date', 'travel-app' ),
-            'time'         => __( 'Start Time', 'travel-app' ),
-            'location'     => __( 'Location', 'travel-app' ),
-            'end_location' => __( 'End Location', 'travel-app' ),
-        ];
-        $report = [];
-
-        foreach ( (array) ( $trip['segments'] ?? [] ) as $segment ) {
-            if ( ! is_array( $segment ) ) {
-                continue;
-            }
-
-            $fields = [ 'title', 'date', 'time', 'location' ];
-            if ( in_array( (string) ( $segment['type'] ?? '' ), [ 'flight', 'train', 'car' ], true ) ) {
-                $fields[] = 'end_location';
-            }
-
-            foreach ( $fields as $field ) {
-                $value = trim( (string) ( $segment[ $field ] ?? '' ) );
-                if ( 'title' === $field && __( 'Untitled item', 'travel-app' ) === $value ) {
-                    $value = '';
-                }
-
-                if ( '' !== $value ) {
-                    continue;
-                }
-
-                $report[] = [
-                    'item_id'    => (int) ( $segment['id'] ?? 0 ),
-                    'item_title' => (string) ( $segment['title'] ?? '' ),
-                    'field'      => $field,
-                    'label'      => (string) ( $field_labels[ $field ] ?? $field ),
-                    'reason'     => $reason,
-                ];
-            }
-        }
-
-        return $report;
-    }
-
     private function get_trip_share_token( int $trip_id, string $mode = 'fellow' ): string {
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
             return '';
         }
 
@@ -2059,7 +1895,7 @@ class App extends BaseApp {
     }
 
     private function create_trip_share_token( int $trip_id, string $mode = 'fellow' ): string {
-        if ( ! $this->get_user_trip( $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             return '';
         }
 
@@ -2303,117 +2139,6 @@ class App extends BaseApp {
         return sprintf( _n( '1 day', '%d days', $days, 'travel-app' ), $days );
     }
 
-    private function get_user_trip_item_post( int $trip_id, int $item_id ) {
-        if ( ! $this->get_user_trip( $trip_id ) || $item_id <= 0 ) {
-            return null;
-        }
-
-        $post = get_post( $item_id );
-        if ( ! $post || 'travel_app_item' !== $post->post_type || (int) $post->post_author !== get_current_user_id() ) {
-            return null;
-        }
-
-        if ( 'trash' === $post->post_status || ! has_term( $trip_id, 'travel_app_trip', $post ) ) {
-            return null;
-        }
-
-        return $post;
-    }
-
-    private function get_user_trip_item_attachment( int $trip_id, int $item_id, int $attachment_id ) {
-        $item = $this->get_user_trip_item_post( $trip_id, $item_id );
-        if ( ! $item || $attachment_id <= 0 ) {
-            return null;
-        }
-
-        $attachment = get_post( $attachment_id );
-        if ( ! $attachment || 'attachment' !== $attachment->post_type ) {
-            return null;
-        }
-
-        if ( (int) $attachment->post_parent !== (int) $item->ID || (int) $attachment->post_author !== get_current_user_id() ) {
-            return null;
-        }
-
-        return $attachment;
-    }
-
-    private function get_trip_item_posts( int $trip_id, ?int $user_id = null ): array {
-        $user_id = $user_id ?? get_current_user_id();
-
-        return get_posts( [
-            'post_type'      => 'travel_app_item',
-            'post_status'    => [ 'private', 'publish', 'draft' ],
-            'author'         => $user_id,
-            'posts_per_page' => -1,
-            'orderby'        => 'meta_value',
-            'meta_key'       => '_travel_app_sort',
-            'order'          => 'ASC',
-            'tax_query'      => [
-                [
-                    'taxonomy' => 'travel_app_trip',
-                    'field'    => 'term_id',
-                    'terms'    => [ $trip_id ],
-                ],
-            ],
-        ] );
-    }
-
-    private function get_trip_segments( int $trip_id, ?int $user_id = null ): array {
-        return array_map( [ $this, 'format_segment_for_output' ], $this->get_trip_item_posts( $trip_id, $user_id ) );
-    }
-
-    private function format_segment_for_output( \WP_Post $post ): array {
-        return [
-            'id'       => (int) $post->ID,
-            'type'     => (string) get_post_meta( $post->ID, '_travel_app_type', true ),
-            'title'    => (string) $post->post_title,
-            'date'     => (string) get_post_meta( $post->ID, '_travel_app_date', true ),
-            'end_date' => (string) get_post_meta( $post->ID, '_travel_app_end_date', true ),
-            'time'     => (string) get_post_meta( $post->ID, '_travel_app_time', true ),
-            'end_time' => (string) get_post_meta( $post->ID, '_travel_app_end_time', true ),
-            'starts_at_utc' => (string) get_post_meta( $post->ID, '_travel_app_starts_at_utc', true ),
-            'ends_at_utc' => (string) get_post_meta( $post->ID, '_travel_app_ends_at_utc', true ),
-            'timezone' => (string) get_post_meta( $post->ID, '_travel_app_timezone', true ),
-            'location' => (string) get_post_meta( $post->ID, '_travel_app_location', true ),
-            'end_location' => (string) get_post_meta( $post->ID, '_travel_app_end_location', true ),
-            'url'      => (string) get_post_meta( $post->ID, '_travel_app_url', true ),
-            'url_preview' => $this->get_url_preview_service()->get_item_preview( $post->ID ),
-            'url_preview_debug' => $this->get_url_preview_service()->get_item_preview_debug( $post->ID ),
-            'attachments' => $this->get_item_attachments_for_output( $post->ID ),
-            'details'  => (string) $post->post_content,
-        ];
-    }
-
-    private function get_item_attachments_for_output( int $item_id ): array {
-        $attachments = get_children( [
-            'post_parent'    => $item_id,
-            'post_type'      => 'attachment',
-            'post_status'    => 'inherit',
-            'posts_per_page' => -1,
-            'orderby'        => 'date',
-            'order'          => 'DESC',
-        ] );
-
-        if ( empty( $attachments ) || ! is_array( $attachments ) ) {
-            return [];
-        }
-
-        return array_values( array_map( static function( \WP_Post $attachment ): array {
-            $file = get_attached_file( $attachment->ID );
-            $size = $file && file_exists( $file ) ? size_format( filesize( $file ) ) : '';
-
-            return [
-                'id'       => (int) $attachment->ID,
-                'title'    => (string) get_the_title( $attachment ),
-                'filename' => wp_basename( (string) get_attached_file( $attachment->ID ) ),
-                'mime'     => (string) get_post_mime_type( $attachment ),
-                'size'     => $size,
-                'url'      => (string) wp_get_attachment_url( $attachment->ID ),
-            ];
-        }, $attachments ) );
-    }
-
     public function parse_itinerary_text( string $text ): array {
         $ics_parser = new IcsParser();
         if ( $ics_parser->supports( $text ) ) {
@@ -2439,7 +2164,7 @@ class App extends BaseApp {
     }
 
     public function parse_quick_plan_text( string $text ): array {
-        return $this->normalize_segment( ( new QuickPlanParser() )->parse( $text ) );
+        return ItineraryItem::normalize( ( new QuickPlanParser() )->parse( $text ) );
     }
 
     private function is_quick_plan_text( string $text ): bool {
@@ -2453,7 +2178,9 @@ class App extends BaseApp {
         }
 
         $matches = [];
-        foreach ( array_map( [ $this, 'format_trip_for_output' ], $this->get_user_trips() ) as $trip_data ) {
+        foreach ( array_map( static function( Trip $trip ): array {
+            return $trip->to_array();
+        }, Trip::for_current_user() ) as $trip_data ) {
             $starts = (string) ( $trip_data['starts_at'] ?? '' );
             $ends = (string) ( $trip_data['ends_at'] ?? '' );
             $date_matches = '' !== $starts && $starts <= $date && ( '' === $ends || $ends >= $date );
@@ -2538,55 +2265,12 @@ class App extends BaseApp {
             'ends_at'     => sanitize_text_field( (string) ( $data['ends_at'] ?? '' ) ),
             'segments'    => array_values( array_map( [ $this, 'normalize_imported_segment' ], $segments ) ),
             'parser'      => sanitize_key( (string) ( $data['parser'] ?? 'fallback' ) ),
-            'parser_error' => $this->normalize_parser_error( $data['parser_error'] ?? [] ),
-        ];
-    }
-
-    private function normalize_parser_error( $error ): array {
-        if ( ! is_array( $error ) ) {
-            return [];
-        }
-
-        $code = sanitize_key( (string) ( $error['code'] ?? '' ) );
-        $message = sanitize_text_field( (string) ( $error['message'] ?? '' ) );
-        if ( '' === $code && '' === $message ) {
-            return [];
-        }
-
-        return [
-            'code'    => $code,
-            'message' => $message,
-        ];
-    }
-
-    private function normalize_segment( $segment ): array {
-        $segment = is_array( $segment ) ? $segment : [];
-        $type = sanitize_key( (string) ( $segment['type'] ?? 'other' ) );
-        if ( 'hotel' === $type ) {
-            $type = 'lodging';
-        }
-        $allowed_types = [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ];
-
-        return [
-            'type'     => in_array( $type, $allowed_types, true ) ? $type : 'other',
-            'title'    => sanitize_text_field( (string) ( $segment['title'] ?? '' ) ),
-            'date'     => sanitize_text_field( (string) ( $segment['date'] ?? '' ) ),
-            'end_date' => sanitize_text_field( (string) ( $segment['end_date'] ?? '' ) ),
-            'time'     => sanitize_text_field( (string) ( $segment['time'] ?? '' ) ),
-            'end_time' => sanitize_text_field( (string) ( $segment['end_time'] ?? '' ) ),
-            'starts_at_utc' => sanitize_text_field( (string) ( $segment['starts_at_utc'] ?? '' ) ),
-            'ends_at_utc' => sanitize_text_field( (string) ( $segment['ends_at_utc'] ?? '' ) ),
-            'timezone' => sanitize_text_field( (string) ( $segment['timezone'] ?? '' ) ),
-            'location' => sanitize_text_field( (string) ( $segment['location'] ?? '' ) ),
-            'end_location' => sanitize_text_field( (string) ( $segment['end_location'] ?? '' ) ),
-            'url'      => esc_url_raw( (string) ( $segment['url'] ?? '' ) ),
-            'url_preview' => $this->get_url_preview_service()->normalize_preview( $segment['url_preview'] ?? [] ),
-            'details'  => sanitize_textarea_field( (string) ( $segment['details'] ?? '' ) ),
+            'parser_error' => Trip::normalize_parser_error( $data['parser_error'] ?? [] ),
         ];
     }
 
     private function normalize_imported_segment( $segment ): array {
-        $normalized = $this->normalize_segment( $segment );
+        $normalized = ItineraryItem::normalize( $segment );
         $normalized['details'] = $this->clean_imported_segment_details( $normalized['details'], $normalized );
 
         return $normalized;
@@ -2649,7 +2333,7 @@ class App extends BaseApp {
     }
 
     private function create_trip_item( int $trip_id, array $segment ) {
-        $segment = $this->normalize_segment( $segment );
+        $segment = ItineraryItem::normalize( $segment );
 
         $item_id = wp_insert_post( [
             'post_type'    => 'travel_app_item',

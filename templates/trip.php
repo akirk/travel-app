@@ -1,5 +1,6 @@
 <?php
 use TravelApp\App;
+use TravelApp\LodgingCoverage;
 use TravelApp\Trip;
 
 global $wp_app_route;
@@ -48,41 +49,24 @@ $segment_type_labels = [
     'activity' => __( 'Activity', 'travel-app' ),
     'other'    => __( 'Other', 'travel-app' ),
 ];
-$timeline_segments = [];
+$lodging_coverage = LodgingCoverage::analyze( $trip_data, $segments );
+$timeline_segments = LodgingCoverage::timeline_segments( $segments );
+$lodging_required_nights = $lodging_coverage['required_nights'];
+$covered_lodging_night_details = $lodging_coverage['covered_details'];
+$missing_lodging_nights = $lodging_coverage['missing_nights'];
+$lodging_missing_ranges = $lodging_coverage['missing_ranges'];
+$missing_lodging_night_details = $lodging_coverage['missing_details'];
 
-foreach ( $segments as $segment ) {
-    $segment['_index'] = (int) ( $segment['id'] ?? 0 );
-    $segment['_sort']  = trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) );
-    $timeline_segments[] = $segment;
-
-    if ( 'lodging' === ( $segment['type'] ?? '' ) && ! empty( $segment['end_date'] ) ) {
-        $checkout_segment = $segment;
-        $checkout_segment['date'] = (string) $segment['end_date'];
-        $checkout_segment['time'] = (string) ( $segment['end_time'] ?? '' );
-        $checkout_segment['title'] = (string) ( $segment['title'] ?: __( 'Lodging', 'travel-app' ) );
-        $checkout_segment['end_date'] = '';
-        $checkout_segment['_timeline_kind'] = 'checkout';
-        $checkout_segment['_sort'] = trim( $checkout_segment['date'] . ' ' . $checkout_segment['time'] );
-        $timeline_segments[] = $checkout_segment;
+foreach ( $timeline_segments as &$timeline_segment ) {
+    if ( 'checkout' === ( $timeline_segment['_timeline_kind'] ?? '' ) && '' === (string) ( $timeline_segment['title'] ?? '' ) ) {
+        $timeline_segment['title'] = __( 'Lodging', 'travel-app' );
     }
 
-    if ( 'car' === ( $segment['type'] ?? '' ) && ! empty( $segment['end_date'] ) ) {
-        $return_segment = $segment;
-        $return_segment['date'] = (string) $segment['end_date'];
-        $return_segment['time'] = (string) ( $segment['end_time'] ?? '' );
-        $return_segment['title'] = (string) ( $segment['title'] ?: __( 'Rental car', 'travel-app' ) );
-        $return_segment['location'] = (string) ( ( $segment['end_location'] ?? '' ) ?: ( $segment['location'] ?? '' ) );
-        $return_segment['end_date'] = '';
-        $return_segment['end_location'] = '';
-        $return_segment['_timeline_kind'] = 'return';
-        $return_segment['_sort'] = trim( $return_segment['date'] . ' ' . $return_segment['time'] );
-        $timeline_segments[] = $return_segment;
+    if ( 'return' === ( $timeline_segment['_timeline_kind'] ?? '' ) && '' === (string) ( $timeline_segment['title'] ?? '' ) ) {
+        $timeline_segment['title'] = __( 'Rental car', 'travel-app' );
     }
 }
-
-usort( $timeline_segments, static function( array $a, array $b ): int {
-    return strcmp( (string) ( $a['_sort'] ?? '' ), (string) ( $b['_sort'] ?? '' ) );
-} );
+unset( $timeline_segment );
 
 $segments_by_day = [];
 foreach ( $timeline_segments as $segment ) {
@@ -291,7 +275,7 @@ if ( count( $route_locations ) >= 2 ) {
         .trip-title-form[hidden] { display: none; }
         .trip-title-form label { margin: 0; }
         .trip-title-form input { font-size: 1.35rem; font-weight: 750; }
-        .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
+        .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
         .trip-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
         .trip-actions .ghost-button {
             display: inline-flex;
@@ -586,6 +570,98 @@ if ( count( $route_locations ) >= 2 ) {
             margin-bottom: 14px;
         }
         .timeline-header h2 { margin: 0; }
+        .lodging-checker {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            min-height: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            color: var(--wp-app-color-muted);
+            font: inherit;
+            font-weight: inherit;
+            line-height: inherit;
+            text-decoration: none;
+        }
+        .lodging-checker-icon {
+            color: #9a6700;
+            font-weight: 800;
+        }
+        .lodging-checker.covered .lodging-checker-icon {
+            color: #238636;
+        }
+        button.lodging-checker {
+            cursor: pointer;
+        }
+        .lodging-checker-box {
+            display: grid;
+            gap: 10px;
+            margin: -4px 0 14px;
+            padding: 12px;
+            border: 1px solid rgba(198, 139, 0, 0.32);
+            border-radius: 8px;
+            background: rgba(198, 139, 0, 0.08);
+        }
+        .lodging-checker-box.covered {
+            border-color: rgba(35, 134, 54, 0.28);
+            background: rgba(35, 134, 54, 0.08);
+        }
+        .lodging-checker-box[hidden] {
+            display: none;
+        }
+        .lodging-checker-box-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            color: var(--wp-app-color-muted);
+            font-size: 0.88rem;
+        }
+        .lodging-checker-box-header strong {
+            color: var(--wp-app-color-text);
+        }
+        .lodging-checker-night {
+            display: grid;
+            grid-template-columns: minmax(150px, 0.8fr) minmax(160px, 1fr);
+            gap: 10px;
+            align-items: center;
+            padding: 8px 0;
+            border-top: 1px solid rgba(198, 139, 0, 0.22);
+        }
+        .lodging-checker-night label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+        }
+        .lodging-checker-night input[type="checkbox"] {
+            width: auto;
+        }
+        .lodging-checker-night input[type="text"] {
+            width: 100%;
+        }
+        .lodging-checker-night-covered {
+            grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1fr) minmax(160px, 1fr);
+        }
+        .lodging-checker-night-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+        }
+        .lodging-checker-night-status .lodging-checker-icon {
+            color: #238636;
+        }
+        .lodging-checker-brief {
+            color: var(--wp-app-color-muted);
+            font-size: 0.88rem;
+            overflow-wrap: anywhere;
+        }
+        .lodging-checker-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
         .add-item-button {
             margin-left: auto;
             min-height: 32px;
@@ -730,6 +806,10 @@ if ( count( $route_locations ) >= 2 ) {
             .trip-title-header { align-items: flex-start; }
             .trip-title-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
+            .timeline-header { flex-wrap: wrap; }
+            .lodging-checker-night,
+            .lodging-checker-night-covered { grid-template-columns: 1fr; }
+            .lodging-checker-actions button { width: 100%; }
             .demo-controls label { min-width: 100%; }
         }
     </style>
@@ -787,6 +867,27 @@ if ( count( $route_locations ) >= 2 ) {
                         <span><?php echo esc_html( $summary_part ); ?></span>
                     <?php endforeach; ?>
                     <span><?php echo esc_html( sprintf( _n( '%d item', '%d items', count( $segments ), 'travel-app' ), count( $segments ) ) ); ?></span>
+                    <?php if ( ! $is_readonly_timeline ) : ?>
+                        <?php if ( ! empty( $lodging_required_nights ) && empty( $lodging_missing_ranges ) ) : ?>
+                            <button class="lodging-checker covered" type="button" data-lodging-checker-toggle aria-controls="lodging-checker-box" aria-expanded="false">
+                                <span class="lodging-checker-icon" aria-hidden="true">✓</span>
+                                <span><?php esc_html_e( 'Lodging covered', 'travel-app' ); ?></span>
+                            </button>
+                        <?php elseif ( ! empty( $lodging_missing_ranges ) ) : ?>
+                            <button class="lodging-checker" type="button" data-lodging-checker-toggle aria-controls="lodging-checker-box" aria-expanded="false">
+                                <span class="lodging-checker-icon" aria-hidden="true">⚠</span>
+                                <span>
+                                    <?php
+                                    printf(
+                                        /* translators: %d: missing lodging night count. */
+                                        esc_html( _n( '%d lodging night missing', '%d lodging nights missing', count( $missing_lodging_nights ), 'travel-app' ) ),
+                                        count( $missing_lodging_nights )
+                                    );
+                                    ?>
+                                </span>
+                            </button>
+                        <?php endif; ?>
+                    <?php endif; ?>
                 </div>
             </header>
 
@@ -806,6 +907,97 @@ if ( count( $route_locations ) >= 2 ) {
                     require __DIR__ . '/partials/demo-controls.php';
                 }
                 ?>
+
+                <?php if ( ! $is_readonly_timeline && ! empty( $missing_lodging_night_details ) ) : ?>
+                    <div class="lodging-checker-box" id="lodging-checker-box" data-lodging-checker-box hidden>
+                        <div class="lodging-checker-box-header">
+                            <span>
+                                <strong><?php esc_html_e( 'Lodging missing', 'travel-app' ); ?></strong>
+                                <?php
+                                printf(
+                                    /* translators: %d: missing lodging night count. */
+                                    esc_html( _n( 'Review %d night without lodging.', 'Review %d nights without lodging.', count( $missing_lodging_nights ), 'travel-app' ) ),
+                                    count( $missing_lodging_nights )
+                                );
+                                ?>
+                            </span>
+                        </div>
+                        <?php foreach ( $missing_lodging_night_details as $night_index => $missing_lodging_night ) : ?>
+                            <?php $night_input_id = 'missing-lodging-night-' . (string) $night_index; ?>
+                            <div class="lodging-checker-night">
+                                <label for="<?php echo esc_attr( $night_input_id ); ?>">
+                                    <input
+                                        id="<?php echo esc_attr( $night_input_id ); ?>"
+                                        type="checkbox"
+                                        data-lodging-night
+                                        value="<?php echo esc_attr( (string) $missing_lodging_night['date'] ); ?>"
+                                        checked
+                                    >
+                                    <span>
+                                        <?php echo esc_html( $travel_app->format_date_label( (string) $missing_lodging_night['date'], false ) ); ?>
+                                        <span aria-hidden="true">→</span>
+                                        <?php echo esc_html( $travel_app->format_date_label( (string) $missing_lodging_night['end_date'] ) ); ?>
+                                    </span>
+                                </label>
+                                <label>
+                                    <span class="screen-reader-text"><?php esc_html_e( 'Location', 'travel-app' ); ?></span>
+                                    <input
+                                        type="text"
+                                        data-lodging-night-location
+                                        value="<?php echo esc_attr( (string) $missing_lodging_night['location'] ); ?>"
+                                        placeholder="<?php esc_attr_e( 'Location', 'travel-app' ); ?>"
+                                    >
+                                </label>
+                            </div>
+                        <?php endforeach; ?>
+                        <?php if ( empty( $quick_plan_segment ) ) : ?>
+                            <div class="lodging-checker-actions">
+                                <button type="button" data-lodging-prefill><?php esc_html_e( 'Add selected lodging', 'travel-app' ); ?></button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php elseif ( ! $is_readonly_timeline && ! empty( $covered_lodging_night_details ) ) : ?>
+                    <div class="lodging-checker-box covered" id="lodging-checker-box" data-lodging-checker-box hidden>
+                        <div class="lodging-checker-box-header">
+                            <span>
+                                <strong><?php esc_html_e( 'Lodging covered', 'travel-app' ); ?></strong>
+                                <?php
+                                printf(
+                                    /* translators: %d: covered lodging night count. */
+                                    esc_html( _n( 'Confirmed for %d night.', 'Confirmed for %d nights.', count( $covered_lodging_night_details ), 'travel-app' ) ),
+                                    count( $covered_lodging_night_details )
+                                );
+                                ?>
+                            </span>
+                        </div>
+                        <?php foreach ( $covered_lodging_night_details as $covered_lodging_night ) : ?>
+                            <?php
+                            $covered_item_type = (string) ( $covered_lodging_night['item_type'] ?? 'other' );
+                            $covered_item_title = trim( (string) ( $covered_lodging_night['item_title'] ?? '' ) );
+                            $covered_item_label = '' !== $covered_item_title
+                                ? $covered_item_title
+                                : ( $segment_type_labels[ $covered_item_type ] ?? __( 'Itinerary item', 'travel-app' ) );
+                            ?>
+                            <div class="lodging-checker-night lodging-checker-night-covered">
+                                <span class="lodging-checker-night-status">
+                                    <span class="lodging-checker-icon" aria-hidden="true">✓</span>
+                                    <span>
+                                        <?php echo esc_html( $travel_app->format_date_label( (string) $covered_lodging_night['date'], false ) ); ?>
+                                        <span aria-hidden="true">→</span>
+                                        <?php echo esc_html( $travel_app->format_date_label( (string) $covered_lodging_night['end_date'] ) ); ?>
+                                    </span>
+                                </span>
+                                <span class="lodging-checker-brief">
+                                    <?php echo esc_html( $covered_item_label ); ?>
+                                    <?php if ( isset( $segment_type_labels[ $covered_item_type ] ) ) : ?>
+                                        · <?php echo esc_html( $segment_type_labels[ $covered_item_type ] ); ?>
+                                    <?php endif; ?>
+                                </span>
+                                <span class="lodging-checker-brief"><?php echo esc_html( (string) ( $covered_lodging_night['location'] ?? '' ) ); ?></span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
 
                 <?php if ( ! $is_readonly_timeline ) : ?>
                     <div class="add-item-panel" id="add-item-form" <?php echo empty( $quick_plan_segment ) ? 'hidden' : ''; ?>>
@@ -1269,6 +1461,126 @@ if ( count( $route_locations ) >= 2 ) {
                     form.setAttribute('hidden', '');
                     button.setAttribute('aria-expanded', 'false');
                 });
+
+                document.querySelectorAll('[data-lodging-prefill]').forEach(function(prefillButton) {
+                    prefillButton.addEventListener('click', function() {
+                        function nextDateValue(dateValue) {
+                            var parts = dateValue.split('-').map(function(part) {
+                                return parseInt(part, 10);
+                            });
+                            var date = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+                            var month = String(date.getMonth() + 1).padStart(2, '0');
+                            var day = String(date.getDate()).padStart(2, '0');
+
+                            return [date.getFullYear(), month, day].join('-');
+                        }
+
+                        function dateValueDays(dateValue) {
+                            var parts = dateValue.split('-').map(function(part) {
+                                return parseInt(part, 10);
+                            });
+
+                            return Math.floor(Date.UTC(parts[0], parts[1] - 1, parts[2]) / 86400000);
+                        }
+
+                        var titleInput = form.querySelector('input[name="segment_title"]');
+                        var typeInput = form.querySelector('[name="segment_type"]');
+                        var locationInput = form.querySelector('input[name="segment_location"]');
+                        var startInput = form.querySelector('input[name="segment_date"]');
+                        var endInput = form.querySelector('input[name="segment_end_date"]');
+                        var detailsInput = form.querySelector('textarea[name="segment_details"]');
+                        var checkerBox = prefillButton.closest('[data-lodging-checker-box]');
+                        var selectedNights = checkerBox
+                            ? Array.prototype.slice.call(checkerBox.querySelectorAll('[data-lodging-night]:checked'))
+                            : [];
+
+                        if (!selectedNights.length) {
+                            return;
+                        }
+
+                        var selected = selectedNights.map(function(nightInput) {
+                            var row = nightInput.closest('.lodging-checker-night');
+                            var rowLocation = row ? row.querySelector('[data-lodging-night-location]') : null;
+                            return {
+                                date: nightInput.value || '',
+                                location: rowLocation ? rowLocation.value.trim() : ''
+                            };
+                        }).filter(function(night) {
+                            return night.date;
+                        }).sort(function(a, b) {
+                            return a.date.localeCompare(b.date);
+                        });
+
+                        if (!selected.length) {
+                            return;
+                        }
+
+                        var hasGap = selected.some(function(night, index) {
+                            return index > 0 && dateValueDays(night.date) - dateValueDays(selected[index - 1].date) !== 1;
+                        });
+
+                        if (hasGap) {
+                            window.alert('<?php echo esc_js( __( 'Select one continuous lodging date range.', 'travel-app' ) ); ?>');
+                            return;
+                        }
+
+                        var startDate = selected[0].date;
+                        var lastDate = selected[selected.length - 1].date;
+                        var endDate = nextDateValue(lastDate);
+                        var locations = selected.map(function(night) {
+                            return night.location;
+                        }).filter(Boolean);
+                        var uniqueLocations = locations.filter(function(location, index) {
+                            return locations.indexOf(location) === index;
+                        });
+
+                        form.removeAttribute('hidden');
+                        button.setAttribute('aria-expanded', 'true');
+
+                        if (typeInput) {
+                            typeInput.value = 'lodging';
+                        }
+                        if (startInput) {
+                            startInput.value = startDate;
+                        }
+                        if (endInput) {
+                            endInput.value = endDate;
+                        }
+                        if (locationInput) {
+                            locationInput.value = locations[0] || '';
+                        }
+                        if (detailsInput && uniqueLocations.length > 1) {
+                            detailsInput.value = selected.map(function(night) {
+                                return night.date + (night.location ? ': ' + night.location : '');
+                            }).join('\n');
+                        } else if (detailsInput && detailsInput.value.indexOf(': ') !== -1) {
+                            detailsInput.value = '';
+                        }
+                        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        if (titleInput) {
+                            titleInput.focus();
+                            titleInput.select();
+                        }
+                    });
+                });
+
+                var lodgingCheckerToggle = document.querySelector('[data-lodging-checker-toggle]');
+                var lodgingCheckerBox = document.querySelector('[data-lodging-checker-box]');
+
+                if (lodgingCheckerToggle && lodgingCheckerBox) {
+                    lodgingCheckerToggle.addEventListener('click', function() {
+                        var isHidden = lodgingCheckerBox.hasAttribute('hidden');
+
+                        if (isHidden) {
+                            lodgingCheckerBox.removeAttribute('hidden');
+                            lodgingCheckerToggle.setAttribute('aria-expanded', 'true');
+                            return;
+                        }
+
+                        lodgingCheckerBox.setAttribute('hidden', '');
+                        lodgingCheckerToggle.setAttribute('aria-expanded', 'false');
+                    });
+                }
             })();
 
             (function() {

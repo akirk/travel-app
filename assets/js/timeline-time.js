@@ -164,7 +164,7 @@
             nextItem.classList.add('current');
         }
 
-        positionMarker(target, value, currentTime, currentItem, nextItem);
+        updateTimelineJumpControls(target, positionMarker(target, value, currentTime, currentItem, nextItem));
     }
 
     function updatePreviewTarget(target, value, currentTime) {
@@ -298,8 +298,14 @@
         var marker = target.querySelector('.time-marker');
         var markerLabel = target.querySelector('.time-marker-label');
 
-        if (!marker || !markerLabel || !currentTime) {
-            return;
+        if (!marker || !markerLabel) {
+            return false;
+        }
+
+        if (!currentTime) {
+            marker.style.display = 'none';
+            markerLabel.textContent = '';
+            return false;
         }
 
         var targetRect = target.getBoundingClientRect();
@@ -330,12 +336,65 @@
 
         if (top === null) {
             marker.style.display = 'none';
-            return;
+            markerLabel.textContent = '';
+            return false;
         }
 
         marker.style.top = Math.max(0, top) + 'px';
         marker.style.display = 'block';
         markerLabel.textContent = value.slice(11, 16);
+        return true;
+    }
+
+    function updateTimelineJumpControls(target, enabled) {
+        if (!target.id) {
+            return;
+        }
+
+        document.querySelectorAll('[data-timeline-now]').forEach(function(button) {
+            if (button.getAttribute('aria-controls') !== target.id) {
+                return;
+            }
+
+            button.disabled = !enabled;
+        });
+    }
+
+    function getScrollOffset() {
+        var viewportOffset = Math.round(window.innerHeight * 0.18);
+        return Math.max(72, Math.min(160, viewportOffset));
+    }
+
+    function scrollToTimelineNow(target) {
+        var marker = target.querySelector('.time-marker');
+        var currentItem = target.querySelector('.timeline-item.current');
+
+        if (marker && marker.style.display !== 'none') {
+            window.scrollTo({
+                top: Math.max(0, marker.getBoundingClientRect().top + window.pageYOffset - getScrollOffset()),
+                behavior: 'smooth'
+            });
+            return;
+        }
+
+        if (currentItem) {
+            currentItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function initTimelineJumpControls() {
+        document.querySelectorAll('[data-timeline-now]').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var targetId = button.getAttribute('aria-controls') || '';
+                var target = targetId ? document.getElementById(targetId) : null;
+
+                if (!target || button.disabled) {
+                    return;
+                }
+
+                scrollToTimelineNow(target);
+            });
+        });
     }
 
     function getTimelineDay(target, dateValue) {
@@ -444,6 +503,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        initTimelineJumpControls();
         document.querySelectorAll('[data-demo-controls]').forEach(initControl);
         updateStandaloneTimelines();
         updateStandalonePreviews();

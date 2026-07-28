@@ -352,23 +352,37 @@ if ( count( $route_locations ) >= 2 ) {
         .time-marker {
             display: none;
             position: absolute;
-            z-index: 2;
-            left: 26px;
-            right: 0;
+            z-index: 3;
+            left: 0;
+            width: 0;
             height: 0;
-            border-top: 2px solid #c62828;
+            color: #c62828;
             pointer-events: none;
+        }
+        .time-marker::before {
+            content: "";
+            position: absolute;
+            left: -5px;
+            top: -5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #c62828;
+            box-shadow: 0 0 0 3px var(--wp-app-color-background);
         }
         .time-marker span {
             position: absolute;
-            right: 0;
-            top: -15px;
+            left: -8px;
+            top: -13px;
+            transform: translateX(-100%);
             padding: 2px 6px;
             border-radius: 999px;
             background: #c62828;
             color: #fff;
             font-size: 0.76rem;
             font-weight: 750;
+            line-height: 1.2;
+            white-space: nowrap;
         }
         .day-heading {
             position: relative;
@@ -566,10 +580,23 @@ if ( count( $route_locations ) >= 2 ) {
         .timeline-header {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 10px;
             margin-bottom: 14px;
         }
         .timeline-header h2 { margin: 0; }
+        .timeline-header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-left: auto;
+        }
+        .timeline-now-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.48;
+        }
         .lodging-checker {
             display: inline-flex;
             align-items: center;
@@ -662,8 +689,13 @@ if ( count( $route_locations ) >= 2 ) {
             display: flex;
             justify-content: flex-end;
         }
+        .timeline-now-button,
         .add-item-button {
-            margin-left: auto;
+            box-sizing: border-box;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 32px;
             min-height: 32px;
             padding: 5px 9px;
             font-size: 0.88rem;
@@ -807,6 +839,14 @@ if ( count( $route_locations ) >= 2 ) {
             .trip-title-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
             .timeline-header { flex-wrap: wrap; }
+            .timeline-header-actions {
+                margin-left: 0;
+                justify-content: flex-start;
+            }
+            .time-marker span {
+                left: 14px;
+                transform: none;
+            }
             .lodging-checker-night,
             .lodging-checker-night-covered { grid-template-columns: 1fr; }
             .lodging-checker-actions button { width: 100%; }
@@ -894,11 +934,16 @@ if ( count( $route_locations ) >= 2 ) {
             <section class="panel timeline-panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
                 <div class="timeline-header">
                     <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
-                    <?php if ( ! $is_readonly_timeline ) : ?>
-                        <button class="add-item-button" type="button" data-add-item-toggle aria-controls="add-item-form" aria-expanded="<?php echo ! empty( $quick_plan_segment ) ? 'true' : 'false'; ?>">
-                            <?php esc_html_e( '+ Add Item', 'travel-app' ); ?>
+                    <div class="timeline-header-actions">
+                        <button class="ghost-button timeline-now-button" type="button" data-timeline-now aria-controls="timeline" aria-label="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" title="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" disabled>
+                            <?php esc_html_e( 'Now', 'travel-app' ); ?>
                         </button>
-                    <?php endif; ?>
+                        <?php if ( ! $is_readonly_timeline ) : ?>
+                            <button class="add-item-button" type="button" data-add-item-toggle aria-controls="add-item-form" aria-expanded="<?php echo ! empty( $quick_plan_segment ) ? 'true' : 'false'; ?>">
+                                <?php esc_html_e( '+ Add Item', 'travel-app' ); ?>
+                            </button>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <?php
                 $demo_control_id = 'trip-' . (string) $trip_data['id'];

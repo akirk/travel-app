@@ -38,6 +38,16 @@ if ( $is_shared_timeline ) {
 }
 $trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
 $segments  = $trip_data['segments'] ?? [];
+$editable_trip_data = [];
+if ( ! $is_readonly_timeline ) {
+    $editable_trip_data = $trip_data;
+    $editable_trip_data['segments'] = array_map( static function( array $editable_segment ) use ( $trip_data ): array {
+        $editable_index = (int) ( $editable_segment['id'] ?? 0 );
+        $editable_segment['edit_nonce'] = wp_create_nonce( 'travel_app_update_segment_' . (int) $trip_data['id'] . '_' . $editable_index );
+
+        return $editable_segment;
+    }, $segments );
+}
 $is_trip_active = $travel_app->is_trip_active( $trip_data );
 $show_now_next_section = '0' !== (string) get_term_meta( $trip_id, '_travel_app_show_now_next', true );
 $fellow_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
@@ -172,6 +182,12 @@ if ( count( $route_locations ) >= 2 ) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo wp_app_title( $trip_data ? $trip_data['title'] : __( 'Travel Plan', 'travel-app' ) ); ?></title>
+    <?php if ( ! $is_static_download ) : ?>
+        <link rel="manifest" href="<?php echo esc_url( $travel_app->get_manifest_url( (int) $trip_data['id'], $share_token ) ); ?>">
+        <meta name="theme-color" content="#0b6bcb">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-title" content="<?php echo esc_attr( $trip_data['title'] ?: __( 'Timeline', 'travel-app' ) ); ?>">
+    <?php endif; ?>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <?php if ( ! $is_static_download ) : ?>
         <?php wp_app_head(); ?>
@@ -353,6 +369,53 @@ if ( count( $route_locations ) >= 2 ) {
             background: rgba(15, 107, 66, 0.08);
         }
         .notice.error { border-color: rgba(138, 75, 8, 0.28); background: rgba(138, 75, 8, 0.08); }
+        .offline-status[hidden] { display: none; }
+        .offline-status {
+            margin-bottom: 18px;
+            border-radius: 6px;
+            padding: 10px 12px;
+            border: 1px solid rgba(11, 107, 203, 0.28);
+            background: rgba(11, 107, 203, 0.08);
+            color: var(--wp-app-color-text);
+        }
+        .offline-status.error { border-color: rgba(138, 75, 8, 0.28); background: rgba(138, 75, 8, 0.08); }
+        .offline-panel {
+            margin-top: 28px;
+            padding-top: 18px;
+            border-top: 1px solid var(--wp-app-color-border);
+            color: var(--wp-app-color-muted);
+        }
+        .offline-panel summary {
+            cursor: pointer;
+        }
+        .offline-panel summary h2 {
+            display: inline;
+        }
+        .offline-panel h2 {
+            margin-bottom: 10px;
+            color: var(--wp-app-color-text);
+        }
+        .offline-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .offline-grid div {
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            background: var(--wp-app-color-surface);
+        }
+        .offline-grid dt {
+            margin: 0 0 3px;
+            font-size: 0.82rem;
+        }
+        .offline-grid dd {
+            margin: 0;
+            color: var(--wp-app-color-text);
+            font-weight: 750;
+            overflow-wrap: anywhere;
+        }
         .demo-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 18px; }
         .demo-controls label { min-width: 190px; margin: 0; }
         .ghost-button {
@@ -447,13 +510,30 @@ if ( count( $route_locations ) >= 2 ) {
             color: inherit;
             text-decoration: none;
         }
+        .timeline-title-button {
+            appearance: none;
+            min-height: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            font-weight: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
         .timeline-title-link:hover,
         .timeline-title-link:focus,
-        .timeline-title-link:focus-visible {
+        .timeline-title-link:focus-visible,
+        .timeline-title-button:hover,
+        .timeline-title-button:focus,
+        .timeline-title-button:focus-visible {
             color: var(--wp-app-color-link);
             text-decoration: none;
         }
-        .timeline-title-link:focus-visible {
+        .timeline-title-link:focus-visible,
+        .timeline-title-button:focus-visible {
             outline: 2px solid var(--wp-app-color-link);
             outline-offset: 2px;
         }
@@ -660,6 +740,28 @@ if ( count( $route_locations ) >= 2 ) {
         .timeline-now-button:disabled {
             cursor: not-allowed;
             opacity: 0.48;
+        }
+        .timeline-edit-panel {
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            background: var(--wp-app-color-surface);
+            margin-bottom: 10px;
+        }
+        .timeline-edit-panel[hidden] {
+            display: none;
+        }
+        .timeline-edit-panel .edit-form {
+            padding: 14px 12px 12px;
+        }
+        .timeline-edit-panel .form-actions {
+            justify-content: space-between;
+            align-items: center;
+        }
+        .attachment-note {
+            color: var(--wp-app-color-muted);
+            font-size: 0.88rem;
+            margin: 0;
+            padding: 0 12px 12px;
         }
         .lodging-checker {
             display: inline-flex;
@@ -948,6 +1050,7 @@ if ( count( $route_locations ) >= 2 ) {
             .lodging-checker-night-covered { grid-template-columns: 1fr; }
             .lodging-checker-actions button { width: 100%; }
             .demo-controls label { min-width: 100%; }
+            .offline-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
     </style>
 </head>
@@ -988,7 +1091,7 @@ if ( count( $route_locations ) >= 2 ) {
                     <?php endif; ?>
                 </div>
                 <?php if ( ! $is_readonly_timeline ) : ?>
-                    <form class="trip-title-form" id="trip-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
+                    <form class="trip-title-form" id="trip-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-offline-sync hidden>
                         <input type="hidden" name="action" value="travel_app_update_trip">
                         <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
                         <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
@@ -1027,6 +1130,10 @@ if ( count( $route_locations ) >= 2 ) {
                     <?php endif; ?>
                 </div>
             </header>
+
+            <?php if ( ! $is_static_download ) : ?>
+                <div class="offline-status" data-offline-status role="status" aria-live="polite" hidden></div>
+            <?php endif; ?>
 
             <?php
             $demo_control_id = 'trip-' . (string) $trip_data['id'];
@@ -1239,7 +1346,7 @@ if ( count( $route_locations ) >= 2 ) {
                             </form>
                         </details>
 
-                        <form class="edit-form add-item-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                        <form class="edit-form add-item-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"<?php echo empty( $quick_plan_segment ) ? ' data-offline-sync' : ''; ?>>
                             <input type="hidden" name="action" value="<?php echo ! empty( $quick_plan_segment ) ? 'travel_app_import' : 'travel_app_add_segment'; ?>">
                             <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
                             <?php if ( ! empty( $quick_plan_segment ) ) : ?>
@@ -1322,6 +1429,32 @@ if ( count( $route_locations ) >= 2 ) {
                             </div>
                         </form>
                     </div>
+                    <?php
+                    $segment_form_template_segment = [
+                        'type'              => 'other',
+                        'title'             => '',
+                        'date'              => '',
+                        'end_date'          => '',
+                        'time'              => '',
+                        'end_time'          => '',
+                        'location'          => '',
+                        'end_location'      => '',
+                        'url'               => '',
+                        'url_preview'       => [],
+                        'url_preview_debug' => [],
+                        'details'           => '',
+                    ];
+                    $segment_form_template_index = 0;
+                    ?>
+                    <script type="application/json" id="travel-app-trip-data"><?php echo wp_json_encode( $editable_trip_data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></script>
+                    <template id="segment-edit-template">
+                        <?php
+                        $segment = $segment_form_template_segment;
+                        $index = $segment_form_template_index;
+                        require __DIR__ . '/partials/segment-form.php';
+                        ?>
+                        <p class="attachment-note"><?php esc_html_e( 'Attachments can be opened from the timeline. Uploading or deleting attachments requires an online connection.', 'travel-app' ); ?></p>
+                    </template>
                 <?php endif; ?>
 
                 <?php if ( empty( $segments_by_day ) ) : ?>
@@ -1361,7 +1494,7 @@ if ( count( $route_locations ) >= 2 ) {
                                     <?php $attachments = $show_attachments && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
                                     <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
-                                        <div class="timeline-item" data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
+                                        <div class="timeline-item" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
                                             <div class="timeline-meta">
                                                 <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
                                                 <div class="type"><?php echo esc_html( $type_label ); ?></div>
@@ -1370,10 +1503,12 @@ if ( count( $route_locations ) >= 2 ) {
                                                 <div class="timeline-title-row title">
                                                     <?php if ( $is_readonly_timeline ) : ?>
                                                         <span><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
-                                                    <?php else : ?>
-                                                        <a class="timeline-title-link" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
+                                                    <?php elseif ( ! $is_end_timeline_entry ) : ?>
+                                                        <button class="timeline-title-button" type="button" data-inline-edit-toggle aria-controls="<?php echo esc_attr( 'edit-segment-' . $index ); ?>">
                                                             <?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?>
-                                                        </a>
+                                                        </button>
+                                                    <?php else : ?>
+                                                        <span><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
                                                     <?php endif; ?>
                                                     <?php if ( $show_url_preview && ! $has_url_preview && ! empty( $segment['url'] ) ) : ?>
                                                         <a class="timeline-url-link" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer" title="<?php esc_attr_e( 'Open item URL', 'travel-app' ); ?>">
@@ -1416,7 +1551,7 @@ if ( count( $route_locations ) >= 2 ) {
                                                             }
                                                             $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'travel-app' ) ) );
                                                             ?>
-                                                            <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>">
+                                                            <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>" data-offline-cache-url>
                                                                 <span aria-hidden="true">↓</span>
                                                                 <span><?php echo esc_html( $attachment_label ); ?></span>
                                                             </a>
@@ -1443,6 +1578,10 @@ if ( count( $route_locations ) >= 2 ) {
                                                 <?php endif; ?>
                                             </div>
                                         </div>
+                                        <?php if ( ! $is_readonly_timeline && ! $is_end_timeline_entry ) : ?>
+                                            <div class="timeline-edit-panel" id="<?php echo esc_attr( 'edit-segment-' . $index ); ?>" data-inline-edit-panel hidden>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
                             </section>
@@ -1459,62 +1598,68 @@ if ( count( $route_locations ) >= 2 ) {
                             <?php $index = (int) $segment['_index']; ?>
                             <?php $show_location = $show_private_share_details || $is_transport_segment( $segment ); ?>
                             <?php $attachments = $show_private_share_details && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
-                            <div class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>">
-                                <div class="summary-grid">
-                                    <span class="time"><?php echo esc_html( trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) ) ); ?></span>
-                                    <span>
-                                        <span class="type"><?php echo esc_html( $segment_type_labels[ $segment['type'] ?? 'other' ] ?? ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span><br>
-                                        <?php if ( $is_readonly_timeline ) : ?>
-                                            <span class="title"><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
-                                        <?php else : ?>
-                                            <a class="timeline-title-link title" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>">
-                                                <?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?>
-                                            </a>
-                                        <?php endif; ?>
-                                        <?php if ( ! empty( $segment['end_date'] ) ) : ?>
-                                            <br><span class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></span>
-                                        <?php endif; ?>
-                                        <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
-                                            <?php $location = (string) $segment['location']; ?>
-                                            <br><span class="detail">
-                                                <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
-                                                    <span aria-hidden="true">&#x1F4CD;</span>
-                                                    <?php echo esc_html( $location ); ?>
-                                                </a>
-                                            </span>
-                                        <?php endif; ?>
-                                        <?php if ( $show_location && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
-                                            <?php $end_location = (string) $segment['end_location']; ?>
-                                            <br><span class="detail">
-                                                <?php esc_html_e( 'To:', 'travel-app' ); ?>
-                                                <a href="<?php echo esc_url( $get_google_maps_url( $end_location ) ); ?>" target="_blank" rel="noopener noreferrer">
-                                                    <span aria-hidden="true">&#x1F4CD;</span>
-                                                    <?php echo esc_html( $end_location ); ?>
-                                                </a>
-                                            </span>
-                                        <?php endif; ?>
-                                        <?php if ( ! empty( $attachments ) ) : ?>
-                                            <div class="attachment-links" aria-label="<?php esc_attr_e( 'Attachments', 'travel-app' ); ?>">
-                                                <?php foreach ( $attachments as $attachment ) : ?>
-                                                    <?php
-                                                    if ( empty( $attachment['url'] ) ) {
-                                                        continue;
-                                                    }
-                                                    $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'travel-app' ) ) );
-                                                    ?>
-                                                    <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>">
-                                                        <span aria-hidden="true">↓</span>
-                                                        <span><?php echo esc_html( $attachment_label ); ?></span>
+                            <div class="item unscheduled-link" id="segment-<?php echo esc_attr( (string) $index ); ?>" data-inline-edit-view>
+                                    <div class="summary-grid">
+                                        <span class="time"><?php echo esc_html( trim( (string) ( $segment['date'] ?? '' ) . ' ' . (string) ( $segment['time'] ?? '' ) ) ); ?></span>
+                                        <span>
+                                            <span class="type"><?php echo esc_html( $segment_type_labels[ $segment['type'] ?? 'other' ] ?? ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) ) ); ?></span><br>
+                                            <?php if ( $is_readonly_timeline ) : ?>
+                                                <span class="title"><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
+                                            <?php else : ?>
+                                                <button class="timeline-title-button title" type="button" data-inline-edit-toggle aria-controls="<?php echo esc_attr( 'edit-segment-' . $index ); ?>">
+                                                    <?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?>
+                                                </button>
+                                            <?php endif; ?>
+                                            <?php if ( ! empty( $segment['end_date'] ) ) : ?>
+                                                <br><span class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></span>
+                                            <?php endif; ?>
+                                            <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
+                                                <?php $location = (string) $segment['location']; ?>
+                                                <br><span class="detail">
+                                                    <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
+                                                        <span aria-hidden="true">&#x1F4CD;</span>
+                                                        <?php echo esc_html( $location ); ?>
                                                     </a>
-                                                <?php endforeach; ?>
-                                            </div>
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ( $show_location && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                                                <?php $end_location = (string) $segment['end_location']; ?>
+                                                <br><span class="detail">
+                                                    <?php esc_html_e( 'To:', 'travel-app' ); ?>
+                                                    <a href="<?php echo esc_url( $get_google_maps_url( $end_location ) ); ?>" target="_blank" rel="noopener noreferrer">
+                                                        <span aria-hidden="true">&#x1F4CD;</span>
+                                                        <?php echo esc_html( $end_location ); ?>
+                                                    </a>
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ( ! empty( $attachments ) ) : ?>
+                                                <div class="attachment-links" aria-label="<?php esc_attr_e( 'Attachments', 'travel-app' ); ?>">
+                                                    <?php foreach ( $attachments as $attachment ) : ?>
+                                                        <?php
+                                                        if ( empty( $attachment['url'] ) ) {
+                                                            continue;
+                                                        }
+                                                        $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'travel-app' ) ) );
+                                                        ?>
+                                                        <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>" data-offline-cache-url>
+                                                            <span aria-hidden="true">↓</span>
+                                                            <span><?php echo esc_html( $attachment_label ); ?></span>
+                                                        </a>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </span>
+                                        <?php if ( ! $is_readonly_timeline ) : ?>
+                                            <button class="ghost-button" type="button" data-inline-edit-toggle aria-controls="<?php echo esc_attr( 'edit-segment-' . $index ); ?>">
+                                                <?php esc_html_e( 'Edit', 'travel-app' ); ?>
+                                            </button>
                                         <?php endif; ?>
-                                    </span>
-                                    <?php if ( ! $is_readonly_timeline ) : ?>
-                                        <a class="detail" href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_data['id'] . '/item/' . $index . '/' ) ); ?>"><?php esc_html_e( 'Open', 'travel-app' ); ?></a>
-                                    <?php endif; ?>
-                                </div>
+                                    </div>
                             </div>
+                            <?php if ( ! $is_readonly_timeline ) : ?>
+                                <div class="timeline-edit-panel" id="<?php echo esc_attr( 'edit-segment-' . $index ); ?>" data-inline-edit-panel hidden>
+                                </div>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
                 </section>
@@ -1591,7 +1736,7 @@ if ( count( $route_locations ) >= 2 ) {
                 <section class="settings-zone" aria-labelledby="settings-heading">
                     <details>
                         <summary><h2 id="settings-heading"><?php esc_html_e( 'Settings', 'travel-app' ); ?></h2></summary>
-                        <form class="settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                        <form class="settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-offline-sync>
                             <input type="hidden" name="action" value="travel_app_update_trip">
                             <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
                             <input type="hidden" name="trip_title" value="<?php echo esc_attr( $trip_data['title'] ); ?>">
@@ -1617,7 +1762,7 @@ if ( count( $route_locations ) >= 2 ) {
                     <details>
                         <summary><h2 id="delete-heading"><?php esc_html_e( 'Delete Travel Plan', 'travel-app' ); ?></h2></summary>
                         <p><?php esc_html_e( 'This deletes the travel plan and moves its itinerary items to the trash.', 'travel-app' ); ?></p>
-                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo esc_js( __( 'Delete this travel plan?', 'travel-app' ) ); ?>');">
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-offline-sync onsubmit="return confirm('<?php echo esc_js( __( 'Delete this travel plan?', 'travel-app' ) ); ?>');">
                             <input type="hidden" name="action" value="travel_app_delete">
                             <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
                             <?php wp_nonce_field( 'travel_app_delete_' . $trip_data['id'] ); ?>
@@ -1625,6 +1770,30 @@ if ( count( $route_locations ) >= 2 ) {
                         </form>
                     </details>
                 </section>
+            <?php endif; ?>
+
+            <?php if ( ! $is_static_download ) : ?>
+                <details class="offline-panel" data-offline-panel>
+                    <summary><h2 id="offline-heading"><?php esc_html_e( 'Offline', 'travel-app' ); ?></h2></summary>
+                    <dl class="offline-grid">
+                        <div>
+                            <dt><?php esc_html_e( 'Connection', 'travel-app' ); ?></dt>
+                            <dd data-offline-connection><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
+                        </div>
+                        <div>
+                            <dt><?php esc_html_e( 'Service worker', 'travel-app' ); ?></dt>
+                            <dd data-offline-worker><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
+                        </div>
+                        <div>
+                            <dt><?php esc_html_e( 'Current page', 'travel-app' ); ?></dt>
+                            <dd data-offline-cache><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
+                        </div>
+                        <div>
+                            <dt><?php esc_html_e( 'Queued changes', 'travel-app' ); ?></dt>
+                            <dd data-offline-queue><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
+                        </div>
+                    </dl>
+                </details>
             <?php endif; ?>
         <?php endif; ?>
     </main>

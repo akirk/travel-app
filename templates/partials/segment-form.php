@@ -1,4 +1,4 @@
-<form class="edit-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+<form class="edit-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-offline-sync>
     <input type="hidden" name="action" value="travel_app_update_segment">
     <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
     <input type="hidden" name="segment_index" value="<?php echo esc_attr( (string) $index ); ?>">
@@ -91,6 +91,7 @@
         <textarea name="segment_details"><?php echo esc_textarea( (string) ( $segment['details'] ?? '' ) ); ?></textarea>
     </label>
     <div class="form-actions">
+        <button class="ghost-button" type="button" data-inline-edit-cancel><?php esc_html_e( 'Cancel', 'travel-app' ); ?></button>
         <button type="submit"><?php esc_html_e( 'Save Item', 'travel-app' ); ?></button>
     </div>
 </form>

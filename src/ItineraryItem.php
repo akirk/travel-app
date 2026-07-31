@@ -44,7 +44,7 @@ class ItineraryItem {
         $this->location = (string) get_post_meta( $this->id, '_travel_app_location', true );
         $this->end_location = (string) get_post_meta( $this->id, '_travel_app_end_location', true );
         $this->url = (string) get_post_meta( $this->id, '_travel_app_url', true );
-        $this->app_url = $this->trip_id ? home_url( '/travel-app/trip/' . $this->trip_id . '/item/' . $this->id . '/' ) : '';
+        $this->app_url = $this->trip_id ? home_url( '/travel-app/trip/' . $this->trip_id . '/#segment-' . $this->id ) : '';
         $this->url_preview = $preview_service->get_item_preview( $this->id );
         $this->url_preview_debug = $preview_service->get_item_preview_debug( $this->id );
         $this->attachments = $this->attachments();

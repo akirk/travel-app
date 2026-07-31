@@ -66,6 +66,7 @@ class App extends BaseApp {
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'register_ai_assistant_welcome_tips' ], 10, 2 );
         add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
         add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
+        add_action( 'template_redirect', [ $this, 'maybe_render_shared_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_timeline' ], 0 );
     }
 
@@ -1249,6 +1250,54 @@ class App extends BaseApp {
         exit;
     }
 
+    public function maybe_render_shared_calendar(): void {
+        $trip_id = isset( $_GET['travel_app_calendar'] ) ? absint( $_GET['travel_app_calendar'] ) : 0;
+        $token = isset( $_GET['travel_app_token'] ) ? sanitize_text_field( wp_unslash( $_GET['travel_app_token'] ) ) : '';
+
+        if ( $trip_id <= 0 || '' === $token ) {
+            return;
+        }
+
+        $mode = $this->get_trip_share_mode_by_token( $trip_id, $token );
+        if ( '' === $mode ) {
+            wp_die(
+                esc_html__( 'This calendar could not be found.', 'travel-app' ),
+                esc_html__( 'Calendar not found', 'travel-app' ),
+                [ 'response' => 404 ]
+            );
+        }
+
+        $trip = Trip::get( $trip_id );
+        if ( ! $trip ) {
+            wp_die(
+                esc_html__( 'This travel plan could not be found.', 'travel-app' ),
+                esc_html__( 'Travel plan not found', 'travel-app' ),
+                [ 'response' => 404 ]
+            );
+        }
+
+        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+            define( 'DONOTCACHEPAGE', true );
+        }
+
+        $ics = $this->render_trip_ics( $trip_id, $mode );
+        $filename = sanitize_title( $trip->title );
+        if ( '' === $filename ) {
+            $filename = 'travel-plan-' . $trip_id;
+        }
+        if ( 'public' === $mode ) {
+            $filename .= '-public';
+        }
+
+        nocache_headers();
+        header( 'Content-Type: text/calendar; charset=utf-8' );
+        header( 'Content-Disposition: inline; filename="' . $filename . '.ics"' );
+        header( 'Content-Length: ' . strlen( $ics ) );
+
+        echo $ics;
+        exit;
+    }
+
     public function handle_update_trip(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
             wp_die( esc_html__( 'You must be logged in to edit travel plans.', 'travel-app' ), 403 );
@@ -1328,9 +1377,10 @@ class App extends BaseApp {
         $this->clear_trip_public_cache( $trip_id );
 
         wp_send_json_success( [
-            'mode'    => $this->normalize_share_mode( $mode ),
-            'url'     => $this->get_trip_share_url( $trip_id, $mode ),
-            'message' => __( 'Read-only timeline share link generated.', 'travel-app' ),
+            'mode'         => $this->normalize_share_mode( $mode ),
+            'url'          => $this->get_trip_share_url( $trip_id, $mode ),
+            'calendar_url' => $this->get_trip_calendar_url( $trip_id, $mode ),
+            'message'      => __( 'Read-only timeline share link generated.', 'travel-app' ),
         ] );
     }
 
@@ -1351,9 +1401,10 @@ class App extends BaseApp {
         delete_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ) );
 
         wp_send_json_success( [
-            'mode'    => $this->normalize_share_mode( $mode ),
-            'url'     => '',
-            'message' => __( 'Read-only timeline share link removed.', 'travel-app' ),
+            'mode'         => $this->normalize_share_mode( $mode ),
+            'url'          => '',
+            'calendar_url' => '',
+            'message'      => __( 'Read-only timeline share link removed.', 'travel-app' ),
         ] );
     }
 
@@ -1375,6 +1426,10 @@ class App extends BaseApp {
             'urls'    => [
                 'fellow' => $this->get_trip_share_url( $trip_id, 'fellow' ),
                 'public' => $this->get_trip_share_url( $trip_id, 'public' ),
+            ],
+            'calendar_urls' => [
+                'fellow' => $this->get_trip_calendar_url( $trip_id, 'fellow' ),
+                'public' => $this->get_trip_calendar_url( $trip_id, 'public' ),
             ],
             'message' => __( 'Read-only timeline cache refreshed.', 'travel-app' ),
         ] );
@@ -1830,6 +1885,21 @@ class App extends BaseApp {
         );
     }
 
+    public function get_trip_calendar_url( int $trip_id, string $mode = 'fellow' ): string {
+        $token = $this->get_trip_share_token( $trip_id, $mode );
+        if ( '' === $token ) {
+            return '';
+        }
+
+        return add_query_arg(
+            [
+                'travel_app_calendar' => $trip_id,
+                'travel_app_token'    => $token,
+            ],
+            home_url( '/' )
+        );
+    }
+
     public function get_trip_share_mode_by_token( int $trip_id, string $token ): string {
         if ( ! Trip::get( $trip_id ) || '' === $token ) {
             return '';
@@ -1890,6 +1960,183 @@ class App extends BaseApp {
         }
 
         return $html;
+    }
+
+    private function render_trip_ics( int $trip_id, string $mode = 'fellow' ): string {
+        $trip = Trip::get( $trip_id );
+        if ( ! $trip ) {
+            return '';
+        }
+
+        $mode = $this->normalize_share_mode( $mode );
+        $segments_user_id = Trip::get_owner_id( $trip_id );
+        $trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
+        $lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Travel App//Travel App//EN',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            'X-WR-CALNAME:' . $this->escape_ics_text( (string) ( $trip_data['title'] ?? __( 'Travel Plan', 'travel-app' ) ) ),
+        ];
+
+        foreach ( (array) ( $trip_data['segments'] ?? [] ) as $segment ) {
+            if ( ! is_array( $segment ) || '' === (string) ( $segment['date'] ?? '' ) ) {
+                continue;
+            }
+
+            $event_times = $this->get_segment_ics_times( $segment );
+            if ( empty( $event_times ) ) {
+                continue;
+            }
+
+            $uid_source = home_url( '/travel-app/trip/' . $trip_id . '/item/' . (int) ( $segment['id'] ?? 0 ) . '/' );
+            $is_fellow_share = 'fellow' === $mode;
+            $is_transport_segment = $this->is_transport_segment( $segment );
+            $description_parts = $is_fellow_share ? array_filter( [
+                (string) ( $segment['details'] ?? '' ),
+                (string) ( $segment['url'] ?? '' ),
+            ] ) : [];
+            $location = ( $is_fellow_share || $is_transport_segment ) ? trim( (string) ( $segment['location'] ?? '' ) ) : '';
+            $end_location = ( $is_fellow_share || $is_transport_segment ) ? trim( (string) ( $segment['end_location'] ?? '' ) ) : '';
+            if ( '' !== $end_location && '' !== $location ) {
+                $location .= ' - ' . $end_location;
+            } elseif ( '' !== $end_location ) {
+                $location = $end_location;
+            }
+
+            $lines[] = 'BEGIN:VEVENT';
+            $lines[] = 'UID:' . $this->escape_ics_text( md5( $uid_source ) . '@travel-app' );
+            $lines[] = 'DTSTAMP:' . gmdate( 'Ymd\THis\Z' );
+            $lines[] = 'SUMMARY:' . $this->escape_ics_text( (string) ( $segment['title'] ?? __( 'Untitled item', 'travel-app' ) ) );
+            foreach ( $event_times as $event_time_line ) {
+                $lines[] = $event_time_line;
+            }
+            if ( '' !== $location ) {
+                $lines[] = 'LOCATION:' . $this->escape_ics_text( $location );
+            }
+            if ( ! empty( $description_parts ) ) {
+                $lines[] = 'DESCRIPTION:' . $this->escape_ics_text( implode( "\n\n", $description_parts ) );
+            }
+            if ( $is_fellow_share && '' !== (string) ( $segment['url'] ?? '' ) ) {
+                $lines[] = 'URL:' . $this->escape_ics_text( (string) $segment['url'] );
+            }
+            $lines[] = 'END:VEVENT';
+        }
+
+        $lines[] = 'END:VCALENDAR';
+
+        return implode( "\r\n", array_map( [ $this, 'fold_ics_line' ], $lines ) ) . "\r\n";
+    }
+
+    private function get_segment_ics_times( array $segment ): array {
+        $starts_at_utc = (string) ( $segment['starts_at_utc'] ?? '' );
+        $ends_at_utc = (string) ( $segment['ends_at_utc'] ?? '' );
+        if ( '' !== $starts_at_utc ) {
+            $starts = strtotime( $starts_at_utc );
+            $ends = '' !== $ends_at_utc ? strtotime( $ends_at_utc ) : false;
+            if ( false === $starts ) {
+                return [];
+            }
+
+            $lines = [ 'DTSTART:' . gmdate( 'Ymd\THis\Z', $starts ) ];
+            if ( false !== $ends && $ends > $starts ) {
+                $lines[] = 'DTEND:' . gmdate( 'Ymd\THis\Z', $ends );
+            }
+
+            return $lines;
+        }
+
+        $date = (string) ( $segment['date'] ?? '' );
+        if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+            return [];
+        }
+
+        $time = (string) ( $segment['time'] ?? '' );
+        $end_date = (string) ( $segment['end_date'] ?? '' );
+        $end_time = (string) ( $segment['end_time'] ?? '' );
+        if ( preg_match( '/^\d{2}:\d{2}$/', $time ) ) {
+            $timezone = $this->normalize_ics_timezone( (string) ( $segment['timezone'] ?? '' ) );
+            $start_value = str_replace( [ '-', ':' ], '', $date . 'T' . $time . '00' );
+            $lines = [ ( '' !== $timezone ? 'DTSTART;TZID=' . $timezone . ':' : 'DTSTART:' ) . $start_value ];
+
+            if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $end_date ) && preg_match( '/^\d{2}:\d{2}$/', $end_time ) ) {
+                $end_value = str_replace( [ '-', ':' ], '', $end_date . 'T' . $end_time . '00' );
+                $lines[] = ( '' !== $timezone ? 'DTEND;TZID=' . $timezone . ':' : 'DTEND:' ) . $end_value;
+            } elseif ( preg_match( '/^\d{2}:\d{2}$/', $end_time ) ) {
+                $end_value = str_replace( [ '-', ':' ], '', $date . 'T' . $end_time . '00' );
+                $lines[] = ( '' !== $timezone ? 'DTEND;TZID=' . $timezone . ':' : 'DTEND:' ) . $end_value;
+            }
+
+            return $lines;
+        }
+
+        $start_date = date_create_immutable( $date );
+        if ( ! $start_date ) {
+            return [];
+        }
+
+        $end_date_object = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $end_date ) ? date_create_immutable( $end_date ) : null;
+        if ( ! $end_date_object || $end_date_object <= $start_date ) {
+            $end_date_object = $start_date->modify( '+1 day' );
+        } elseif ( 'lodging' !== (string) ( $segment['type'] ?? '' ) ) {
+            $end_date_object = $end_date_object->modify( '+1 day' );
+        }
+
+        return [
+            'DTSTART;VALUE=DATE:' . $start_date->format( 'Ymd' ),
+            'DTEND;VALUE=DATE:' . $end_date_object->format( 'Ymd' ),
+        ];
+    }
+
+    private function normalize_ics_timezone( string $timezone ): string {
+        $timezone = trim( $timezone );
+
+        return preg_match( '/^[A-Za-z0-9_+\-\/]+$/', $timezone ) ? $timezone : '';
+    }
+
+    private function is_transport_segment( array $segment ): bool {
+        $type = (string) ( $segment['type'] ?? '' );
+        if ( in_array( $type, [ 'flight', 'train' ], true ) ) {
+            return true;
+        }
+
+        return 1 === preg_match( '/\bbus(?:ses|es)?\b/i', (string) ( $segment['title'] ?? '' ) . ' ' . (string) ( $segment['details'] ?? '' ) );
+    }
+
+    private function escape_ics_text( string $text ): string {
+        $text = str_replace( [ "\\", "\r\n", "\r", "\n", ';', ',' ], [ '\\\\', '\n', '\n', '\n', '\;', '\,' ], $text );
+
+        return $text;
+    }
+
+    private function fold_ics_line( string $line ): string {
+        if ( strlen( $line ) <= 75 ) {
+            return $line;
+        }
+
+        $characters = preg_split( '//u', $line, -1, PREG_SPLIT_NO_EMPTY );
+        if ( ! is_array( $characters ) ) {
+            return rtrim( chunk_split( $line, 75, "\r\n " ), "\r\n " );
+        }
+
+        $folded_lines = [];
+        $current_line = '';
+        foreach ( $characters as $character ) {
+            if ( strlen( $current_line . $character ) > 75 && '' !== $current_line ) {
+                $folded_lines[] = $current_line;
+                $current_line = $character;
+                continue;
+            }
+
+            $current_line .= $character;
+        }
+
+        if ( '' !== $current_line ) {
+            $folded_lines[] = $current_line;
+        }
+
+        return implode( "\r\n ", $folded_lines );
     }
 
     public function get_quick_plan_draft( string $draft_key ): array {

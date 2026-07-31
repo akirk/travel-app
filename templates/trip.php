@@ -42,6 +42,8 @@ $is_trip_active = $travel_app->is_trip_active( $trip_data );
 $show_now_next_section = '0' !== (string) get_term_meta( $trip_id, '_travel_app_show_now_next', true );
 $fellow_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
 $public_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
+$fellow_calendar_url = ! $is_shared_timeline ? $travel_app->get_trip_calendar_url( (int) $trip_data['id'], 'fellow' ) : '';
+$public_calendar_url = ! $is_shared_timeline ? $travel_app->get_trip_calendar_url( (int) $trip_data['id'], 'public' ) : '';
 $segment_type_labels = [
     'flight'   => __( 'Flight', 'travel-app' ),
     'lodging'  => __( 'Lodging', 'travel-app' ),
@@ -314,6 +316,7 @@ if ( count( $route_locations ) >= 2 ) {
             border-radius: 6px;
             text-decoration: none;
         }
+        .share-link .ghost-button[hidden] { display: none; }
         .share-actions {
             display: flex;
             gap: 10px;
@@ -343,6 +346,7 @@ if ( count( $route_locations ) >= 2 ) {
         .ghost-button {
             background: transparent;
             color: var(--wp-app-color-text);
+            border: 1px solid var(--wp-app-color-border);
             border-color: var(--wp-app-color-border);
         }
         .timeline { position: relative; display: grid; gap: 0; }
@@ -1525,11 +1529,12 @@ if ( count( $route_locations ) >= 2 ) {
                                 </span>
                                 <span class="share-actions">
                                     <a class="ghost-button" href="<?php echo esc_url( $travel_app->get_trip_html_download_url( (int) $trip_data['id'], 'fellow' ) ); ?>">
-                                        <?php esc_html_e( 'Download', 'travel-app' ); ?>
+                                        <?php esc_html_e( 'HTML', 'travel-app' ); ?>
                                     </a>
                                     <?php if ( ! $travel_app->is_playground() ) : ?>
-                                        <button class="ghost-button" type="button" data-share-copy data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
-                                        <button class="ghost-button" type="button" data-share-remove data-share-mode="fellow" <?php echo '' === $fellow_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                        <button class="ghost-button" type="button" data-share-copy data-share-kind="timeline" data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'URL', 'travel-app' ); ?></button>
+                                        <button class="ghost-button" type="button" data-share-copy data-share-kind="calendar" data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_calendar_url ); ?>"><?php esc_html_e( 'ICS', 'travel-app' ); ?></button>
+                                        <button class="ghost-button" type="button" data-share-remove data-share-mode="fellow" <?php echo '' === $fellow_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Stop sharing', 'travel-app' ); ?></button>
                                     <?php endif; ?>
                                 </span>
                             </div>
@@ -1540,11 +1545,12 @@ if ( count( $route_locations ) >= 2 ) {
                                 </span>
                                 <span class="share-actions">
                                     <a class="ghost-button" href="<?php echo esc_url( $travel_app->get_trip_html_download_url( (int) $trip_data['id'], 'public' ) ); ?>">
-                                        <?php esc_html_e( 'Download', 'travel-app' ); ?>
+                                        <?php esc_html_e( 'HTML', 'travel-app' ); ?>
                                     </a>
                                     <?php if ( ! $travel_app->is_playground() ) : ?>
-                                        <button class="ghost-button" type="button" data-share-copy data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'Copy', 'travel-app' ); ?></button>
-                                        <button class="ghost-button" type="button" data-share-remove data-share-mode="public" <?php echo '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Remove', 'travel-app' ); ?></button>
+                                        <button class="ghost-button" type="button" data-share-copy data-share-kind="timeline" data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'URL', 'travel-app' ); ?></button>
+                                        <button class="ghost-button" type="button" data-share-copy data-share-kind="calendar" data-share-mode="public" data-share-url="<?php echo esc_attr( $public_calendar_url ); ?>"><?php esc_html_e( 'ICS', 'travel-app' ); ?></button>
+                                        <button class="ghost-button" type="button" data-share-remove data-share-mode="public" <?php echo '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Stop sharing', 'travel-app' ); ?></button>
                                     <?php endif; ?>
                                 </span>
                             </div>
@@ -1786,10 +1792,12 @@ if ( count( $route_locations ) >= 2 ) {
 
                 var copyButtons = Array.prototype.slice.call(control.querySelectorAll('[data-share-copy]'));
                 var removeButtons = Array.prototype.slice.call(control.querySelectorAll('[data-share-remove]'));
-                var primaryCopyButton = copyButtons[0] || null;
                 var status = control.querySelector('[data-share-status]');
-                var defaultCopyText = primaryCopyButton ? primaryCopyButton.textContent : '';
                 var copyResetTimers = {};
+
+                copyButtons.forEach(function(button) {
+                    button.setAttribute('data-share-default-text', button.textContent);
+                });
 
                 function setStatus(message) {
                     if (status) {
@@ -1805,16 +1813,20 @@ if ( count( $route_locations ) >= 2 ) {
                     });
                 }
 
-                function setShareUrl(mode, url) {
+                function getShareButtonKey(button) {
+                    return (button.getAttribute('data-share-mode') || 'fellow') + ':' + (button.getAttribute('data-share-kind') || 'timeline');
+                }
+
+                function setShareUrls(mode, timelineUrl, calendarUrl) {
                     copyButtons.forEach(function(button) {
                         if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
-                            button.setAttribute('data-share-url', url || '');
+                            button.setAttribute('data-share-url', (button.getAttribute('data-share-kind') || 'timeline') === 'calendar' ? (calendarUrl || '') : (timelineUrl || ''));
                         }
                     });
 
                     removeButtons.forEach(function(button) {
                         if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
-                            button.hidden = !url;
+                            button.hidden = !timelineUrl;
                         }
                     });
 
@@ -1824,26 +1836,31 @@ if ( count( $route_locations ) >= 2 ) {
                 function resetCopyButton(mode) {
                     copyButtons.forEach(function(button) {
                         if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
-                            button.textContent = defaultCopyText;
+                            button.textContent = button.getAttribute('data-share-default-text') || button.textContent;
                             button.classList.remove('copied');
                         }
                     });
                 }
 
-                function confirmCopied(mode) {
+                function confirmCopied(button) {
+                    var mode = button.getAttribute('data-share-mode') || 'fellow';
+                    var timerKey = getShareButtonKey(button);
+
                     copyButtons.forEach(function(button) {
                         if ((button.getAttribute('data-share-mode') || 'fellow') === mode) {
-                            button.textContent = '<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>';
-                            button.classList.add('copied');
+                            button.textContent = button.getAttribute('data-share-default-text') || button.textContent;
+                            button.classList.remove('copied');
                         }
                     });
-                    setStatus('<?php echo esc_js( __( 'Share link copied.', 'travel-app' ) ); ?>');
+                    button.textContent = '<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>';
+                    button.classList.add('copied');
+                    setStatus((button.getAttribute('data-share-kind') || 'timeline') === 'calendar' ? '<?php echo esc_js( __( 'Calendar subscription link copied.', 'travel-app' ) ); ?>' : '<?php echo esc_js( __( 'Share link copied.', 'travel-app' ) ); ?>');
 
-                    if (copyResetTimers[mode]) {
-                        window.clearTimeout(copyResetTimers[mode]);
+                    if (copyResetTimers[timerKey]) {
+                        window.clearTimeout(copyResetTimers[timerKey]);
                     }
 
-                    copyResetTimers[mode] = window.setTimeout(function() {
+                    copyResetTimers[timerKey] = window.setTimeout(function() {
                         resetCopyButton(mode);
                     }, 1800);
                 }
@@ -1877,7 +1894,7 @@ if ( count( $route_locations ) >= 2 ) {
                         });
                     }).then(function(data) {
                         if (data.mode) {
-                            setShareUrl(data.mode, data.url || '');
+                            setShareUrls(data.mode, data.url || '', data.calendar_url || '');
                         }
                         setStatus(data.message || '');
                         return data;
@@ -1895,35 +1912,37 @@ if ( count( $route_locations ) >= 2 ) {
                     });
                 });
 
-                function copyShareUrl(url, mode) {
+                function copyShareUrl(url, button) {
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         return navigator.clipboard.writeText(url).then(function() {
-                            confirmCopied(mode);
+                            confirmCopied(button);
                         }).catch(function() {
-                            window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
-                            confirmCopied(mode);
+                            window.prompt('<?php echo esc_js( __( 'Copy this link:', 'travel-app' ) ); ?>', url);
+                            confirmCopied(button);
                         });
                     }
 
-                    window.prompt('<?php echo esc_js( __( 'Copy this share link:', 'travel-app' ) ); ?>', url);
-                    confirmCopied(mode);
+                    window.prompt('<?php echo esc_js( __( 'Copy this link:', 'travel-app' ) ); ?>', url);
+                    confirmCopied(button);
                     return Promise.resolve();
                 }
 
                 copyButtons.forEach(function(copyButton) {
                     copyButton.addEventListener('click', function() {
                         var mode = copyButton.getAttribute('data-share-mode') || 'fellow';
+                        var kind = copyButton.getAttribute('data-share-kind') || 'timeline';
                         var url = copyButton.getAttribute('data-share-url') || '';
 
                         if (url) {
-                            copyShareUrl(url, mode);
+                            copyShareUrl(url, copyButton);
                             return;
                         }
 
                         copyButton.textContent = '<?php echo esc_js( __( 'Generating...', 'travel-app' ) ); ?>';
                         requestShareAction('travel_app_generate_share_link', mode).then(function(data) {
-                            if (data && data.url) {
-                                copyShareUrl(data.url, mode);
+                            var generatedUrl = data ? (kind === 'calendar' ? data.calendar_url : data.url) : '';
+                            if (generatedUrl) {
+                                copyShareUrl(generatedUrl, copyButton);
                                 return;
                             }
 

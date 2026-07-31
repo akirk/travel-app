@@ -39,6 +39,7 @@ if ( $is_shared_timeline ) {
 $trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
 $segments  = $trip_data['segments'] ?? [];
 $is_trip_active = $travel_app->is_trip_active( $trip_data );
+$show_now_next_section = '0' !== (string) get_term_meta( $trip_id, '_travel_app_show_now_next', true );
 $fellow_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
 $public_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
 $segment_type_labels = [
@@ -828,6 +829,7 @@ if ( count( $route_locations ) >= 2 ) {
             align-items: center;
         }
         .route-zone,
+        .settings-zone,
         .sharing-zone,
         .danger-zone {
             margin-top: 28px;
@@ -836,11 +838,13 @@ if ( count( $route_locations ) >= 2 ) {
             color: var(--wp-app-color-muted);
         }
         .route-zone h2,
+        .settings-zone h2,
         .sharing-zone h2,
         .danger-zone h2 {
             color: var(--wp-app-color-text);
         }
         .route-zone details summary,
+        .settings-zone details summary,
         .sharing-zone details summary,
         .danger-zone details summary {
             cursor: pointer;
@@ -848,11 +852,40 @@ if ( count( $route_locations ) >= 2 ) {
             font-weight: 700;
         }
         .route-zone details summary h2,
+        .settings-zone details summary h2,
         .sharing-zone details summary h2,
         .danger-zone details summary h2 {
             display: inline;
             margin: 0;
             font-size: 1.15rem;
+        }
+        .settings-form {
+            display: grid;
+            gap: 14px;
+            margin-top: 14px;
+        }
+        .setting-option {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin: 0;
+            font-weight: 400;
+        }
+        .setting-option input {
+            width: auto;
+            margin-top: 4px;
+        }
+        .setting-option strong {
+            display: block;
+            color: var(--wp-app-color-text);
+        }
+        .setting-option span span {
+            color: var(--wp-app-color-muted);
+            font-size: 0.88rem;
+        }
+        .settings-form-actions {
+            display: flex;
+            justify-content: flex-end;
         }
         .trip-import-form {
             display: grid;
@@ -983,7 +1016,7 @@ if ( count( $route_locations ) >= 2 ) {
             $demo_control_id = 'trip-' . (string) $trip_data['id'];
             $demo_control_value = $demo_start_time;
             ?>
-            <?php if ( $is_trip_active && ! empty( $timeline_segments ) ) : ?>
+            <?php if ( $show_now_next_section && $is_trip_active && ! empty( $timeline_segments ) ) : ?>
                 <section class="panel now-next-panel" aria-labelledby="now-next-heading">
                     <h2 id="now-next-heading"><?php esc_html_e( 'Now and Next', 'travel-app' ); ?></h2>
                     <div class="mini-timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>" data-demo-preview>
@@ -1519,6 +1552,31 @@ if ( count( $route_locations ) >= 2 ) {
                         <?php if ( ! $travel_app->is_playground() ) : ?>
                             <p class="empty" data-share-status aria-live="polite"></p>
                         <?php endif; ?>
+                    </details>
+                </section>
+            <?php endif; ?>
+
+            <?php if ( ! $is_readonly_timeline ) : ?>
+                <section class="settings-zone" aria-labelledby="settings-heading">
+                    <details>
+                        <summary><h2 id="settings-heading"><?php esc_html_e( 'Settings', 'travel-app' ); ?></h2></summary>
+                        <form class="settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                            <input type="hidden" name="action" value="travel_app_update_trip">
+                            <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                            <input type="hidden" name="trip_title" value="<?php echo esc_attr( $trip_data['title'] ); ?>">
+                            <input type="hidden" name="trip_show_now_next_present" value="1">
+                            <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
+                            <label class="setting-option">
+                                <input type="checkbox" name="trip_show_now_next" value="1" <?php checked( $show_now_next_section ); ?>>
+                                <span>
+                                    <strong><?php esc_html_e( 'Show Now and Next', 'travel-app' ); ?></strong>
+                                    <span><?php esc_html_e( 'Display the current and next itinerary items above the timeline while this trip is active.', 'travel-app' ); ?></span>
+                                </span>
+                            </label>
+                            <div class="settings-form-actions">
+                                <button type="submit"><?php esc_html_e( 'Save Settings', 'travel-app' ); ?></button>
+                            </div>
+                        </form>
                     </details>
                 </section>
             <?php endif; ?>

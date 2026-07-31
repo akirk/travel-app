@@ -1261,6 +1261,10 @@ class App extends BaseApp {
         $title = isset( $_POST['trip_title'] ) ? sanitize_text_field( wp_unslash( $_POST['trip_title'] ) ) : '';
         $updated = $this->update_user_trip_title( $trip_id, $title );
 
+        if ( ! is_wp_error( $updated ) && isset( $_POST['trip_show_now_next_present'] ) ) {
+            $updated = $this->update_user_trip_now_next_visibility( $trip_id, isset( $_POST['trip_show_now_next'] ) );
+        }
+
         if ( is_wp_error( $updated ) ) {
             $redirect = add_query_arg( 'travel_app_error', rawurlencode( $updated->get_error_code() ), $redirect );
         } else {
@@ -1505,6 +1509,17 @@ class App extends BaseApp {
         if ( ! $deleted || is_wp_error( $deleted ) ) {
             return new \WP_Error( 'delete_failed', __( 'The travel plan could not be deleted.', 'travel-app' ) );
         }
+
+        return true;
+    }
+
+    private function update_user_trip_now_next_visibility( int $trip_id, bool $show_now_next ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
+        }
+
+        update_term_meta( $trip_id, '_travel_app_show_now_next', $show_now_next ? '1' : '0' );
+        $this->clear_trip_public_cache( $trip_id );
 
         return true;
     }

@@ -81,6 +81,8 @@ $unscheduled_segments = $segments_by_day['unscheduled'] ?? [];
 unset( $segments_by_day['unscheduled'] );
 
 $today = current_time( 'Y-m-d' );
+$trip_end_date = (string) ( $trip_data['ends_at'] ?? '' );
+$is_trip_past = '' !== $trip_end_date && $trip_end_date < $today;
 if ( $is_trip_active && '' !== $today && ! isset( $segments_by_day[ $today ] ) ) {
     $segments_by_day[ $today ] = [];
     ksort( $segments_by_day );
@@ -91,6 +93,8 @@ if ( '' === $demo_start ) {
     $demo_start = gmdate( 'Y-m-d' );
 }
 $demo_start_time = $demo_start . 'T12:00';
+$show_timeline_demo_controls = ! $is_readonly_timeline && $demo_mode_enabled && ! $is_trip_active && ! $is_trip_past;
+$show_timeline_time_marker = $is_trip_active || $show_timeline_demo_controls;
 
 $get_google_maps_url = static function( string $address ): string {
     $address = trim( $address );
@@ -264,9 +268,13 @@ if ( count( $route_locations ) >= 2 ) {
             min-height: 38px;
             padding: 0;
             border-radius: 6px;
-            border: 1px solid var(--wp-app-color-border);
+            border: 0;
             background: transparent;
             color: var(--wp-app-color-link);
+        }
+        .trip-title-edit-button span[aria-hidden="true"] {
+            display: inline-block;
+            transform: scaleX(-1);
         }
         .trip-title-form {
             display: grid;
@@ -314,7 +322,11 @@ if ( count( $route_locations ) >= 2 ) {
             box-sizing: border-box;
             padding: 8px 12px;
             border-radius: 6px;
+            color: var(--wp-app-color-text);
+            font: inherit;
+            font-weight: 700;
             text-decoration: none;
+            cursor: pointer;
         }
         .share-link .ghost-button[hidden] { display: none; }
         .share-actions {
@@ -1021,8 +1033,7 @@ if ( count( $route_locations ) >= 2 ) {
             $demo_control_value = $demo_start_time;
             ?>
             <?php if ( $show_now_next_section && $is_trip_active && ! empty( $timeline_segments ) ) : ?>
-                <section class="panel now-next-panel" aria-labelledby="now-next-heading">
-                    <h2 id="now-next-heading"><?php esc_html_e( 'Now and Next', 'travel-app' ); ?></h2>
+                <section class="panel now-next-panel" aria-label="<?php esc_attr_e( 'Now and Next', 'travel-app' ); ?>">
                     <div class="mini-timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>" data-demo-preview>
                         <?php foreach ( $timeline_segments as $step ) : ?>
                             <?php
@@ -1044,12 +1055,22 @@ if ( count( $route_locations ) >= 2 ) {
                             $step_show_location = 'checkout' !== $step_timeline_kind && ( $show_private_share_details || $is_transport_segment( $step ) );
                             $step_location = $step_show_location ? (string) ( $step['location'] ?? '' ) : '';
                             $step_end_location = $step_show_location ? (string) ( $step['end_location'] ?? '' ) : '';
+                            $step_title = (string) ( $step['title'] ?? '' );
+                            if ( 'checkout' === $step_timeline_kind ) {
+                                $step_title = '' !== $step_title
+                                    ? sprintf( __( 'Check out: %s', 'travel-app' ), $step_title )
+                                    : __( 'Check out', 'travel-app' );
+                            } elseif ( 'return' === $step_timeline_kind ) {
+                                $step_title = '' !== $step_title
+                                    ? sprintf( __( 'Return car: %s', 'travel-app' ), $step_title )
+                                    : __( 'Return car', 'travel-app' );
+                            }
                             ?>
-                            <span hidden data-preview-item data-url="<?php echo esc_url( '#' . $step_anchor ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( (string) ( $step['date'] ?? '' ) ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( (string) ( $step['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $step['end_time'] ?? '' ) ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( $step_location ); ?>" data-end-location="<?php echo esc_attr( $step_end_location ); ?>" data-title="<?php echo esc_attr( (string) ( $step['title'] ?? '' ) ); ?>"></span>
+                            <span hidden data-preview-item data-url="<?php echo esc_url( '#' . $step_anchor ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-timeline-kind="<?php echo esc_attr( $step_timeline_kind ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( (string) ( $step['date'] ?? '' ) ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( (string) ( $step['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $step['end_time'] ?? '' ) ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( $step_location ); ?>" data-end-location="<?php echo esc_attr( $step_end_location ); ?>" data-title="<?php echo esc_attr( $step_title ); ?>"></span>
                         <?php endforeach; ?>
-                        <?php foreach ( [ 'current' => __( 'Current', 'travel-app' ), 'next' => __( 'Next', 'travel-app' ) ] as $key => $label ) : ?>
-                            <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">
-                                <div class="mini-label"><?php echo esc_html( $label ); ?></div>
+                        <?php foreach ( [ 'current' => __( 'Now', 'travel-app' ), 'next' => __( 'Next', 'travel-app' ) ] as $key => $label ) : ?>
+                            <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-slot-label="<?php echo esc_attr( $label ); ?>" data-ended-label="<?php esc_attr_e( 'Last', 'travel-app' ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">
+                                <div class="mini-label" data-preview-label><?php echo esc_html( $label ); ?></div>
                                 <div class="mini-title" data-preview-title><?php esc_html_e( 'No item', 'travel-app' ); ?></div>
                                 <div class="mini-countdown" data-preview-countdown></div>
                                 <div class="mini-location" data-preview-meta></div>
@@ -1065,9 +1086,11 @@ if ( count( $route_locations ) >= 2 ) {
                 <div class="timeline-header">
                     <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
                     <div class="timeline-header-actions">
-                        <button class="ghost-button timeline-now-button" type="button" data-timeline-now aria-controls="timeline" aria-label="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" title="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" disabled>
-                            <?php esc_html_e( 'Now', 'travel-app' ); ?>
-                        </button>
+                        <?php if ( $is_trip_active ) : ?>
+                            <button class="ghost-button timeline-now-button" type="button" data-timeline-now aria-controls="timeline" aria-label="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" title="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" disabled>
+                                <?php esc_html_e( 'Now', 'travel-app' ); ?>
+                            </button>
+                        <?php endif; ?>
                         <?php if ( ! $is_readonly_timeline ) : ?>
                             <button class="add-item-button" type="button" data-add-item-toggle aria-controls="add-item-form" aria-expanded="<?php echo ! empty( $quick_plan_segment ) ? 'true' : 'false'; ?>">
                                 <?php esc_html_e( '+ Add Item', 'travel-app' ); ?>
@@ -1076,7 +1099,7 @@ if ( count( $route_locations ) >= 2 ) {
                     </div>
                 </div>
                 <?php
-                if ( ! $is_readonly_timeline && $demo_mode_enabled && ! $is_trip_active ) {
+                if ( $show_timeline_demo_controls ) {
                     require __DIR__ . '/partials/demo-controls.php';
                 }
                 ?>
@@ -1304,8 +1327,10 @@ if ( count( $route_locations ) >= 2 ) {
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'travel-app' ); ?></p>
                 <?php else : ?>
-                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>">
-                        <div class="time-marker"><span class="time-marker-label"></span></div>
+                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_trip_active ? ' data-current-time="1"' : ''; ?>>
+                        <?php if ( $show_timeline_time_marker ) : ?>
+                            <div class="time-marker"><span class="time-marker-label"></span></div>
+                        <?php endif; ?>
                         <?php foreach ( $segments_by_day as $day => $day_segments ) : ?>
                             <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" data-date="<?php echo esc_attr( $day ); ?>">
                                 <h3 class="day-heading"><?php echo esc_html( $travel_app->format_date_label( $day ) ); ?></h3>

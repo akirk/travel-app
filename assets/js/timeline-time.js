@@ -175,8 +175,9 @@
         var current = null;
         var next = null;
         var items = Array.prototype.slice.call(target.querySelectorAll('[data-preview-item]'));
+        var currentDate = value ? value.slice(0, 10) : '';
 
-        items.forEach(function(item) {
+        items.forEach(function(item, index) {
             var itemTime = parseDateTime(item.getAttribute('data-datetime') || '');
             item.hidden = true;
             if (!currentTime || !itemTime) {
@@ -186,17 +187,39 @@
                 current = item;
             } else if (!next) {
                 next = item;
+                if (isTodayCheckout(item, currentDate)) {
+                    current = item;
+                    next = findNextPreviewItem(items, index + 1, currentTime);
+                }
             }
         });
 
         var currentSlot = target.querySelector('[data-preview-slot="current"]');
         var nextSlot = target.querySelector('[data-preview-slot="next"]');
-        renderPreviewSlot(currentSlot, current, currentTime, value ? value.slice(0, 10) : '');
-        renderPreviewSlot(nextSlot, next, currentTime, value ? value.slice(0, 10) : '');
+        renderPreviewSlot(currentSlot, current, currentTime, currentDate);
+        renderPreviewSlot(nextSlot, next, currentTime, currentDate);
 
         target.querySelectorAll('[data-preview-demo-time]').forEach(function(node) {
             node.textContent = value ? value.replace('T', ' ') : '';
         });
+    }
+
+    function isTodayCheckout(item, currentDate) {
+        return item
+            && item.getAttribute('data-timeline-kind') === 'checkout'
+            && currentDate
+            && item.getAttribute('data-date') === currentDate;
+    }
+
+    function findNextPreviewItem(items, startIndex, currentTime) {
+        for (var index = startIndex; index < items.length; index++) {
+            var itemTime = parseDateTime(items[index].getAttribute('data-datetime') || '');
+            if (currentTime && itemTime && itemTime > currentTime) {
+                return items[index];
+            }
+        }
+
+        return null;
     }
 
     function renderPreviewSlot(slot, source, currentTime, currentDate) {
@@ -209,11 +232,15 @@
         var previewLocation = slot.querySelector('[data-preview-location]');
         var end = slot.querySelector('[data-preview-end]');
         var countdown = slot.querySelector('[data-preview-countdown]');
+        var label = slot.querySelector('[data-preview-label]');
         var isCurrentSlot = slot.getAttribute('data-preview-slot') === 'current';
 
         if (!source) {
             slot.hidden = true;
             slot.removeAttribute('href');
+            if (label) {
+                label.textContent = slot.getAttribute('data-slot-label') || '';
+            }
             if (title) {
                 title.textContent = slot.getAttribute('data-empty-title') || 'No item';
             }
@@ -242,10 +269,18 @@
         var endDate = source.getAttribute('data-end-date') || '';
         var endTime = source.getAttribute('data-end-time') || '';
         var endTimeValue = getSourceEndTime(source);
-        var isLodging = source.getAttribute('data-type') === 'lodging';
+        var timelineKind = source.getAttribute('data-timeline-kind') || 'start';
+        var isCheckout = timelineKind === 'checkout';
+        var isLodging = source.getAttribute('data-type') === 'lodging' && !isCheckout;
+        var hasEnded = isCurrentSlot && currentTime && endTimeValue && endTimeValue <= currentTime;
         var isTravelInProgress = isCurrentSlot && currentTime && endTimeValue > currentTime && endLocation && endLocation !== location;
         var isLodgingInProgress = isCurrentSlot && currentTime && endTimeValue > currentTime && isLodging;
 
+        if (label) {
+            label.textContent = hasEnded
+                ? (slot.getAttribute('data-ended-label') || slot.getAttribute('data-slot-label') || '')
+                : (slot.getAttribute('data-slot-label') || '');
+        }
         if (meta) {
             if (isTravelInProgress) {
                 meta.textContent = [
@@ -496,7 +531,7 @@
 
         document.querySelectorAll('.timeline').forEach(function(target) {
             var id = target.getAttribute('data-demo-target') || '';
-            if (!controlledIds[id]) {
+            if (!controlledIds[id] && target.getAttribute('data-current-time') === '1') {
                 updateTimelineTarget(target, value, dateValue, currentTime);
             }
         });

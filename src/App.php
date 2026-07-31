@@ -79,11 +79,13 @@ class App extends BaseApp {
     }
 
     public function enqueue_assets(): void {
+        $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
+
         wp_enqueue_script(
             'travel-app-timeline-time',
             plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/travel-app.php' ),
             [],
-            '1.0.0',
+            file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
             true
         );
     }
@@ -1451,7 +1453,11 @@ class App extends BaseApp {
         if ( is_wp_error( $updated ) ) {
             $redirect = add_query_arg( 'travel_app_error', rawurlencode( $updated->get_error_code() ), $redirect );
         } else {
-            $redirect = add_query_arg( 'updated', rawurlencode( (string) $index ), $redirect );
+            $redirect = add_query_arg(
+                'updated',
+                rawurlencode( (string) $index ),
+                home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' )
+            ) . '#segment-' . $index;
         }
 
         wp_safe_redirect( $redirect );

@@ -626,11 +626,25 @@ if ( count( $route_locations ) >= 2 ) {
             outline: 2px solid var(--wp-app-color-link);
             outline-offset: 2px;
         }
-        .attachment-download span:last-child {
+        .attachment-download-icon {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1em;
+            flex: 0 0 1em;
+        }
+        .attachment-download span:nth-child(2) {
             min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        .attachment-offline-indicator {
+            flex: 0 0 auto;
+            color: #237a3b;
+            font-weight: 900;
+            line-height: 1;
         }
         .url-preview {
             display: grid;
@@ -1787,6 +1801,10 @@ if ( count( $route_locations ) >= 2 ) {
                         <div>
                             <dt><?php esc_html_e( 'Current page', 'travel-app' ); ?></dt>
                             <dd data-offline-cache><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
+                        </div>
+                        <div>
+                            <dt><?php esc_html_e( 'Cached files', 'travel-app' ); ?></dt>
+                            <dd data-offline-files><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
                         </div>
                         <div>
                             <dt><?php esc_html_e( 'Queued changes', 'travel-app' ); ?></dt>

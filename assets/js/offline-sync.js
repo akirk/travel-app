@@ -7,6 +7,7 @@
         connection: navigator.onLine ? 'Online' : 'Offline',
         worker: 'Checking',
         cache: 'Checking',
+        files: 'Checking',
         queue: '0 pending'
     };
     var workerState = 'Checking';
@@ -37,6 +38,48 @@
         workerVersion = value ? String(value).replace(/^travel-app-/, '') : '';
         offlineState.worker = workerVersion ? workerState + ', ' + workerVersion : workerState;
         updateOfflinePanel();
+    }
+
+    function offlineCacheUrl(element) {
+        var url = element.getAttribute('href') || element.getAttribute('src') || element.getAttribute('data-offline-cache-url');
+        return url ? new URL(url, window.location.href).href : '';
+    }
+
+    function offlineCacheElements() {
+        return Array.prototype.slice.call(document.querySelectorAll('[data-offline-cache-url]'));
+    }
+
+    function ensureAttachmentIndicator(element) {
+        var indicator = element.querySelector('[data-offline-attachment-indicator]');
+        if (indicator) {
+            return indicator;
+        }
+
+        var icon = element.querySelector('span:first-child') || element;
+        icon.classList.add('attachment-download-icon');
+        indicator = document.createElement('span');
+        indicator.className = 'attachment-offline-indicator';
+        indicator.setAttribute('data-offline-attachment-indicator', '');
+        indicator.setAttribute('aria-label', 'Available offline');
+        indicator.setAttribute('title', 'Available offline');
+        indicator.textContent = '✓';
+        indicator.hidden = true;
+        element.insertBefore(indicator, icon.nextSibling);
+        return indicator;
+    }
+
+    function updateAttachmentAvailability(cachedUrls) {
+        var cached = {};
+        (cachedUrls || []).forEach(function(url) {
+            cached[url] = true;
+        });
+
+        offlineCacheElements().forEach(function(element) {
+            var indicator = ensureAttachmentIndicator(element);
+            var available = !!cached[offlineCacheUrl(element)];
+            element.toggleAttribute('data-offline-available', available);
+            indicator.hidden = !available;
+        });
     }
 
     function openDb() {
@@ -233,20 +276,43 @@
         if (!window.isSecureContext) {
             setWorkerState('Needs HTTPS');
             setOfflineState('cache', 'Unavailable');
+            setOfflineState('files', 'Unavailable');
             return;
         }
 
         if (!('serviceWorker' in navigator)) {
             setWorkerState('Not supported');
             setOfflineState('cache', 'Unavailable');
+            setOfflineState('files', 'Unavailable');
             return;
         }
 
         if (!config.serviceWorkerUrl) {
             setWorkerState('Missing URL');
             setOfflineState('cache', 'Unavailable');
+            setOfflineState('files', 'Unavailable');
             return;
         }
+
+        navigator.serviceWorker.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'travel-app-sync') {
+                flushQueue();
+            }
+            if (event.data && event.data.type === 'travel-app-cache-status') {
+                setOfflineState('cache', event.data.ok ? 'Ready offline' : 'Not cached');
+                if (typeof event.data.cachedCount === 'number' && typeof event.data.totalCount === 'number') {
+                    setOfflineState('files', event.data.cachedCount + ' of ' + event.data.totalCount + ' files');
+                }
+                updateAttachmentAvailability(event.data.cachedUrls || []);
+            }
+            if (event.data && event.data.type === 'travel-app-version') {
+                setWorkerVersion(event.data.version || '');
+            }
+        });
+
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+            setWorkerState('Active');
+        });
 
         navigator.serviceWorker.register(config.serviceWorkerUrl, {
             scope: config.scopePath || '/'
@@ -260,8 +326,8 @@
                 });
                 var requiredUrls = [window.location.href].concat(config.assetUrls || []);
                 var urls = requiredUrls.slice();
-                document.querySelectorAll('[data-offline-cache-url]').forEach(function(element) {
-                    var url = element.getAttribute('href') || element.getAttribute('src') || element.getAttribute('data-offline-cache-url');
+                offlineCacheElements().forEach(function(element) {
+                    var url = offlineCacheUrl(element);
                     if (url) {
                         urls.push(url);
                     }
@@ -275,22 +341,7 @@
         }).catch(function(error) {
             setWorkerState(error && error.message ? error.message : 'Registration failed');
             setOfflineState('cache', 'Unavailable');
-        });
-
-        navigator.serviceWorker.addEventListener('message', function(event) {
-            if (event.data && event.data.type === 'travel-app-sync') {
-                flushQueue();
-            }
-            if (event.data && event.data.type === 'travel-app-cache-status') {
-                setOfflineState('cache', event.data.ok ? 'Ready offline' : 'Not cached');
-            }
-            if (event.data && event.data.type === 'travel-app-version') {
-                setWorkerVersion(event.data.version || '');
-            }
-        });
-
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-            setWorkerState('Active');
+            setOfflineState('files', 'Unavailable');
         });
     }
 

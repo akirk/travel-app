@@ -149,6 +149,8 @@
     function formToMutation(form) {
         var data = new FormData(form);
         var entries = [];
+        var action = form.getAttribute('action') || window.location.href;
+        var method = form.getAttribute('method') || 'POST';
 
         data.forEach(function(value, key) {
             if (value instanceof File) {
@@ -159,8 +161,8 @@
 
         return {
             id: String(Date.now()) + '-' + Math.random().toString(16).slice(2),
-            url: form.action,
-            method: (form.method || 'POST').toUpperCase(),
+            url: new URL(action, window.location.href).href,
+            method: method.toUpperCase(),
             entries: entries,
             createdAt: new Date().toISOString(),
             returnTo: window.location.href

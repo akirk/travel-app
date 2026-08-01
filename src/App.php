@@ -48,6 +48,7 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_travel_app_import', [ $this, 'handle_import' ] );
         add_action( 'admin_post_travel_app_update_trip', [ $this, 'handle_update_trip' ] );
+        add_action( 'admin_post_travel_app_open_journal_entry', [ $this, 'handle_open_journal_entry' ] );
         add_action( 'admin_post_travel_app_download_trip_html', [ $this, 'handle_download_trip_html' ] );
         add_action( 'wp_ajax_travel_app_generate_share_link', [ $this, 'handle_generate_share_link' ] );
         add_action( 'wp_ajax_travel_app_remove_share_link', [ $this, 'handle_remove_share_link' ] );
@@ -450,6 +451,9 @@ self.addEventListener('sync', function(event) {
             'quick_plan_invalid'       => __( 'Review the parsed fields and choose where to save the item.', 'travel-app' ),
             'segment_delete_failed'    => __( 'This itinerary item could not be deleted.', 'travel-app' ),
             'segment_not_found'        => __( 'This itinerary item could not be found.', 'travel-app' ),
+            'journal_create_failed'     => __( 'The journal entry could not be created.', 'travel-app' ),
+            'journal_disabled'          => __( 'Travel journaling is disabled for this travel plan.', 'travel-app' ),
+            'journal_invalid_date'      => __( 'Choose a valid day for the journal entry.', 'travel-app' ),
             'trip_not_found'           => __( 'This travel plan could not be found.', 'travel-app' ),
             'upload_failed'            => __( 'The itinerary file could not be uploaded.', 'travel-app' ),
             'upload_invalid'           => __( 'The itinerary file upload was invalid.', 'travel-app' ),
@@ -552,6 +556,18 @@ self.addEventListener('sync', function(event) {
             'show_ui'      => true,
             'show_in_rest' => true,
             'supports'     => [ 'title', 'editor', 'author' ],
+            'map_meta_cap' => true,
+        ] );
+
+        register_post_type( 'travel_app_journal', [
+            'labels'       => [
+                'name'          => __( 'Travel Journals', 'travel-app' ),
+                'singular_name' => __( 'Travel Journal', 'travel-app' ),
+            ],
+            'public'       => false,
+            'show_ui'      => true,
+            'show_in_rest' => true,
+            'supports'     => [ 'title', 'editor', 'author', 'revisions' ],
             'map_meta_cap' => true,
         ] );
     }
@@ -1654,6 +1670,10 @@ self.addEventListener('sync', function(event) {
             $updated = $this->update_user_trip_now_next_visibility( $trip_id, isset( $_POST['trip_show_now_next'] ) );
         }
 
+        if ( ! is_wp_error( $updated ) && isset( $_POST['trip_journal_enabled_present'] ) ) {
+            $updated = $this->update_user_trip_journal_visibility( $trip_id, isset( $_POST['trip_journal_enabled'] ) );
+        }
+
         if ( is_wp_error( $updated ) ) {
             $redirect = add_query_arg( 'travel_app_error', rawurlencode( $updated->get_error_code() ), $redirect );
         } else {
@@ -1661,6 +1681,33 @@ self.addEventListener('sync', function(event) {
         }
 
         wp_safe_redirect( $redirect );
+        exit;
+    }
+
+    public function handle_open_journal_entry(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_die( esc_html__( 'You must be logged in to edit travel journals.', 'travel-app' ), 403 );
+        }
+
+        $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
+        check_admin_referer( 'travel_app_open_journal_entry_' . $trip_id );
+
+        $date = isset( $_POST['journal_date'] ) ? sanitize_text_field( wp_unslash( $_POST['journal_date'] ) ) : '';
+        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
+        $journal_id = $this->get_or_create_journal_entry( $trip_id, $date );
+
+        if ( is_wp_error( $journal_id ) ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $journal_id->get_error_code() ), $redirect ) );
+            exit;
+        }
+
+        $edit_link = get_edit_post_link( (int) $journal_id, 'raw' );
+        if ( ! $edit_link ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'journal_create_failed', $redirect ) );
+            exit;
+        }
+
+        wp_safe_redirect( $edit_link );
         exit;
     }
 
@@ -1904,12 +1951,27 @@ self.addEventListener('sync', function(event) {
             wp_trash_post( $item->id );
         }
 
+        foreach ( $this->get_journal_entry_ids_for_trip( $trip_id ) as $journal_id ) {
+            wp_trash_post( $journal_id );
+        }
+
         $deleted = wp_delete_term( $trip_id, 'travel_app_trip' );
         if ( ! $deleted || is_wp_error( $deleted ) ) {
             return new \WP_Error( 'delete_failed', __( 'The travel plan could not be deleted.', 'travel-app' ) );
         }
 
         return true;
+    }
+
+    private function get_journal_entry_ids_for_trip( int $trip_id ): array {
+        return array_map( 'intval', get_posts( [
+            'post_type'      => 'travel_app_journal',
+            'post_status'    => 'any',
+            'fields'         => 'ids',
+            'posts_per_page' => -1,
+            'meta_key'       => '_travel_app_trip_id',
+            'meta_value'     => (string) $trip_id,
+        ] ) );
     }
 
     private function update_user_trip_now_next_visibility( int $trip_id, bool $show_now_next ) {
@@ -1921,6 +1983,115 @@ self.addEventListener('sync', function(event) {
         $this->clear_trip_public_cache( $trip_id );
 
         return true;
+    }
+
+    private function update_user_trip_journal_visibility( int $trip_id, bool $journal_enabled ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
+        }
+
+        update_term_meta( $trip_id, '_travel_app_journal_enabled', $journal_enabled ? '1' : '0' );
+        $this->clear_trip_public_cache( $trip_id );
+
+        return true;
+    }
+
+    private function get_or_create_journal_entry( int $trip_id, string $date ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
+        }
+
+        if ( '1' !== (string) get_term_meta( $trip_id, '_travel_app_journal_enabled', true ) ) {
+            return new \WP_Error( 'journal_disabled', __( 'Travel journaling is disabled for this travel plan.', 'travel-app' ) );
+        }
+
+        if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+            return new \WP_Error( 'journal_invalid_date', __( 'Choose a valid day for the journal entry.', 'travel-app' ) );
+        }
+
+        $existing = get_posts( [
+            'post_type'      => 'travel_app_journal',
+            'post_status'    => [ 'draft', 'private', 'publish', 'future', 'pending' ],
+            'author'         => get_current_user_id(),
+            'fields'         => 'ids',
+            'posts_per_page' => 1,
+            'meta_query'     => [
+                [
+                    'key'   => '_travel_app_trip_id',
+                    'value' => (string) $trip_id,
+                ],
+                [
+                    'key'   => '_travel_app_date',
+                    'value' => $date,
+                ],
+            ],
+        ] );
+
+        if ( ! empty( $existing ) ) {
+            return (int) $existing[0];
+        }
+
+        $trip = Trip::get( $trip_id );
+        if ( ! $trip ) {
+            return new \WP_Error( 'trip_not_found', __( 'This travel plan could not be found.', 'travel-app' ) );
+        }
+
+        $journal_id = wp_insert_post( [
+            'post_type'    => 'travel_app_journal',
+            'post_status'  => 'draft',
+            'post_author'  => get_current_user_id(),
+            'post_title'   => sprintf(
+                /* translators: 1: trip title, 2: journal date. */
+                __( '%1$s Journal: %2$s', 'travel-app' ),
+                $trip->title,
+                $this->format_date_label( $date )
+            ),
+            'post_content' => $this->build_journal_entry_content( $trip_id, $date ),
+        ], true );
+
+        if ( is_wp_error( $journal_id ) ) {
+            return new \WP_Error( 'journal_create_failed', __( 'The journal entry could not be created.', 'travel-app' ) );
+        }
+
+        update_post_meta( (int) $journal_id, '_travel_app_trip_id', $trip_id );
+        update_post_meta( (int) $journal_id, '_travel_app_date', $date );
+
+        return (int) $journal_id;
+    }
+
+    private function build_journal_entry_content( int $trip_id, string $date ): string {
+        $segments = array_map( static function( ItineraryItem $item ): array {
+            return $item->to_array();
+        }, ItineraryItem::get_for_trip( $trip_id ) );
+        $timeline_segments = LodgingCoverage::timeline_segments( $segments );
+        $blocks = [];
+
+        foreach ( $timeline_segments as $segment ) {
+            if ( $date !== (string) ( $segment['date'] ?? '' ) ) {
+                continue;
+            }
+
+            $title = trim( implode( ' ', array_filter( [
+                (string) ( $segment['time'] ?? '' ),
+                (string) ( $segment['title'] ?? '' ),
+            ] ) ) );
+
+            if ( '' === $title ) {
+                $title = __( 'Untitled item', 'travel-app' );
+            }
+
+            $blocks[] = '<!-- wp:heading {"level":2} -->' . "\n"
+                . '<h2>' . esc_html( $title ) . '</h2>' . "\n"
+                . '<!-- /wp:heading -->';
+        }
+
+        if ( empty( $blocks ) ) {
+            $blocks[] = '<!-- wp:paragraph -->' . "\n"
+                . '<p>' . esc_html__( 'Journal notes for this day.', 'travel-app' ) . '</p>' . "\n"
+                . '<!-- /wp:paragraph -->';
+        }
+
+        return implode( "\n\n", $blocks );
     }
 
     private function update_user_trip_title( int $trip_id, string $title ) {

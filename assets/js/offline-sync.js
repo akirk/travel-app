@@ -64,7 +64,7 @@
         indicator.setAttribute('title', 'Available offline');
         indicator.textContent = '✓';
         indicator.hidden = true;
-        icon.appendChild(indicator);
+        element.insertBefore(indicator, icon.nextSibling);
         return indicator;
     }
 

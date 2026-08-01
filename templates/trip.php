@@ -641,14 +641,10 @@ if ( count( $route_locations ) >= 2 ) {
             white-space: nowrap;
         }
         .attachment-offline-indicator {
-            position: absolute;
-            right: 0.05em;
-            bottom: 0.22em;
+            flex: 0 0 auto;
             color: #237a3b;
-            font-size: 0.78em;
             font-weight: 900;
             line-height: 1;
-            text-shadow: 0 0 2px var(--wp-app-color-surface);
         }
         .url-preview {
             display: grid;

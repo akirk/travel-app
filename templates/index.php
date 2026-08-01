@@ -301,6 +301,16 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             border-radius: 8px;
             padding: 16px;
         }
+        .current-card h3 a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .current-card h3 a:hover,
+        .current-card h3 a:focus,
+        .current-card h3 a:focus-visible {
+            color: var(--wp-app-color-link);
+            text-decoration: underline;
+        }
         .mini-timeline {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -413,7 +423,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         </div>
                         <?php $current_trip = $featured_trip; ?>
                         <article class="current-card">
-                            <h3><?php echo esc_html( $current_trip['title'] ); ?></h3>
+                            <h3><a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><?php echo esc_html( $current_trip['title'] ); ?></a></h3>
                             <div class="trip-meta">
                                 <?php foreach ( $travel_app->get_trip_summary_parts( $current_trip, $today ) as $summary_part ) : ?>
                                     <span><?php echo esc_html( $summary_part ); ?></span>
@@ -444,7 +454,6 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     </a>
                                 <?php endforeach; ?>
                             </div>
-                            <a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><?php esc_html_e( 'Open Timeline', 'travel-app' ); ?></a>
                         </article>
                     </section>
                 <?php endif; ?>

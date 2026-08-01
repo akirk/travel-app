@@ -23,7 +23,6 @@ if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
 $share_mode = $is_static_download ? ( isset( $travel_app_static_share_mode ) ? (string) $travel_app_static_share_mode : 'fellow' ) : ( $is_shared_timeline ? $travel_app->get_trip_share_mode_by_token( $trip_id, $share_token ) : '' );
 $show_private_share_details = ( ! $is_shared_timeline && ! $is_static_download ) || 'fellow' === $share_mode;
 $updated    = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
-$trip_updated = isset( $_GET['trip_updated'] ) ? absint( $_GET['trip_updated'] ) : null;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
 $quick_plan_draft_key = isset( $_GET['quick_plan_draft'] ) ? sanitize_key( wp_unslash( $_GET['quick_plan_draft'] ) ) : '';
 $quick_plan_draft = '' !== $quick_plan_draft_key ? $travel_app->get_quick_plan_draft( $quick_plan_draft_key ) : [];
@@ -93,6 +92,8 @@ $unscheduled_segments = $segments_by_day['unscheduled'] ?? [];
 unset( $segments_by_day['unscheduled'] );
 
 $today = current_time( 'Y-m-d' );
+$timeline_current_time_value = current_time( 'Y-m-d\TH:i' );
+$timeline_current_time_captured = (string) time();
 $trip_end_date = (string) ( $trip_data['ends_at'] ?? '' );
 $is_trip_past = '' !== $trip_end_date && $trip_end_date < $today;
 if ( $is_trip_active && '' !== $today && ! isset( $segments_by_day[ $today ] ) ) {
@@ -1105,9 +1106,7 @@ if ( count( $route_locations ) >= 2 ) {
             </div>
         <?php endif; ?>
 
-        <?php if ( ! $is_readonly_timeline && null !== $trip_updated ) : ?>
-            <div class="notice" role="status"><?php esc_html_e( 'Travel plan updated.', 'travel-app' ); ?></div>
-        <?php elseif ( ! $is_readonly_timeline && null !== $updated ) : ?>
+        <?php if ( ! $is_readonly_timeline && null !== $updated ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Itinerary item updated.', 'travel-app' ); ?></div>
         <?php elseif ( ! $is_readonly_timeline && $error ) : ?>
             <div class="notice error" role="alert"><?php echo esc_html( $travel_app->get_error_notice_message( $error ) ); ?></div>
@@ -1180,7 +1179,7 @@ if ( count( $route_locations ) >= 2 ) {
             ?>
             <?php if ( $show_now_next_section && $is_trip_active && ! empty( $timeline_segments ) ) : ?>
                 <section class="panel now-next-panel" aria-label="<?php esc_attr_e( 'Now and Next', 'travel-app' ); ?>">
-                    <div class="mini-timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>" data-demo-preview>
+                    <div class="mini-timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>" data-demo-preview data-current-time-value="<?php echo esc_attr( $timeline_current_time_value ); ?>" data-current-time-captured="<?php echo esc_attr( $timeline_current_time_captured ); ?>">
                         <?php foreach ( $timeline_segments as $step ) : ?>
                             <?php
                             if ( empty( $step['date'] ) ) {
@@ -1500,7 +1499,7 @@ if ( count( $route_locations ) >= 2 ) {
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'travel-app' ); ?></p>
                 <?php else : ?>
-                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_trip_active ? ' data-current-time="1"' : ''; ?>>
+                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_trip_active ? ' data-current-time="1" data-current-time-value="' . esc_attr( $timeline_current_time_value ) . '" data-current-time-captured="' . esc_attr( $timeline_current_time_captured ) . '"' : ''; ?>>
                         <?php if ( $show_timeline_time_marker ) : ?>
                             <div class="time-marker"><span class="time-marker-label"></span></div>
                         <?php endif; ?>
@@ -1545,7 +1544,7 @@ if ( count( $route_locations ) >= 2 ) {
                                     <?php $attachments = $show_attachments && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
                                     <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
-                                        <div class="timeline-item" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
+                                        <div class="timeline-item" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
                                             <div class="timeline-meta">
                                                 <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
                                                 <div class="type"><?php echo esc_html( $type_label ); ?></div>

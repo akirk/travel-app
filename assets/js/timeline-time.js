@@ -145,12 +145,12 @@
         });
 
         target.querySelectorAll('.timeline-item').forEach(function(item) {
-            var itemTime = parseDateTime(item.getAttribute('data-datetime') || '');
+            var itemRange = getItemTimeRange(item);
             item.classList.remove('current', 'past');
-            if (!currentTime || !itemTime) {
+            if (!currentTime || !itemRange) {
                 return;
             }
-            if (itemTime <= currentTime) {
+            if (itemRange.start <= currentTime) {
                 currentItem = item;
                 item.classList.add('past');
             } else if (!nextItem) {
@@ -164,7 +164,7 @@
             nextItem.classList.add('current');
         }
 
-        updateTimelineJumpControls(target, positionMarker(target, value, currentTime, currentItem, nextItem));
+        updateTimelineJumpControls(target, positionMarker(target, value, currentTime));
     }
 
     function updatePreviewTarget(target, value, currentTime) {
@@ -329,7 +329,7 @@
         }
     }
 
-    function positionMarker(target, value, currentTime, currentItem, nextItem) {
+    function positionMarker(target, value, currentTime) {
         var marker = target.querySelector('.time-marker');
         var markerLabel = target.querySelector('.time-marker-label');
 
@@ -344,40 +344,9 @@
         }
 
         var targetRect = target.getBoundingClientRect();
-        var top = null;
         var dateValue = value ? value.slice(0, 10) : '';
         var currentDay = getTimelineDay(target, dateValue);
-        var currentDayIsEmpty = currentDay && !currentDay.querySelector('.timeline-item');
-        var currentItemDate = getItemDate(currentItem);
-        var nextItemDate = getItemDate(nextItem);
-
-        if (currentDayIsEmpty) {
-            top = getTimeMarkerDayTop(currentDay, targetRect, currentTime);
-        } else if (
-            currentDay
-            && (
-                (currentItemDate && currentItemDate !== dateValue)
-                || (nextItemDate && nextItemDate !== dateValue)
-            )
-        ) {
-            top = getTimeMarkerDayTop(currentDay, targetRect, currentTime);
-        } else if (currentItem && nextItem) {
-            var currentRect = currentItem.getBoundingClientRect();
-            var nextRect = nextItem.getBoundingClientRect();
-            var currentValue = parseDateTime(currentItem.getAttribute('data-datetime') || '');
-            var nextValue = parseDateTime(nextItem.getAttribute('data-datetime') || '');
-            var ratio = nextValue > currentValue ? (currentTime - currentValue) / (nextValue - currentValue) : 1;
-            ratio = Math.max(0, Math.min(1, ratio));
-            top = (currentRect.bottom - targetRect.top) + (nextRect.top - currentRect.bottom) * ratio;
-        } else if (nextItem) {
-            top = nextItem.getBoundingClientRect().top - targetRect.top - 8;
-        } else if (currentItem) {
-            top = currentItem.getBoundingClientRect().bottom - targetRect.top + 8;
-        }
-
-        if (top === null && currentDay) {
-            top = getTimeMarkerDayTop(currentDay, targetRect, currentTime);
-        }
+        var top = currentDay ? getTimeMarkerDayTop(currentDay, targetRect, currentTime) : null;
 
         if (top === null) {
             marker.style.display = 'none';
@@ -389,6 +358,27 @@
         marker.style.display = 'block';
         markerLabel.textContent = value.slice(11, 16);
         return true;
+    }
+
+    function hasExplicitItemTime(item) {
+        return !!(item && String(item.getAttribute('data-time') || '').trim().match(/^\d{1,2}:\d{2}$/));
+    }
+
+    function getItemTimeRange(item) {
+        if (!item) {
+            return null;
+        }
+
+        if (hasExplicitItemTime(item)) {
+            var time = parseDateTime(item.getAttribute('data-datetime') || '');
+            return time ? { start: time, end: time } : null;
+        }
+
+        var date = getItemDate(item);
+        var start = date ? parseDateTime(date + 'T00:00') : 0;
+        var end = date ? parseDateTime(date + 'T23:59:59') : 0;
+
+        return start && end ? { start: start, end: end } : null;
     }
 
     function getItemDate(item) {
@@ -462,20 +452,120 @@
     }
 
     function getTimeMarkerDayTop(day, targetRect, currentTime) {
-        var dayRect = day.getBoundingClientRect();
-        var heading = day.querySelector('.day-heading');
-        var headingRect = heading ? heading.getBoundingClientRect() : null;
-        var start = (headingRect ? headingRect.bottom : dayRect.top) - targetRect.top + 10;
-        var end = dayRect.bottom - targetRect.top - 10;
-        var date = new Date(currentTime);
-        var minutes = date.getHours() * 60 + date.getMinutes();
-        var ratio = minutes / 1439;
+        var date = day.getAttribute('data-date') || '';
+        var startValue = date ? parseDateTime(date + 'T00:00') : 0;
+        var endValue = date ? parseDateTime(date + 'T23:59:59') : 0;
+        var anchors = [];
 
-        if (end <= start) {
-            return dayRect.top - targetRect.top;
+        if (!startValue || !endValue) {
+            return null;
         }
 
-        return start + (end - start) * ratio;
+        anchors.push({
+            value: startValue,
+            top: getTimelineDayAnchorTop(day, targetRect)
+        });
+
+        Array.prototype.slice.call(day.querySelectorAll('.timeline-item')).forEach(function(item) {
+            var itemDate = getItemDate(item);
+            var itemTime = String(item.getAttribute('data-time') || '').trim();
+            var itemRect;
+            var itemValue;
+            var endDate;
+            var endTime;
+            var endValueForItem;
+
+            if (itemDate !== date || !itemTime.match(/^\d{1,2}:\d{2}$/)) {
+                return;
+            }
+
+            itemRect = item.getBoundingClientRect();
+            itemValue = parseDateTime(date + 'T' + itemTime);
+            if (itemValue) {
+                anchors.push({
+                    value: itemValue,
+                    top: itemRect.top - targetRect.top
+                });
+            }
+
+            endDate = item.getAttribute('data-end-date') || '';
+            endTime = String(item.getAttribute('data-end-time') || '').trim();
+            if (endTime.match(/^\d{1,2}:\d{2}$/) && (!endDate || endDate === date)) {
+                endValueForItem = parseDateTime(date + 'T' + endTime);
+                if (endValueForItem && endValueForItem > itemValue) {
+                    anchors.push({
+                        value: endValueForItem,
+                        top: itemRect.bottom - targetRect.top
+                    });
+                }
+            }
+        });
+
+        anchors.push({
+            value: endValue,
+            top: getTimelineDayEndTop(day, targetRect)
+        });
+
+        anchors.sort(function(a, b) {
+            return a.value - b.value || a.top - b.top;
+        });
+
+        return interpolateTimeMarkerTop(anchors, currentTime);
+    }
+
+    function interpolateTimeMarkerTop(anchors, currentTime) {
+        var previous = anchors[0] || null;
+        var next = null;
+        var ratio;
+
+        if (!previous) {
+            return null;
+        }
+
+        for (var index = 1; index < anchors.length; index++) {
+            next = anchors[index];
+            if (currentTime <= next.value) {
+                break;
+            }
+            previous = next;
+            next = null;
+        }
+
+        if (!next) {
+            return previous.top;
+        }
+
+        if (next.value <= previous.value || next.top <= previous.top) {
+            return previous.top;
+        }
+
+        ratio = (currentTime - previous.value) / (next.value - previous.value);
+        ratio = Math.max(0, Math.min(1, ratio));
+
+        return previous.top + (next.top - previous.top) * ratio;
+    }
+
+    function getTimelineDayAnchorTop(day, targetRect) {
+        var heading = day.querySelector('.day-heading');
+        var rect = heading ? heading.getBoundingClientRect() : day.getBoundingClientRect();
+
+        return rect.top - targetRect.top + (heading ? 14 : 0);
+    }
+
+    function getTimelineDayEndTop(day, targetRect) {
+        var nextDay = getNextTimelineDay(day);
+
+        return nextDay ? nextDay.getBoundingClientRect().top - targetRect.top : day.getBoundingClientRect().bottom - targetRect.top;
+    }
+
+    function getNextTimelineDay(day) {
+        var next = day.nextElementSibling;
+
+        while (next && !next.classList.contains('timeline-day')) {
+            next = next.nextElementSibling;
+        }
+
+        return next || null;
     }
 
     function initControl(control) {
@@ -517,8 +607,26 @@
         updateControl(control);
     }
 
-    function currentDateTimeValue() {
-        return formatInputDate(new Date());
+    function currentDateTimeValue(target) {
+        var seeded = getSeededCurrentDateTime(target);
+
+        return seeded || formatInputDate(new Date());
+    }
+
+    function getSeededCurrentDateTime(target) {
+        if (!target) {
+            return '';
+        }
+
+        var value = target.getAttribute('data-current-time-value') || '';
+        var captured = parseInt(target.getAttribute('data-current-time-captured') || '', 10);
+        var base = value ? new Date(value) : null;
+
+        if (!value || !captured || !base || isNaN(base.getTime())) {
+            return '';
+        }
+
+        return formatInputDate(new Date(base.getTime() + Math.max(0, Date.now() - captured * 1000)));
     }
 
     function updateStandalonePreviews() {
@@ -527,11 +635,11 @@
             controlledIds[control.getAttribute('data-demo-controls')] = true;
         });
 
-        var value = currentDateTimeValue();
-        var currentTime = parseDateTime(value);
         document.querySelectorAll('[data-demo-preview]').forEach(function(target) {
             var id = target.getAttribute('data-demo-target') || '';
             if (!controlledIds[id]) {
+                var value = currentDateTimeValue(target);
+                var currentTime = parseDateTime(value);
                 updatePreviewTarget(target, value, currentTime);
             }
         });
@@ -543,13 +651,12 @@
             controlledIds[control.getAttribute('data-demo-controls')] = true;
         });
 
-        var value = currentDateTimeValue();
-        var currentTime = parseDateTime(value);
-        var dateValue = value ? value.slice(0, 10) : '';
-
         document.querySelectorAll('.timeline').forEach(function(target) {
             var id = target.getAttribute('data-demo-target') || '';
             if (!controlledIds[id] && target.getAttribute('data-current-time') === '1') {
+                var value = currentDateTimeValue(target);
+                var currentTime = parseDateTime(value);
+                var dateValue = value ? value.slice(0, 10) : '';
                 updateTimelineTarget(target, value, dateValue, currentTime);
             }
         });

@@ -66,6 +66,7 @@ class App extends BaseApp {
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'register_ai_assistant_welcome_tips' ], 10, 2 );
         add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
         add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
+        add_action( 'template_redirect', [ $this, 'maybe_render_pwa_asset' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_timeline' ], 0 );
     }
@@ -80,6 +81,7 @@ class App extends BaseApp {
 
     public function enqueue_assets(): void {
         $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
+        $offline_script_path = dirname( __DIR__ ) . '/assets/js/offline-sync.js';
 
         wp_enqueue_script(
             'travel-app-timeline-time',
@@ -88,6 +90,301 @@ class App extends BaseApp {
             file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
             true
         );
+
+        wp_enqueue_script(
+            'travel-app-offline-sync',
+            plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/travel-app.php' ),
+            [],
+            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
+            true
+        );
+        wp_add_inline_script(
+            'travel-app-offline-sync',
+            'window.travelAppPwa=' . wp_json_encode( [
+                'serviceWorkerUrl' => (string) wp_parse_url( home_url( '/' . $this->get_url_path() . '/service-worker.js' ), PHP_URL_PATH ),
+                'scopeUrl'         => home_url( '/' ),
+                'scopePath'        => (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ),
+                'assetUrls'        => [
+                    plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/travel-app.php' ),
+                    plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/travel-app.php' ),
+                ],
+                'messages'         => [
+                    'offlineQueued' => __( 'Saved offline. Changes will sync when you are back online.', 'travel-app' ),
+                    'syncing'       => __( 'Syncing offline changes...', 'travel-app' ),
+                    'synced'        => __( 'Offline changes synced.', 'travel-app' ),
+                    'syncFailed'    => __( 'Some offline changes could not sync yet.', 'travel-app' ),
+                ],
+            ] ) . ';',
+            'before'
+        );
+    }
+
+    public function get_manifest_url( int $trip_id = 0, string $share_token = '' ): string {
+        $args = [];
+        if ( $trip_id > 0 ) {
+            $args['trip_id'] = $trip_id;
+        }
+        if ( '' !== $share_token ) {
+            $args['token'] = $share_token;
+        }
+
+        return add_query_arg( $args, home_url( '/' . $this->get_url_path() . '/manifest.webmanifest' ) );
+    }
+
+    public function maybe_render_pwa_asset(): void {
+        $request_path = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH ) : '';
+        $base_path = (string) wp_parse_url( home_url( '/' . $this->get_url_path() . '/' ), PHP_URL_PATH );
+        $asset = trim( substr( $request_path, strlen( rtrim( $base_path, '/' ) ) ), '/' );
+
+        if ( 'manifest.webmanifest' === $asset ) {
+            $this->render_manifest();
+            exit;
+        }
+
+        if ( 'service-worker.js' === $asset ) {
+            $this->render_service_worker();
+            exit;
+        }
+
+        if ( 'icon.svg' === $asset ) {
+            $this->render_icon();
+            exit;
+        }
+    }
+
+    private function render_manifest(): void {
+        $trip_id = isset( $_GET['trip_id'] ) ? absint( $_GET['trip_id'] ) : 0;
+        $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+        $name = __( 'Travel Timeline', 'travel-app' );
+        $short_name = __( 'Timeline', 'travel-app' );
+        $start_url = home_url( '/' . $this->get_url_path() . '/' );
+
+        if ( $trip_id > 0 ) {
+            $trip = Trip::get( $trip_id );
+            if ( $trip ) {
+                $name = $trip->title;
+                $short_name = $this->get_manifest_short_name( $trip->title );
+                $start_url = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
+                if ( '' !== $token ) {
+                    $start_url = add_query_arg(
+                        [
+                            'travel_app_share' => $trip_id,
+                            'travel_app_token' => $token,
+                        ],
+                        home_url( '/' )
+                    );
+                }
+            }
+        }
+
+        nocache_headers();
+        status_header( 200 );
+        header( 'Content-Type: application/manifest+json; charset=utf-8' );
+        echo wp_json_encode( [
+            'name'             => $name,
+            'short_name'       => $short_name,
+            'start_url'        => $start_url,
+            'scope'            => home_url( '/' ),
+            'display'          => 'standalone',
+            'background_color' => '#f8fafc',
+            'theme_color'      => '#0b6bcb',
+            'icons'            => [
+                [
+                    'src'   => home_url( '/' . $this->get_url_path() . '/icon.svg' ),
+                    'sizes' => 'any',
+                    'type'  => 'image/svg+xml',
+                ],
+            ],
+        ] );
+    }
+
+    private function get_manifest_short_name( string $name ): string {
+        $name = trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( $name ) ) );
+        if ( '' === $name ) {
+            return __( 'Timeline', 'travel-app' );
+        }
+
+        if ( function_exists( 'mb_strlen' ) && function_exists( 'mb_substr' ) ) {
+            return mb_strlen( $name ) > 12 ? rtrim( mb_substr( $name, 0, 12 ) ) : $name;
+        }
+
+        return strlen( $name ) > 12 ? rtrim( substr( $name, 0, 12 ) ) : $name;
+    }
+
+    private function render_service_worker(): void {
+        $scope_path = (string) wp_parse_url( home_url( '/' . $this->get_url_path() . '/' ), PHP_URL_PATH );
+        $asset_path = (string) wp_parse_url( plugins_url( 'assets/', dirname( __DIR__ ) . '/travel-app.php' ), PHP_URL_PATH );
+        $upload_dir = wp_upload_dir();
+        $upload_path = ! empty( $upload_dir['baseurl'] ) ? (string) wp_parse_url( (string) $upload_dir['baseurl'], PHP_URL_PATH ) : '';
+        $cache_name = 'travel-app-v7';
+
+        nocache_headers();
+        status_header( 200 );
+        header( 'Content-Type: application/javascript; charset=utf-8' );
+        header( 'Service-Worker-Allowed: /' );
+        echo "const CACHE_NAME = " . wp_json_encode( $cache_name ) . ";\n";
+        echo "const APP_SCOPE_PATH = " . wp_json_encode( $scope_path ) . ";\n";
+        echo "const ASSET_PATH = " . wp_json_encode( $asset_path ) . ";\n";
+        echo "const UPLOAD_PATH = " . wp_json_encode( $upload_path ) . ";\n";
+        ?>
+function isTravelAppRequest(url) {
+    return url.pathname.indexOf(APP_SCOPE_PATH) === 0
+        || url.pathname.indexOf(ASSET_PATH) === 0
+        || (UPLOAD_PATH && url.pathname.indexOf(UPLOAD_PATH) === 0)
+        || url.search.indexOf('travel_app_share=') !== -1;
+}
+
+self.addEventListener('install', function(event) {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', function(event) {
+    event.waitUntil(caches.keys().then(function(keys) {
+        return Promise.all(keys.filter(function(key) {
+            return key !== CACHE_NAME && key.indexOf('travel-app-') === 0;
+        }).map(function(key) {
+            return caches.delete(key);
+        }));
+    }).then(function() {
+        return self.clients.claim();
+    }));
+});
+
+self.addEventListener('fetch', function(event) {
+    var request = event.request;
+    var url = new URL(request.url);
+
+    if (request.method !== 'GET' || url.origin !== location.origin) {
+        return;
+    }
+
+    if (!isTravelAppRequest(url)) {
+        return;
+    }
+
+    event.respondWith(fetch(request).then(function(response) {
+        var copy = response.clone();
+        if (response.ok) {
+            caches.open(CACHE_NAME).then(function(cache) {
+                cache.put(request, copy);
+            });
+        }
+        return response;
+    }).catch(function() {
+        return caches.match(request).then(function(cached) {
+            if (cached) {
+                return cached;
+            }
+
+            if (request.mode === 'navigate') {
+                return caches.match(url.href).then(function(urlCached) {
+                    return urlCached || caches.match(APP_SCOPE_PATH);
+                });
+            }
+
+            return caches.match(APP_SCOPE_PATH);
+        });
+    }));
+});
+
+self.addEventListener('message', function(event) {
+    if (!event.data) {
+        return;
+    }
+
+    if (event.data.type === 'travel-app-version') {
+        if (event.source) {
+            event.source.postMessage({
+                type: 'travel-app-version',
+                version: CACHE_NAME
+            });
+        }
+        return;
+    }
+
+    if (event.data.type !== 'travel-app-cache-url') {
+        return;
+    }
+
+    var urls = Array.isArray(event.data.urls) ? event.data.urls : [event.data.url];
+    var requiredUrls = Array.isArray(event.data.requiredUrls) ? event.data.requiredUrls : urls;
+    urls = urls.filter(Boolean).map(function(url) {
+        return new URL(url, location.origin);
+    });
+    requiredUrls = requiredUrls.filter(Boolean).map(function(url) {
+        return new URL(url, location.origin);
+    });
+    function sendCacheStatus(ok) {
+        if (event.source) {
+            event.source.postMessage({
+                type: 'travel-app-cache-status',
+                ok: !!ok
+            });
+        }
+    }
+
+    urls = urls.filter(function(url) {
+        return url.origin === location.origin && isTravelAppRequest(url);
+    });
+    requiredUrls = requiredUrls.filter(function(url) {
+        return url.origin === location.origin && isTravelAppRequest(url);
+    });
+
+    if (!requiredUrls.length) {
+        sendCacheStatus(false);
+        return;
+    }
+
+    event.waitUntil(caches.open(CACHE_NAME).then(function(cache) {
+        return Promise.all(urls.map(function(url) {
+            return fetch(url.href, {
+                credentials: 'same-origin',
+                cache: 'reload'
+            }).then(function(response) {
+                if (response.ok) {
+                    return cache.put(url.href, response);
+                }
+            }).catch(function() {});
+        })).then(function() {
+            return Promise.all(requiredUrls.map(function(url) {
+                return cache.match(url.href).then(function(cached) {
+                    if (cached) {
+                        return;
+                    }
+                    return Promise.reject(new Error('Not cached'));
+                });
+            })).then(function() {
+                sendCacheStatus(true);
+            }, function() {
+                sendCacheStatus(false);
+            });
+        });
+    }).catch(function() {
+        sendCacheStatus(false);
+    }));
+});
+
+self.addEventListener('sync', function(event) {
+    if (event.tag === 'travel-app-sync' && self.clients) {
+        event.waitUntil(self.clients.matchAll().then(function(clients) {
+            clients.forEach(function(client) {
+                client.postMessage({ type: 'travel-app-sync' });
+            });
+        }));
+    }
+});
+        <?php
+    }
+
+    private function render_icon(): void {
+        status_header( 200 );
+        header( 'Content-Type: image/svg+xml; charset=utf-8' );
+        ?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0b6bcb"/>
+  <path fill="#fff" d="M136 152h240a32 32 0 0 1 32 32v184a32 32 0 0 1-32 32H136a32 32 0 0 1-32-32V184a32 32 0 0 1 32-32Zm0 80h240v-48H136v48Zm48-112h48v64h-48v-64Zm96 0h48v64h-48v-64ZM160 288h72v72h-72v-72Zm120 0h72v72h-72v-72Z"/>
+</svg>
+        <?php
     }
 
     public function get_error_notice_message( string $error_code, string $fallback = '' ): string {
@@ -192,7 +489,6 @@ class App extends BaseApp {
     protected function setup_routes(): void {
         $this->app->route( 'trip/{id}', 'trip.php' );
         $this->app->route( 'trip/{id}/map', 'map.php' );
-        $this->app->route( 'trip/{id}/item/{item_id}', 'item.php' );
     }
 
     protected function setup_menu(): void {
@@ -935,7 +1231,7 @@ class App extends BaseApp {
             'item_id' => (int) $item_id,
             'item'    => ( $item = ItineraryItem::get_user_item( $trip_id, (int) $item_id ) ) ? $item->to_array() : [],
             'trip'    => ( $trip = Trip::from_term( $trip_id ) ) ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [],
-            'url'     => home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . (int) $item_id . '/' ),
+            'url'     => home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/#segment-' . (int) $item_id ),
         ];
     }
 
@@ -963,7 +1259,7 @@ class App extends BaseApp {
             'item_id' => $item_id,
             'item'    => ( $item = ItineraryItem::get_user_item( $trip_id, $item_id ) ) ? $item->to_array() : [],
             'trip'    => ( $trip = Trip::from_term( $trip_id ) ) ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [],
-            'url'     => home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $item_id . '/' ),
+            'url'     => home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/#segment-' . $item_id ),
         ];
     }
 
@@ -1446,7 +1742,7 @@ class App extends BaseApp {
         $index = isset( $_POST['segment_index'] ) ? absint( $_POST['segment_index'] ) : 0;
         check_admin_referer( 'travel_app_update_segment_' . $trip_id . '_' . $index );
 
-        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $index . '/' );
+        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' ) . '#segment-' . $index;
         $segment = ItineraryItem::from_request();
 
         $updated = $this->update_user_trip_segment( $trip_id, $index, $segment );
@@ -1517,7 +1813,7 @@ class App extends BaseApp {
         $index = isset( $_POST['segment_index'] ) ? absint( $_POST['segment_index'] ) : 0;
         check_admin_referer( 'travel_app_upload_item_attachment_' . $trip_id . '_' . $index );
 
-        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $index . '/' );
+        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' ) . '#segment-' . $index;
         $uploaded = $this->upload_user_trip_item_attachments( $trip_id, $index );
 
         if ( is_wp_error( $uploaded ) ) {
@@ -1540,7 +1836,7 @@ class App extends BaseApp {
         $attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
         check_admin_referer( 'travel_app_delete_item_attachment_' . $trip_id . '_' . $index . '_' . $attachment_id );
 
-        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/item/' . $index . '/' );
+        $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' ) . '#segment-' . $index;
         $deleted = $this->delete_user_trip_item_attachment( $trip_id, $index, $attachment_id );
 
         if ( is_wp_error( $deleted ) ) {
@@ -1996,7 +2292,7 @@ class App extends BaseApp {
                 continue;
             }
 
-            $uid_source = home_url( '/travel-app/trip/' . $trip_id . '/item/' . (int) ( $segment['id'] ?? 0 ) . '/' );
+            $uid_source = home_url( '/travel-app/trip/' . $trip_id . '/#segment-' . (int) ( $segment['id'] ?? 0 ) );
             $is_fellow_share = 'fellow' === $mode;
             $is_transport_segment = $this->is_transport_segment( $segment );
             $description_parts = $is_fellow_share ? array_filter( [

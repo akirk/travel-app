@@ -38,7 +38,7 @@ foreach ( $segments as $segment ) {
                 'date'     => (string) ( $segment['date'] ?? '' ),
                 'time'     => (string) ( $segment['time'] ?? '' ),
                 'details'  => (string) ( $segment['details'] ?? '' ),
-                'url'      => home_url( '/travel-app/trip/' . $trip_id . '/item/' . (int) ( $segment['id'] ?? 0 ) . '/' ),
+                'url'      => home_url( '/travel-app/trip/' . $trip_id . '/#segment-' . (int) ( $segment['id'] ?? 0 ) ),
             ];
         }
     }

@@ -642,8 +642,8 @@ if ( count( $route_locations ) >= 2 ) {
         }
         .attachment-offline-indicator {
             position: absolute;
-            right: -0.45em;
-            bottom: -0.45em;
+            right: -0.18em;
+            bottom: -0.18em;
             color: #237a3b;
             font-size: 0.78em;
             font-weight: 900;

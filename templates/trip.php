@@ -31,6 +31,7 @@ $quick_plan_draft_target = isset( $quick_plan_draft['target_trip_id'] ) ? absint
 $quick_plan_segment = $quick_plan_draft_target === $trip_id && isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] )
     ? $quick_plan_draft['segment']
     : [];
+$has_ai = function_exists( 'wp_ai_client_prompt' );
 
 $segments_user_id = null;
 if ( $is_shared_timeline ) {
@@ -436,7 +437,7 @@ if ( count( $route_locations ) >= 2 ) {
             left: 0;
             width: 0;
             height: 0;
-            color: #c62828;
+            color: var(--wp-app-color-link);
             pointer-events: none;
         }
         .time-marker::before {
@@ -447,7 +448,7 @@ if ( count( $route_locations ) >= 2 ) {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: #c62828;
+            background: var(--wp-app-color-link);
             box-shadow: 0 0 0 3px var(--wp-app-color-background);
         }
         .time-marker span {
@@ -457,7 +458,7 @@ if ( count( $route_locations ) >= 2 ) {
             transform: translateX(-100%);
             padding: 2px 6px;
             border-radius: 999px;
-            background: #c62828;
+            background: var(--wp-app-color-link);
             color: #fff;
             font-size: 0.76rem;
             font-weight: 750;
@@ -1339,7 +1340,7 @@ if ( count( $route_locations ) >= 2 ) {
                         }
                         ?>
                         <details>
-                            <summary><?php esc_html_e( 'Import from Confirmation', 'travel-app' ); ?></summary>
+                            <summary><?php esc_html_e( 'Import or Add from Text', 'travel-app' ); ?></summary>
                             <form class="trip-import-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                                 <input type="hidden" name="action" value="travel_app_import">
                                 <input type="hidden" name="import_trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
@@ -1348,12 +1349,13 @@ if ( count( $route_locations ) >= 2 ) {
                                     <?php
                                     printf(
                                         /* translators: %s: trip title. */
-                                        esc_html__( 'Paste confirmation or plan for %s', 'travel-app' ),
+                                        esc_html__( 'Paste confirmation, file text, or a typed entry for %s', 'travel-app' ),
                                         esc_html( $trip_data['title'] )
                                     );
                                     ?>
                                 </label>
-                                <textarea id="trip_import_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Paste itinerary text or a dated plan...', 'travel-app' ); ?>"></textarea>
+                                <textarea id="trip_import_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'travel-app' ); ?>"></textarea>
+                                <p class="hint"><?php echo esc_html( $has_ai ? __( 'AI extraction can turn plain text into an entry for review; confirmations still work too.', 'travel-app' ) : __( 'Uses quick parsing or a basic parser.', 'travel-app' ) ); ?></p>
                                 <div class="form-actions">
                                     <button type="submit"><?php esc_html_e( 'Review Import', 'travel-app' ); ?></button>
                                 </div>
@@ -1372,7 +1374,7 @@ if ( count( $route_locations ) >= 2 ) {
                                     <?php
                                     printf(
                                         /* translators: %s: parser source label. */
-                                        esc_html__( 'Prefilled from import. Review the fields before adding. Parsed with: %s.', 'travel-app' ),
+                                        esc_html__( 'Prefilled from text. Review the fields before adding this entry. Parsed with: %s.', 'travel-app' ),
                                         esc_html( $quick_plan_parser_label )
                                     );
                                     ?>

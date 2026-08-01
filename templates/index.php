@@ -516,7 +516,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                             <input type="hidden" name="quick_plan_draft" value="<?php echo esc_attr( $quick_plan_draft_key ); ?>">
                             <?php wp_nonce_field( 'travel_app_import' ); ?>
                             <p class="quick-plan-confirm">
-                                <?php esc_html_e( 'Review the parsed fields, then choose where to save it.', 'travel-app' ); ?>
+                                <?php esc_html_e( 'Review the parsed entry fields, then choose whether to add it to an existing trip or create a new trip.', 'travel-app' ); ?>
                                 <?php
                                 printf(
                                     /* translators: %s: parser source label. */
@@ -639,9 +639,9 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <span class="drop-file-name" id="itinerary_file_name"><?php esc_html_e( 'ICS or text file', 'travel-app' ); ?></span>
                         <input type="file" id="itinerary_file" name="itinerary_file" accept=".ics,.txt,text/calendar,text/plain">
                     </label>
-                    <label for="itinerary_text"><?php esc_html_e( 'Paste confirmation or plan', 'travel-app' ); ?></label>
-                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Paste itinerary text or a dated plan...', 'travel-app' ); ?>"></textarea>
-                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'Uses quick parsing, calendar parsing, or AI extraction.', 'travel-app' ) : __( 'Uses quick parsing, calendar parsing, or a basic parser.', 'travel-app' ) ); ?></p>
+                    <label for="itinerary_text"><?php esc_html_e( 'Paste confirmation, file text, or a typed entry', 'travel-app' ); ?></label>
+                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'travel-app' ); ?>"></textarea>
+                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'AI extraction can turn plain text into an entry for review; files and confirmations still work too.', 'travel-app' ) : __( 'Uses quick parsing, calendar parsing, or a basic parser.', 'travel-app' ) ); ?></p>
                     <button type="submit"><?php esc_html_e( 'Import', 'travel-app' ); ?></button>
                 </form>
                     <?php endif; ?>

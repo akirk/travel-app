@@ -118,6 +118,23 @@
         setStatus(message || (messages.syncFailed || 'Some offline changes could not sync yet.'), true);
     }
 
+    function setFormStatus(form, message, isError) {
+        var target = form.querySelector('[data-offline-form-status]');
+
+        if (!target) {
+            target = document.createElement('div');
+            target.className = 'offline-status';
+            target.setAttribute('data-offline-form-status', '');
+            target.setAttribute('role', 'status');
+            target.setAttribute('aria-live', 'polite');
+            form.appendChild(target);
+        }
+
+        target.textContent = message || '';
+        target.classList.toggle('error', !!isError);
+        target.hidden = !message;
+    }
+
     function refreshQueueStatus() {
         return getMutations().then(function(mutations) {
             var count = mutations.length;
@@ -286,13 +303,19 @@
     }
 
     function queueForm(form) {
-        return putMutation(formToMutation(form)).then(function() {
+        setFormStatus(form, 'Saving offline...');
+
+        return Promise.resolve().then(function() {
+            return putMutation(formToMutation(form));
+        }).then(function() {
             setStatus(messages.offlineQueued || 'Saved offline. Changes will sync when you are back online.');
+            setFormStatus(form, messages.offlineQueued || 'Saved offline. Changes will sync when you are back online.');
             refreshQueueStatus();
-            form.reset();
             requestBackgroundSync();
-        }).catch(function() {
-            reportError(messages.syncFailed || 'Some offline changes could not sync yet.');
+        }).catch(function(error) {
+            var message = error && error.message ? error.message : (messages.syncFailed || 'Some offline changes could not sync yet.');
+            reportError(message);
+            setFormStatus(form, message, true);
         });
     }
 
@@ -308,7 +331,20 @@
         document.addEventListener('submit', function(event) {
             var form = event.target;
 
-            if (event.defaultPrevented || !isOfflineSyncForm(form) || !canQueueForm(form) || navigator.onLine) {
+            if (event.defaultPrevented || !isOfflineSyncForm(form)) {
+                return;
+            }
+
+            if (!canQueueForm(form)) {
+                if (!navigator.onLine) {
+                    event.preventDefault();
+                    setFormStatus(form, 'Uploading attachments requires an online connection.', true);
+                }
+                return;
+            }
+
+            if (navigator.onLine) {
+                setFormStatus(form, '');
                 return;
             }
 

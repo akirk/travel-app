@@ -216,7 +216,7 @@ class App extends BaseApp {
         $asset_path = (string) wp_parse_url( plugins_url( 'assets/', dirname( __DIR__ ) . '/travel-app.php' ), PHP_URL_PATH );
         $upload_dir = wp_upload_dir();
         $upload_path = ! empty( $upload_dir['baseurl'] ) ? (string) wp_parse_url( (string) $upload_dir['baseurl'], PHP_URL_PATH ) : '';
-        $cache_name = 'travel-app-v6';
+        $cache_name = 'travel-app-v7';
 
         nocache_headers();
         status_header( 200 );

@@ -324,13 +324,14 @@ self.addEventListener('message', function(event) {
             return true;
         });
     }
-    function sendCacheStatus(ok, cachedCount, totalCount) {
+    function sendCacheStatus(ok, cachedCount, totalCount, cachedUrls) {
         if (event.source) {
             event.source.postMessage({
                 type: 'travel-app-cache-status',
                 ok: !!ok,
                 cachedCount: cachedCount || 0,
-                totalCount: totalCount || 0
+                totalCount: totalCount || 0,
+                cachedUrls: cachedUrls || []
             });
         }
     }
@@ -360,14 +361,27 @@ self.addEventListener('message', function(event) {
                 }
             }).catch(function() {});
         })).then(function() {
-            var cachedUrlCount = Promise.all(urls.map(function(url) {
+            var cachedUrlResults = Promise.all(urls.map(function(url) {
                 return cache.match(url.href).then(function(cached) {
-                    return cached ? 1 : 0;
+                    return {
+                        href: url.href,
+                        cached: !!cached
+                    };
                 });
-            })).then(function(results) {
-                return results.reduce(function(total, count) {
-                    return total + count;
+            }));
+            var cachedUrlStatus = cachedUrlResults.then(function(results) {
+                var cachedUrls = [];
+                var cachedCount = results.reduce(function(total, result) {
+                    if (result.cached) {
+                        cachedUrls.push(result.href);
+                        return total + 1;
+                    }
+                    return total;
                 }, 0);
+                return {
+                    count: cachedCount,
+                    urls: cachedUrls
+                };
             });
             var requiredReady = Promise.all(requiredUrls.map(function(url) {
                 return cache.match(url.href).then(function(cached) {
@@ -377,18 +391,18 @@ self.addEventListener('message', function(event) {
                     return Promise.reject(new Error('Not cached'));
                 });
             }));
-            return Promise.all([cachedUrlCount, requiredReady]).then(function(results) {
-                sendCacheStatus(true, results[0], urls.length);
+            return Promise.all([cachedUrlStatus, requiredReady]).then(function(results) {
+                sendCacheStatus(true, results[0].count, urls.length, results[0].urls);
             }, function() {
-                return cachedUrlCount.then(function(count) {
-                    sendCacheStatus(false, count, urls.length);
+                return cachedUrlStatus.then(function(status) {
+                    sendCacheStatus(false, status.count, urls.length, status.urls);
                 }, function() {
-                    sendCacheStatus(false, 0, urls.length);
+                    sendCacheStatus(false, 0, urls.length, []);
                 });
             });
         });
     }).catch(function() {
-        sendCacheStatus(false);
+        sendCacheStatus(false, 0, urls.length, []);
     }));
 });
 

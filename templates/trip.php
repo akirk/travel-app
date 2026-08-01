@@ -626,11 +626,16 @@ if ( count( $route_locations ) >= 2 ) {
             outline: 2px solid var(--wp-app-color-link);
             outline-offset: 2px;
         }
-        .attachment-download span:last-child {
+        .attachment-download span:nth-child(2) {
             min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        .attachment-offline-indicator {
+            flex: 0 0 auto;
+            color: #237a3b;
+            font-weight: 900;
         }
         .url-preview {
             display: grid;

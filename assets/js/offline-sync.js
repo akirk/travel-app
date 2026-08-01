@@ -40,6 +40,46 @@
         updateOfflinePanel();
     }
 
+    function offlineCacheUrl(element) {
+        var url = element.getAttribute('href') || element.getAttribute('src') || element.getAttribute('data-offline-cache-url');
+        return url ? new URL(url, window.location.href).href : '';
+    }
+
+    function offlineCacheElements() {
+        return Array.prototype.slice.call(document.querySelectorAll('[data-offline-cache-url]'));
+    }
+
+    function ensureAttachmentIndicator(element) {
+        var indicator = element.querySelector('[data-offline-attachment-indicator]');
+        if (indicator) {
+            return indicator;
+        }
+
+        indicator = document.createElement('span');
+        indicator.className = 'attachment-offline-indicator';
+        indicator.setAttribute('data-offline-attachment-indicator', '');
+        indicator.setAttribute('aria-label', 'Available offline');
+        indicator.setAttribute('title', 'Available offline');
+        indicator.textContent = '✓';
+        indicator.hidden = true;
+        element.appendChild(indicator);
+        return indicator;
+    }
+
+    function updateAttachmentAvailability(cachedUrls) {
+        var cached = {};
+        (cachedUrls || []).forEach(function(url) {
+            cached[url] = true;
+        });
+
+        offlineCacheElements().forEach(function(element) {
+            var indicator = ensureAttachmentIndicator(element);
+            var available = !!cached[offlineCacheUrl(element)];
+            element.toggleAttribute('data-offline-available', available);
+            indicator.hidden = !available;
+        });
+    }
+
     function openDb() {
         return new Promise(function(resolve, reject) {
             if (!window.indexedDB) {
@@ -252,6 +292,26 @@
             return;
         }
 
+        navigator.serviceWorker.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'travel-app-sync') {
+                flushQueue();
+            }
+            if (event.data && event.data.type === 'travel-app-cache-status') {
+                setOfflineState('cache', event.data.ok ? 'Ready offline' : 'Not cached');
+                if (typeof event.data.cachedCount === 'number' && typeof event.data.totalCount === 'number') {
+                    setOfflineState('files', event.data.cachedCount + ' of ' + event.data.totalCount + ' files');
+                }
+                updateAttachmentAvailability(event.data.cachedUrls || []);
+            }
+            if (event.data && event.data.type === 'travel-app-version') {
+                setWorkerVersion(event.data.version || '');
+            }
+        });
+
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+            setWorkerState('Active');
+        });
+
         navigator.serviceWorker.register(config.serviceWorkerUrl, {
             scope: config.scopePath || '/'
         }).then(function() {
@@ -264,8 +324,8 @@
                 });
                 var requiredUrls = [window.location.href].concat(config.assetUrls || []);
                 var urls = requiredUrls.slice();
-                document.querySelectorAll('[data-offline-cache-url]').forEach(function(element) {
-                    var url = element.getAttribute('href') || element.getAttribute('src') || element.getAttribute('data-offline-cache-url');
+                offlineCacheElements().forEach(function(element) {
+                    var url = offlineCacheUrl(element);
                     if (url) {
                         urls.push(url);
                     }
@@ -280,25 +340,6 @@
             setWorkerState(error && error.message ? error.message : 'Registration failed');
             setOfflineState('cache', 'Unavailable');
             setOfflineState('files', 'Unavailable');
-        });
-
-        navigator.serviceWorker.addEventListener('message', function(event) {
-            if (event.data && event.data.type === 'travel-app-sync') {
-                flushQueue();
-            }
-            if (event.data && event.data.type === 'travel-app-cache-status') {
-                setOfflineState('cache', event.data.ok ? 'Ready offline' : 'Not cached');
-                if (typeof event.data.cachedCount === 'number' && typeof event.data.totalCount === 'number') {
-                    setOfflineState('files', event.data.cachedCount + ' of ' + event.data.totalCount + ' files');
-                }
-            }
-            if (event.data && event.data.type === 'travel-app-version') {
-                setWorkerVersion(event.data.version || '');
-            }
-        });
-
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-            setWorkerState('Active');
         });
     }
 

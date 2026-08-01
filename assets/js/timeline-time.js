@@ -348,8 +348,18 @@
         var dateValue = value ? value.slice(0, 10) : '';
         var currentDay = getTimelineDay(target, dateValue);
         var currentDayIsEmpty = currentDay && !currentDay.querySelector('.timeline-item');
+        var currentItemDate = getItemDate(currentItem);
+        var nextItemDate = getItemDate(nextItem);
 
         if (currentDayIsEmpty) {
+            top = getTimeMarkerDayTop(currentDay, targetRect, currentTime);
+        } else if (
+            currentDay
+            && (
+                (currentItemDate && currentItemDate !== dateValue)
+                || (nextItemDate && nextItemDate !== dateValue)
+            )
+        ) {
             top = getTimeMarkerDayTop(currentDay, targetRect, currentTime);
         } else if (currentItem && nextItem) {
             var currentRect = currentItem.getBoundingClientRect();
@@ -379,6 +389,14 @@
         marker.style.display = 'block';
         markerLabel.textContent = value.slice(11, 16);
         return true;
+    }
+
+    function getItemDate(item) {
+        if (!item) {
+            return '';
+        }
+
+        return item.getAttribute('data-date') || (item.getAttribute('data-datetime') || '').slice(0, 10);
     }
 
     function updateTimelineJumpControls(target, enabled) {

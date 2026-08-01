@@ -626,6 +626,14 @@ if ( count( $route_locations ) >= 2 ) {
             outline: 2px solid var(--wp-app-color-link);
             outline-offset: 2px;
         }
+        .attachment-download-icon {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1em;
+            flex: 0 0 1em;
+        }
         .attachment-download span:nth-child(2) {
             min-width: 0;
             overflow: hidden;
@@ -633,9 +641,14 @@ if ( count( $route_locations ) >= 2 ) {
             white-space: nowrap;
         }
         .attachment-offline-indicator {
-            flex: 0 0 auto;
+            position: absolute;
+            right: -0.45em;
+            bottom: -0.45em;
             color: #237a3b;
+            font-size: 0.78em;
             font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 0 2px var(--wp-app-color-surface);
         }
         .url-preview {
             display: grid;

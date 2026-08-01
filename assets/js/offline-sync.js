@@ -55,6 +55,8 @@
             return indicator;
         }
 
+        var icon = element.querySelector('span:first-child') || element;
+        icon.classList.add('attachment-download-icon');
         indicator = document.createElement('span');
         indicator.className = 'attachment-offline-indicator';
         indicator.setAttribute('data-offline-attachment-indicator', '');
@@ -62,7 +64,7 @@
         indicator.setAttribute('title', 'Available offline');
         indicator.textContent = '✓';
         indicator.hidden = true;
-        element.appendChild(indicator);
+        icon.appendChild(indicator);
         return indicator;
     }
 

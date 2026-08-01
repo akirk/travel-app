@@ -7,6 +7,7 @@
         connection: navigator.onLine ? 'Online' : 'Offline',
         worker: 'Checking',
         cache: 'Checking',
+        files: 'Checking',
         queue: '0 pending'
     };
     var workerState = 'Checking';
@@ -233,18 +234,21 @@
         if (!window.isSecureContext) {
             setWorkerState('Needs HTTPS');
             setOfflineState('cache', 'Unavailable');
+            setOfflineState('files', 'Unavailable');
             return;
         }
 
         if (!('serviceWorker' in navigator)) {
             setWorkerState('Not supported');
             setOfflineState('cache', 'Unavailable');
+            setOfflineState('files', 'Unavailable');
             return;
         }
 
         if (!config.serviceWorkerUrl) {
             setWorkerState('Missing URL');
             setOfflineState('cache', 'Unavailable');
+            setOfflineState('files', 'Unavailable');
             return;
         }
 
@@ -275,6 +279,7 @@
         }).catch(function(error) {
             setWorkerState(error && error.message ? error.message : 'Registration failed');
             setOfflineState('cache', 'Unavailable');
+            setOfflineState('files', 'Unavailable');
         });
 
         navigator.serviceWorker.addEventListener('message', function(event) {
@@ -283,6 +288,9 @@
             }
             if (event.data && event.data.type === 'travel-app-cache-status') {
                 setOfflineState('cache', event.data.ok ? 'Ready offline' : 'Not cached');
+                if (typeof event.data.cachedCount === 'number' && typeof event.data.totalCount === 'number') {
+                    setOfflineState('files', event.data.cachedCount + ' of ' + event.data.totalCount + ' files');
+                }
             }
             if (event.data && event.data.type === 'travel-app-version') {
                 setWorkerVersion(event.data.version || '');

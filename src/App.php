@@ -314,11 +314,23 @@ self.addEventListener('message', function(event) {
     requiredUrls = requiredUrls.filter(Boolean).map(function(url) {
         return new URL(url, location.origin);
     });
-    function sendCacheStatus(ok) {
+    function uniqueUrls(items) {
+        var seen = {};
+        return items.filter(function(url) {
+            if (seen[url.href]) {
+                return false;
+            }
+            seen[url.href] = true;
+            return true;
+        });
+    }
+    function sendCacheStatus(ok, cachedCount, totalCount) {
         if (event.source) {
             event.source.postMessage({
                 type: 'travel-app-cache-status',
-                ok: !!ok
+                ok: !!ok,
+                cachedCount: cachedCount || 0,
+                totalCount: totalCount || 0
             });
         }
     }
@@ -329,6 +341,8 @@ self.addEventListener('message', function(event) {
     requiredUrls = requiredUrls.filter(function(url) {
         return url.origin === location.origin && isTravelAppRequest(url);
     });
+    urls = uniqueUrls(urls);
+    requiredUrls = uniqueUrls(requiredUrls);
 
     if (!requiredUrls.length) {
         sendCacheStatus(false);
@@ -346,17 +360,31 @@ self.addEventListener('message', function(event) {
                 }
             }).catch(function() {});
         })).then(function() {
-            return Promise.all(requiredUrls.map(function(url) {
+            var cachedUrlCount = Promise.all(urls.map(function(url) {
+                return cache.match(url.href).then(function(cached) {
+                    return cached ? 1 : 0;
+                });
+            })).then(function(results) {
+                return results.reduce(function(total, count) {
+                    return total + count;
+                }, 0);
+            });
+            var requiredReady = Promise.all(requiredUrls.map(function(url) {
                 return cache.match(url.href).then(function(cached) {
                     if (cached) {
                         return;
                     }
                     return Promise.reject(new Error('Not cached'));
                 });
-            })).then(function() {
-                sendCacheStatus(true);
+            }));
+            return Promise.all([cachedUrlCount, requiredReady]).then(function(results) {
+                sendCacheStatus(true, results[0], urls.length);
             }, function() {
-                sendCacheStatus(false);
+                return cachedUrlCount.then(function(count) {
+                    sendCacheStatus(false, count, urls.length);
+                }, function() {
+                    sendCacheStatus(false, 0, urls.length);
+                });
             });
         });
     }).catch(function() {

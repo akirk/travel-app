@@ -1789,6 +1789,10 @@ if ( count( $route_locations ) >= 2 ) {
                             <dd data-offline-cache><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
                         </div>
                         <div>
+                            <dt><?php esc_html_e( 'Cached files', 'travel-app' ); ?></dt>
+                            <dd data-offline-files><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
+                        </div>
+                        <div>
                             <dt><?php esc_html_e( 'Queued changes', 'travel-app' ); ?></dt>
                             <dd data-offline-queue><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
                         </div>

@@ -114,6 +114,10 @@
         });
     }
 
+    function reportError(message) {
+        setStatus(message || (messages.syncFailed || 'Some offline changes could not sync yet.'), true);
+    }
+
     function refreshQueueStatus() {
         return getMutations().then(function(mutations) {
             var count = mutations.length;
@@ -281,36 +285,44 @@
         }).catch(function() {});
     }
 
+    function queueForm(form) {
+        return putMutation(formToMutation(form)).then(function() {
+            setStatus(messages.offlineQueued || 'Saved offline. Changes will sync when you are back online.');
+            refreshQueueStatus();
+            form.reset();
+            requestBackgroundSync();
+        }).catch(function() {
+            reportError(messages.syncFailed || 'Some offline changes could not sync yet.');
+        });
+    }
+
+    function isOfflineSyncForm(element) {
+        return element && element.nodeType === 1 && element.matches && element.matches('form[data-offline-sync]');
+    }
+
+    function canQueueForm(form) {
+        return !form.enctype || form.enctype.toLowerCase() !== 'multipart/form-data';
+    }
+
+    function bindOfflineSubmitHandler() {
+        document.addEventListener('submit', function(event) {
+            var form = event.target;
+
+            if (event.defaultPrevented || !isOfflineSyncForm(form) || !canQueueForm(form) || navigator.onLine) {
+                return;
+            }
+
+            event.preventDefault();
+            queueForm(form);
+        });
+    }
+
     function bindOfflineForm(form) {
         if (form.hasAttribute('data-offline-sync-bound')) {
             return;
         }
 
         form.setAttribute('data-offline-sync-bound', '1');
-
-        if (form.enctype && form.enctype.toLowerCase() === 'multipart/form-data') {
-            return;
-        }
-
-        form.addEventListener('submit', function(event) {
-            if (event.defaultPrevented) {
-                return;
-            }
-
-            if (navigator.onLine) {
-                return;
-            }
-
-            event.preventDefault();
-            putMutation(formToMutation(form)).then(function() {
-                setStatus(messages.offlineQueued || 'Saved offline. Changes will sync when you are back online.');
-                refreshQueueStatus();
-                form.reset();
-                requestBackgroundSync();
-            }).catch(function() {
-                setStatus(messages.syncFailed || 'Some offline changes could not sync yet.', true);
-            });
-        });
     }
 
     function bindOfflineForms() {
@@ -371,6 +383,16 @@
         setField(form, 'segment_url_preview_description', preview.description || '');
     }
 
+    function replaceContent(element, content) {
+        while (element.firstChild) {
+            element.removeChild(element.firstChild);
+        }
+
+        if (content) {
+            element.appendChild(content);
+        }
+    }
+
     function renderInlineEditor(panel, segmentId) {
         var template = document.getElementById('segment-edit-template');
         var tripData = getTripData();
@@ -380,7 +402,7 @@
             return null;
         }
 
-        panel.replaceChildren(template.content.cloneNode(true));
+        replaceContent(panel, template.content.cloneNode(true));
         var form = panel.querySelector('form[data-offline-sync]');
         if (!form) {
             return null;
@@ -435,7 +457,7 @@
 
             var wrap = panel.closest('.timeline-item-wrap') || panel.parentElement;
             var view = wrap ? wrap.querySelector('[data-inline-edit-view]') : null;
-            panel.replaceChildren();
+            replaceContent(panel);
             panel.hidden = true;
             if (view) {
                 view.hidden = false;
@@ -445,9 +467,10 @@
     }
 
     updateOfflinePanel();
-    registerServiceWorker();
+    bindOfflineSubmitHandler();
     bindOfflineForms();
     bindInlineEditors();
+    registerServiceWorker();
     refreshQueueStatus();
     window.addEventListener('online', function() {
         setOfflineState('connection', 'Online');
@@ -455,6 +478,14 @@
     });
     window.addEventListener('offline', function() {
         setOfflineState('connection', 'Offline');
+    });
+    window.addEventListener('error', function(event) {
+        reportError(event.message ? 'JavaScript error: ' + event.message : 'JavaScript error.');
+    });
+    window.addEventListener('unhandledrejection', function(event) {
+        var reason = event.reason;
+        var message = reason && reason.message ? reason.message : 'Unhandled JavaScript promise rejection.';
+        reportError('JavaScript error: ' + message);
     });
     flushQueue();
 })();

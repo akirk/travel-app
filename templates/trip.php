@@ -1178,6 +1178,10 @@ if ( count( $route_locations ) >= 2 ) {
                             }
 
                             $step_timeline_kind = (string) ( $step['_timeline_kind'] ?? 'start' );
+                            if ( $is_readonly_timeline && 'checkout' === $step_timeline_kind ) {
+                                continue;
+                            }
+
                             $step_anchor_suffix = in_array( $step_timeline_kind, [ 'checkout', 'return' ], true ) ? '-' . $step_timeline_kind : '';
                             $step_anchor = 'segment-' . (int) ( $step['_index'] ?? 0 ) . $step_anchor_suffix;
                             $step_date = (string) ( $step['date'] ?? '' );
@@ -1825,7 +1829,7 @@ if ( count( $route_locations ) >= 2 ) {
                 </section>
             <?php endif; ?>
 
-            <?php if ( ! $is_static_download ) : ?>
+            <?php if ( ! $is_readonly_timeline ) : ?>
                 <details class="offline-panel" data-offline-panel>
                     <summary><h2 id="offline-heading"><?php esc_html_e( 'Offline', 'travel-app' ); ?></h2></summary>
                     <dl class="offline-grid">

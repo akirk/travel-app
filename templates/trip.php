@@ -1600,8 +1600,9 @@ if ( count( $route_locations ) >= 2 ) {
                                                                 continue;
                                                             }
                                                             $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'travel-app' ) ) );
+                                                            $attachment_download_filename = (string) ( ( $attachment['filename'] ?? '' ) ?: $attachment_label );
                                                             ?>
-                                                            <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>" data-offline-cache-url>
+                                                            <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>" data-offline-cache-url data-attachment-filename="<?php echo esc_attr( $attachment_download_filename ); ?>">
                                                                 <span aria-hidden="true">↓</span>
                                                                 <span><?php echo esc_html( $attachment_label ); ?></span>
                                                             </a>
@@ -1690,8 +1691,9 @@ if ( count( $route_locations ) >= 2 ) {
                                                             continue;
                                                         }
                                                         $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'travel-app' ) ) );
+                                                        $attachment_download_filename = (string) ( ( $attachment['filename'] ?? '' ) ?: $attachment_label );
                                                         ?>
-                                                        <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>" data-offline-cache-url>
+                                                        <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'travel-app' ), $attachment_label ) ); ?>" data-offline-cache-url data-attachment-filename="<?php echo esc_attr( $attachment_download_filename ); ?>">
                                                             <span aria-hidden="true">↓</span>
                                                             <span><?php echo esc_html( $attachment_label ); ?></span>
                                                         </a>

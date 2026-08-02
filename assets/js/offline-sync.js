@@ -82,6 +82,59 @@
         });
     }
 
+    function attachmentFilename(link) {
+        return link.getAttribute('data-attachment-filename') || link.getAttribute('download') || 'attachment';
+    }
+
+    function triggerAttachmentDownload(link, blob) {
+        var binaryBlob = new Blob([blob], { type: 'application/x-binary' });
+        var url = window.URL.createObjectURL(binaryBlob);
+        var download = document.createElement('a');
+        download.href = url;
+        download.download = attachmentFilename(link);
+        download.style.display = 'none';
+        document.body.appendChild(download);
+        download.click();
+        window.setTimeout(function() {
+            window.URL.revokeObjectURL(url);
+            download.remove();
+        }, 1000);
+    }
+
+    function downloadAttachment(link) {
+        return fetch(link.href, {
+            credentials: 'same-origin'
+        }).then(function(response) {
+            if (!response.ok) {
+                throw new Error('Download failed with HTTP ' + response.status + '.');
+            }
+
+            return response.blob();
+        }).then(function(blob) {
+            triggerAttachmentDownload(link, blob);
+        });
+    }
+
+    function bindAttachmentDownloadHandler() {
+        if (!window.URL || !window.URL.createObjectURL || !window.fetch || !window.Blob) {
+            return;
+        }
+
+        document.addEventListener('click', function(event) {
+            var link = event.target.closest('a.attachment-download[data-offline-cache-url]');
+
+            if (!link || event.defaultPrevented) {
+                return;
+            }
+
+            event.preventDefault();
+            downloadAttachment(link).catch(function(error) {
+                var message = error && error.message ? error.message : 'The attachment could not be downloaded.';
+                reportError(message);
+            });
+        });
+    }
+
     function openDb() {
         return new Promise(function(resolve, reject) {
             if (!window.indexedDB) {
@@ -556,6 +609,7 @@
     }
 
     updateOfflinePanel();
+    bindAttachmentDownloadHandler();
     bindOfflineSubmitHandler();
     bindOfflineForms();
     bindInlineEditors();

@@ -1,5 +1,6 @@
 <?php
 use TravelApp\App;
+use TravelApp\LodgingCoverage;
 use TravelApp\Trip;
 
 $travel_app = App::get_instance();
@@ -422,6 +423,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                             <h2 id="current-trip-heading"><?php echo esc_html( ! empty( $current_trips ) ? __( 'Current Trip', 'travel-app' ) : __( 'Trip Preview', 'travel-app' ) ); ?></h2>
                         </div>
                         <?php $current_trip = $featured_trip; ?>
+                        <?php $current_trip_timeline_segments = LodgingCoverage::timeline_segments( $current_trip['segments'] ?? [] ); ?>
                         <article class="current-card">
                             <h3><a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><?php echo esc_html( $current_trip['title'] ); ?></a></h3>
                             <div class="trip-meta">
@@ -430,18 +432,35 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                 <?php endforeach; ?>
                             </div>
                             <div class="mini-timeline" data-demo-target="<?php echo esc_attr( $front_demo_control_id ); ?>" data-demo-preview>
-                                <?php foreach ( $current_trip['segments'] as $step ) : ?>
+                                <?php foreach ( $current_trip_timeline_segments as $step ) : ?>
                                     <?php
+                                    $step_timeline_kind = (string) ( $step['_timeline_kind'] ?? 'start' );
+                                    $step_anchor_suffix = in_array( $step_timeline_kind, [ 'checkout', 'return' ], true ) ? '-' . $step_timeline_kind : '';
+                                    $step_anchor = 'segment-' . (int) ( $step['_index'] ?? ( $step['id'] ?? 0 ) ) . $step_anchor_suffix;
+                                    $step_date = (string) ( $step['date'] ?? '' );
+                                    $step_end_time = (string) ( $step['end_time'] ?? '' );
+                                    $step_end_date = (string) ( $step['end_date'] ?? '' );
+                                    $step_effective_end_date = '' !== $step_end_date ? $step_end_date : ( '' !== $step_end_time ? $step_date : '' );
                                     $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['time'] ?? '' ) ?: '00:00' ) );
-                                    $step_time_label = ( ! empty( $step['end_date'] ) && $step['end_date'] === ( $step['date'] ?? '' ) && ! empty( $step['end_time'] ) )
-                                        ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), (string) $step['end_time'] )
+                                    $step_time_label = ( '' !== $step_effective_end_date && $step_effective_end_date === $step_date && '' !== $step_end_time )
+                                        ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
                                         : (string) ( $step['time'] ?? '' );
-                                    $step_start_label = trim( $travel_app->format_date_label( (string) ( $step['date'] ?? '' ) ) . ' ' . (string) ( $step['time'] ?? '' ) );
-                                    $step_end_label = ! empty( $step['end_date'] ) && $step['end_date'] !== ( $step['date'] ?? '' )
-                                        ? trim( $travel_app->format_date_label( (string) $step['end_date'] ) . ' ' . (string) ( $step['end_time'] ?? '' ) )
+                                    $step_start_label = trim( $travel_app->format_date_label( $step_date ) . ' ' . (string) ( $step['time'] ?? '' ) );
+                                    $step_end_label = '' !== $step_effective_end_date && $step_effective_end_date !== $step_date
+                                        ? trim( $travel_app->format_date_label( $step_effective_end_date ) . ' ' . $step_end_time )
                                         : '';
+                                    $step_title = (string) ( $step['title'] ?? '' );
+                                    if ( 'checkout' === $step_timeline_kind ) {
+                                        $step_title = '' !== $step_title
+                                            ? sprintf( __( 'Check out: %s', 'travel-app' ), $step_title )
+                                            : __( 'Check out', 'travel-app' );
+                                    } elseif ( 'return' === $step_timeline_kind ) {
+                                        $step_title = '' !== $step_title
+                                            ? sprintf( __( 'Return car: %s', 'travel-app' ), $step_title )
+                                            : __( 'Return car', 'travel-app' );
+                                    }
                                     ?>
-                                    <span hidden data-preview-item data-url="<?php echo esc_url( home_url( '/travel-app/trip/' . $current_trip['id'] . '/#segment-' . absint( $step['id'] ?? 0 ) ) ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( (string) ( $step['date'] ?? '' ) ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( (string) ( $step['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $step['end_time'] ?? '' ) ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( (string) ( $step['location'] ?? '' ) ); ?>" data-end-location="<?php echo esc_attr( (string) ( $step['end_location'] ?? '' ) ); ?>" data-title="<?php echo esc_attr( (string) ( $step['title'] ?? '' ) ); ?>"></span>
+                                    <span hidden data-preview-item data-url="<?php echo esc_url( home_url( '/travel-app/trip/' . $current_trip['id'] . '/#' . $step_anchor ) ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-timeline-kind="<?php echo esc_attr( $step_timeline_kind ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( $step_date ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( $step_effective_end_date ); ?>" data-end-time="<?php echo esc_attr( $step_end_time ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( (string) ( $step['location'] ?? '' ) ); ?>" data-end-location="<?php echo esc_attr( (string) ( $step['end_location'] ?? '' ) ); ?>" data-title="<?php echo esc_attr( $step_title ); ?>"></span>
                                 <?php endforeach; ?>
                                 <?php foreach ( [ 'current' => __( 'Current', 'travel-app' ), 'next' => __( 'Next', 'travel-app' ) ] as $key => $label ) : ?>
                                     <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">

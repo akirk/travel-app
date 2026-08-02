@@ -45,10 +45,11 @@
     }
 
     function getSourceEndTime(source) {
-        var endDate = source.getAttribute('data-end-date') || '';
+        var date = source.getAttribute('data-date') || '';
+        var endDate = source.getAttribute('data-end-date') || date;
         var endTime = source.getAttribute('data-end-time') || '';
 
-        return endDate && endTime ? parseDateTime(endDate + 'T' + endTime) : 0;
+        return date && endDate && endTime ? parseDateTime(endDate + 'T' + endTime) : 0;
     }
 
     function formatDuration(milliseconds) {

@@ -64,6 +64,16 @@ $segment_type_labels = [
 ];
 $lodging_coverage = LodgingCoverage::analyze( $trip_data, $segments );
 $timeline_segments = LodgingCoverage::timeline_segments( $segments );
+if ( $is_readonly_timeline ) {
+    $timeline_segments = array_values(
+        array_filter(
+            $timeline_segments,
+            static function( array $timeline_segment ): bool {
+                return 'checkout' !== ( $timeline_segment['_timeline_kind'] ?? '' );
+            }
+        )
+    );
+}
 $lodging_required_nights = $lodging_coverage['required_nights'];
 $covered_lodging_night_details = $lodging_coverage['covered_details'];
 $missing_lodging_nights = $lodging_coverage['missing_nights'];
@@ -1178,10 +1188,6 @@ if ( count( $route_locations ) >= 2 ) {
                             }
 
                             $step_timeline_kind = (string) ( $step['_timeline_kind'] ?? 'start' );
-                            if ( $is_readonly_timeline && 'checkout' === $step_timeline_kind ) {
-                                continue;
-                            }
-
                             $step_anchor_suffix = in_array( $step_timeline_kind, [ 'checkout', 'return' ], true ) ? '-' . $step_timeline_kind : '';
                             $step_anchor = 'segment-' . (int) ( $step['_index'] ?? 0 ) . $step_anchor_suffix;
                             $step_date = (string) ( $step['date'] ?? '' );

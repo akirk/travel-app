@@ -22,7 +22,6 @@ if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
 }
 $share_mode = $is_static_download ? ( isset( $travel_app_static_share_mode ) ? (string) $travel_app_static_share_mode : 'fellow' ) : ( $is_shared_timeline ? $travel_app->get_trip_share_mode_by_token( $trip_id, $share_token ) : '' );
 $show_private_share_details = ( ! $is_shared_timeline && ! $is_static_download ) || 'fellow' === $share_mode;
-$updated    = isset( $_GET['updated'] ) ? absint( $_GET['updated'] ) : null;
 $error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
 $quick_plan_draft_key = isset( $_GET['quick_plan_draft'] ) ? sanitize_key( wp_unslash( $_GET['quick_plan_draft'] ) ) : '';
 $quick_plan_draft = '' !== $quick_plan_draft_key ? $travel_app->get_quick_plan_draft( $quick_plan_draft_key ) : [];
@@ -267,7 +266,7 @@ if ( count( $route_locations ) >= 2 ) {
             font-weight: 700;
             cursor: pointer;
         }
-        .topbar { margin-bottom: 24px; }
+        .bottom-nav { margin-top: 24px; }
         .trip-title-header {
             display: flex;
             gap: 10px;
@@ -1100,15 +1099,7 @@ if ( count( $route_locations ) >= 2 ) {
     <?php endif; ?>
 
     <main>
-        <?php if ( ! $is_readonly_timeline ) : ?>
-            <div class="topbar">
-                <a href="<?php echo esc_url( home_url( '/travel-app/' ) ); ?>"><?php esc_html_e( 'Back to Travel App', 'travel-app' ); ?></a>
-            </div>
-        <?php endif; ?>
-
-        <?php if ( ! $is_readonly_timeline && null !== $updated ) : ?>
-            <div class="notice" role="status"><?php esc_html_e( 'Itinerary item updated.', 'travel-app' ); ?></div>
-        <?php elseif ( ! $is_readonly_timeline && $error ) : ?>
+        <?php if ( ! $is_readonly_timeline && $error ) : ?>
             <div class="notice error" role="alert"><?php echo esc_html( $travel_app->get_error_notice_message( $error ) ); ?></div>
         <?php endif; ?>
 
@@ -1189,13 +1180,17 @@ if ( count( $route_locations ) >= 2 ) {
                             $step_timeline_kind = (string) ( $step['_timeline_kind'] ?? 'start' );
                             $step_anchor_suffix = in_array( $step_timeline_kind, [ 'checkout', 'return' ], true ) ? '-' . $step_timeline_kind : '';
                             $step_anchor = 'segment-' . (int) ( $step['_index'] ?? 0 ) . $step_anchor_suffix;
+                            $step_date = (string) ( $step['date'] ?? '' );
+                            $step_end_time = (string) ( $step['end_time'] ?? '' );
+                            $step_end_date = (string) ( $step['end_date'] ?? '' );
+                            $step_effective_end_date = '' !== $step_end_date ? $step_end_date : ( '' !== $step_end_time ? $step_date : '' );
                             $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['time'] ?? '' ) ?: '00:00' ) );
-                            $step_time_label = ( ! empty( $step['end_date'] ) && $step['end_date'] === ( $step['date'] ?? '' ) && ! empty( $step['end_time'] ) )
-                                ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), (string) $step['end_time'] )
+                            $step_time_label = ( '' !== $step_effective_end_date && $step_effective_end_date === $step_date && '' !== $step_end_time )
+                                ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
                                 : (string) ( $step['time'] ?? '' );
-                            $step_start_label = trim( $travel_app->format_date_label( (string) ( $step['date'] ?? '' ) ) . ' ' . (string) ( $step['time'] ?? '' ) );
-                            $step_end_label = ! empty( $step['end_date'] ) && $step['end_date'] !== ( $step['date'] ?? '' )
-                                ? trim( $travel_app->format_date_label( (string) $step['end_date'] ) . ' ' . (string) ( $step['end_time'] ?? '' ) )
+                            $step_start_label = trim( $travel_app->format_date_label( $step_date ) . ' ' . (string) ( $step['time'] ?? '' ) );
+                            $step_end_label = '' !== $step_effective_end_date && $step_effective_end_date !== $step_date
+                                ? trim( $travel_app->format_date_label( $step_effective_end_date ) . ' ' . $step_end_time )
                                 : '';
                             $step_show_location = 'checkout' !== $step_timeline_kind && ( $show_private_share_details || $is_transport_segment( $step ) );
                             $step_location = $step_show_location ? (string) ( $step['location'] ?? '' ) : '';
@@ -1211,7 +1206,7 @@ if ( count( $route_locations ) >= 2 ) {
                                     : __( 'Return car', 'travel-app' );
                             }
                             ?>
-                            <span hidden data-preview-item data-url="<?php echo esc_url( '#' . $step_anchor ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-timeline-kind="<?php echo esc_attr( $step_timeline_kind ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( (string) ( $step['date'] ?? '' ) ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( (string) ( $step['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $step['end_time'] ?? '' ) ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( $step_location ); ?>" data-end-location="<?php echo esc_attr( $step_end_location ); ?>" data-title="<?php echo esc_attr( $step_title ); ?>"></span>
+                            <span hidden data-preview-item data-url="<?php echo esc_url( '#' . $step_anchor ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-timeline-kind="<?php echo esc_attr( $step_timeline_kind ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( $step_date ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( $step_effective_end_date ); ?>" data-end-time="<?php echo esc_attr( $step_end_time ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( $step_location ); ?>" data-end-location="<?php echo esc_attr( $step_end_location ); ?>" data-title="<?php echo esc_attr( $step_title ); ?>"></span>
                         <?php endforeach; ?>
                         <?php foreach ( [ 'current' => __( 'Now', 'travel-app' ), 'next' => __( 'Next', 'travel-app' ) ] as $key => $label ) : ?>
                             <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-slot-label="<?php echo esc_attr( $label ); ?>" data-ended-label="<?php esc_attr_e( 'Last', 'travel-app' ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">
@@ -1544,7 +1539,7 @@ if ( count( $route_locations ) >= 2 ) {
                                     <?php $attachments = $show_attachments && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
                                     <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
-                                        <div class="timeline-item" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
+                                        <div class="timeline-item" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-end-date="<?php echo esc_attr( (string) ( $segment['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $segment['end_time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
                                             <div class="timeline-meta">
                                                 <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
                                                 <div class="type"><?php echo esc_html( $type_label ); ?></div>
@@ -1856,6 +1851,12 @@ if ( count( $route_locations ) >= 2 ) {
                         </div>
                     </dl>
                 </details>
+            <?php endif; ?>
+
+            <?php if ( ! $is_readonly_timeline ) : ?>
+                <div class="bottom-nav">
+                    <a href="<?php echo esc_url( home_url( '/travel-app/' ) ); ?>"><?php esc_html_e( 'Back to Travel App', 'travel-app' ); ?></a>
+                </div>
             <?php endif; ?>
         <?php endif; ?>
     </main>

@@ -191,14 +191,20 @@ class ItineraryItem {
         if ( 'hotel' === $type ) {
             $type = 'lodging';
         }
+        $date = sanitize_text_field( (string) ( $segment['date'] ?? '' ) );
+        $end_date = sanitize_text_field( (string) ( $segment['end_date'] ?? '' ) );
+        $end_time = sanitize_text_field( (string) ( $segment['end_time'] ?? '' ) );
+        if ( '' === $end_date && '' !== $end_time ) {
+            $end_date = $date;
+        }
 
         return [
             'type'          => in_array( $type, self::TYPES, true ) ? $type : 'other',
             'title'         => sanitize_text_field( (string) ( $segment['title'] ?? '' ) ),
-            'date'          => sanitize_text_field( (string) ( $segment['date'] ?? '' ) ),
-            'end_date'      => sanitize_text_field( (string) ( $segment['end_date'] ?? '' ) ),
+            'date'          => $date,
+            'end_date'      => $end_date,
             'time'          => sanitize_text_field( (string) ( $segment['time'] ?? '' ) ),
-            'end_time'      => sanitize_text_field( (string) ( $segment['end_time'] ?? '' ) ),
+            'end_time'      => $end_time,
             'starts_at_utc' => sanitize_text_field( (string) ( $segment['starts_at_utc'] ?? '' ) ),
             'ends_at_utc'   => sanitize_text_field( (string) ( $segment['ends_at_utc'] ?? '' ) ),
             'timezone'      => sanitize_text_field( (string) ( $segment['timezone'] ?? '' ) ),

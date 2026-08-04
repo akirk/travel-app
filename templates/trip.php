@@ -64,6 +64,16 @@ $segment_type_labels = [
 ];
 $lodging_coverage = LodgingCoverage::analyze( $trip_data, $segments );
 $timeline_segments = LodgingCoverage::timeline_segments( $segments );
+if ( $is_readonly_timeline ) {
+    $timeline_segments = array_values(
+        array_filter(
+            $timeline_segments,
+            static function( array $timeline_segment ): bool {
+                return 'checkout' !== ( $timeline_segment['_timeline_kind'] ?? '' );
+            }
+        )
+    );
+}
 $lodging_required_nights = $lodging_coverage['required_nights'];
 $covered_lodging_night_details = $lodging_coverage['covered_details'];
 $missing_lodging_nights = $lodging_coverage['missing_nights'];
@@ -431,6 +441,7 @@ if ( count( $route_locations ) >= 2 ) {
         .timeline-day.empty { min-height: 96px; }
         .timeline-day.current { border-left-color: var(--wp-app-color-link); }
         .timeline-day.past { opacity: 0.62; }
+        .timeline[data-readonly-timeline] .timeline-day.past { opacity: 1; }
         .time-marker {
             display: none;
             position: absolute;
@@ -1494,7 +1505,7 @@ if ( count( $route_locations ) >= 2 ) {
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'travel-app' ); ?></p>
                 <?php else : ?>
-                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_trip_active ? ' data-current-time="1" data-current-time-value="' . esc_attr( $timeline_current_time_value ) . '" data-current-time-captured="' . esc_attr( $timeline_current_time_captured ) . '"' : ''; ?>>
+                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_readonly_timeline ? ' data-readonly-timeline="1"' : ''; ?><?php echo $is_trip_active ? ' data-current-time="1" data-current-time-value="' . esc_attr( $timeline_current_time_value ) . '" data-current-time-captured="' . esc_attr( $timeline_current_time_captured ) . '"' : ''; ?>>
                         <?php if ( $show_timeline_time_marker ) : ?>
                             <div class="time-marker"><span class="time-marker-label"></span></div>
                         <?php endif; ?>
@@ -1825,7 +1836,7 @@ if ( count( $route_locations ) >= 2 ) {
                 </section>
             <?php endif; ?>
 
-            <?php if ( ! $is_static_download ) : ?>
+            <?php if ( ! $is_readonly_timeline ) : ?>
                 <details class="offline-panel" data-offline-panel>
                     <summary><h2 id="offline-heading"><?php esc_html_e( 'Offline', 'travel-app' ); ?></h2></summary>
                     <dl class="offline-grid">

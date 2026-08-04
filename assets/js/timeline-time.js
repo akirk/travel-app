@@ -52,6 +52,14 @@
         return date && endDate && endTime ? parseDateTime(endDate + 'T' + endTime) : 0;
     }
 
+    function hasSameDayEndTimeInMeta(source, dateTimeLabel) {
+        var date = source.getAttribute('data-date') || '';
+        var endDate = source.getAttribute('data-end-date') || '';
+        var endTime = source.getAttribute('data-end-time') || '';
+
+        return !!(date && endDate === date && endTime && dateTimeLabel.indexOf(endTime) !== -1);
+    }
+
     function formatDuration(milliseconds) {
         var past = milliseconds < 0;
         var minutesTotal = Math.max(0, Math.round(Math.abs(milliseconds) / 60000));
@@ -282,6 +290,7 @@
                 ? (slot.getAttribute('data-ended-label') || slot.getAttribute('data-slot-label') || '')
                 : (slot.getAttribute('data-slot-label') || '');
         }
+        var dateTimeLabel = '';
         if (meta) {
             if (isTravelInProgress) {
                 meta.textContent = [
@@ -297,7 +306,7 @@
                     : (location || endLocation);
                 var date = source.getAttribute('data-date') || '';
                 var timeLabel = source.getAttribute('data-time-label') || '';
-                var dateTimeLabel = formatRelativeDateTime(
+                dateTimeLabel = formatRelativeDateTime(
                     date,
                     timeLabel,
                     source.getAttribute('data-date-time-label') || '',
@@ -320,7 +329,9 @@
                 source.getAttribute('data-end-label') || '',
                 currentDate
             );
-            end.textContent = endDate && !isTravelInProgress ? ['→', endLabel].filter(Boolean).join(' ') : '';
+            end.textContent = endDate && !isTravelInProgress && !hasSameDayEndTimeInMeta(source, dateTimeLabel)
+                ? ['→', endLabel].filter(Boolean).join(' ')
+                : '';
         }
         if (countdown) {
             var countdownTarget = isTravelInProgress || isLodgingInProgress ? endTimeValue : parseDateTime(source.getAttribute('data-datetime') || '');

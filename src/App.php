@@ -664,7 +664,12 @@ self.addEventListener('sync', function(event) {
             'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
-                'properties'           => [],
+                'properties'           => [
+                    'active' => [
+                        'type'        => 'boolean',
+                        'description' => 'When true, return only trips active today. When false, return only trips not active today.',
+                    ],
+                ],
                 'additionalProperties' => false,
             ],
             'output_schema'       => [
@@ -679,6 +684,7 @@ self.addEventListener('sync', function(event) {
                                 'title'        => [ 'type' => 'string' ],
                                 'starts_at'    => [ 'type' => 'string' ],
                                 'ends_at'      => [ 'type' => 'string' ],
+                                'is_active'    => [ 'type' => 'boolean' ],
                                 'segment_count'=> [ 'type' => 'integer' ],
                             ],
                         ],
@@ -1132,10 +1138,19 @@ self.addEventListener('sync', function(event) {
     }
 
     public function list_ability_items( $input ): array {
+        $active = is_array( $input ) && array_key_exists( 'active', $input ) ? (bool) $input['active'] : null;
+        $trips = array_map( static function( Trip $trip ): array {
+            return $trip->to_array();
+        }, Trip::for_current_user() );
+
+        if ( null !== $active ) {
+            $trips = array_values( array_filter( $trips, static function( array $trip ) use ( $active ): bool {
+                return (bool) ( $trip['is_active'] ?? false ) === $active;
+            } ) );
+        }
+
         return [
-            'trips' => array_map( static function( Trip $trip ): array {
-                return $trip->to_array();
-            }, Trip::for_current_user() ),
+            'trips' => $trips,
         ];
     }
 
@@ -2721,15 +2736,7 @@ self.addEventListener('sync', function(event) {
     }
 
     public function is_trip_active( array $trip_data, ?string $today = null ): bool {
-        $today = $today ?: current_time( 'Y-m-d' );
-        $starts = (string) ( $trip_data['starts_at'] ?? '' );
-        $ends = (string) ( $trip_data['ends_at'] ?? '' );
-
-        if ( '' === $starts ) {
-            return false;
-        }
-
-        return $starts <= $today && ( '' === $ends || $ends >= $today );
+        return Trip::is_active_data( $trip_data, $today );
     }
 
     public function get_trip_date_range_label( array $trip_data ): string {

@@ -25,6 +25,7 @@ class Trip {
 
     public static function schema(): array {
         $properties = self::schema_properties();
+        $properties['is_active'] = [ 'type' => 'boolean' ];
         $properties['segment_count'] = [ 'type' => 'integer' ];
         $properties['segments'] = ItineraryItem::array_schema();
         $properties['url'] = [ 'type' => 'string' ];
@@ -153,6 +154,25 @@ class Trip {
         return new self( $this->term, $user_id );
     }
 
+    public static function is_active_data( array $trip_data, ?string $today = null ): bool {
+        $today = $today ?: ( function_exists( 'current_time' ) ? current_time( 'Y-m-d' ) : date( 'Y-m-d' ) );
+        $starts = (string) ( $trip_data['starts_at'] ?? '' );
+        $ends = (string) ( $trip_data['ends_at'] ?? '' );
+
+        if ( '' === $starts ) {
+            return false;
+        }
+
+        return $starts <= $today && ( '' === $ends || $ends >= $today );
+    }
+
+    public function is_active( ?string $today = null ): bool {
+        return self::is_active_data( [
+            'starts_at' => $this->starts_at,
+            'ends_at'   => $this->ends_at,
+        ], $today );
+    }
+
     public function to_array(): array {
         $segments = array_map( static function( ItineraryItem $item ): array {
             return $item->to_array();
@@ -163,6 +183,7 @@ class Trip {
             $trip[ $field ] = $this->{$field};
         }
 
+        $trip['is_active'] = $this->is_active();
         $trip['segments'] = $segments;
         $trip['segment_count'] = count( $segments );
 

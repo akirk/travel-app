@@ -8,9 +8,31 @@ final class DomainSchemaTest extends TestCase {
     public function test_trip_schema_matches_public_properties(): void {
         $schema_fields = array_keys( Trip::schema()['properties'] );
         $property_fields = $this->public_property_names( Trip::class );
-        $computed_fields = [ 'segment_count', 'segments', 'url', 'share_urls', 'missing_fields' ];
+        $computed_fields = [ 'is_active', 'segment_count', 'segments', 'url', 'share_urls', 'missing_fields' ];
 
         $this->assert_same_fields( array_merge( $property_fields, $computed_fields ), $schema_fields );
+    }
+
+    public function test_trip_active_data_matches_date_range(): void {
+        self::assertTrue( Trip::is_active_data( [
+            'starts_at' => '2026-08-01',
+            'ends_at'   => '2026-08-05',
+        ], '2026-08-05' ) );
+
+        self::assertTrue( Trip::is_active_data( [
+            'starts_at' => '2026-08-01',
+            'ends_at'   => '',
+        ], '2026-08-05' ) );
+
+        self::assertFalse( Trip::is_active_data( [
+            'starts_at' => '2026-08-06',
+            'ends_at'   => '2026-08-10',
+        ], '2026-08-05' ) );
+
+        self::assertFalse( Trip::is_active_data( [
+            'starts_at' => '',
+            'ends_at'   => '2026-08-05',
+        ], '2026-08-05' ) );
     }
 
     public function test_itinerary_item_schema_matches_public_properties(): void {

@@ -42,6 +42,9 @@ class App extends BaseApp {
             'app_name'     => 'Travel App',
             // 'my_apps'      => true,
             // 'my_apps_icon' => null,
+
+            // Progressive Web App support
+            'pwa'          => $this->get_pwa_config(),
         ] );
 
         add_action( 'init', [ $this, 'register_post_types' ] );
@@ -66,8 +69,8 @@ class App extends BaseApp {
         add_filter( 'ai_assistant_ability_instructions', [ $this, 'get_ai_assistant_ability_instructions' ], 10, 4 );
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'register_ai_assistant_welcome_tips' ], 10, 2 );
         add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
+        add_filter( 'wp_app_pwa_manifest_travel-app', [ $this, 'filter_pwa_manifest' ], 10, 2 );
         add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
-        add_action( 'template_redirect', [ $this, 'maybe_render_pwa_asset' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_timeline' ], 0 );
     }
@@ -78,6 +81,56 @@ class App extends BaseApp {
 
     protected function get_template_dir(): string {
         return dirname( __DIR__ ) . '/templates';
+    }
+
+    private function get_pwa_config(): array {
+        $asset_base_url = plugins_url( 'assets/', dirname( __DIR__ ) . '/travel-app.php' );
+        $asset_path = (string) wp_parse_url( $asset_base_url, PHP_URL_PATH );
+        $upload_dir = wp_upload_dir();
+        $upload_path = ! empty( $upload_dir['baseurl'] ) ? (string) wp_parse_url( (string) $upload_dir['baseurl'], PHP_URL_PATH ) : '';
+
+        return [
+            'name'                             => __( 'Travel Timeline', 'travel-app' ),
+            'short_name'                       => __( 'Timeline', 'travel-app' ),
+            'manifest_path'                    => 'manifest.webmanifest',
+            'service_worker_path'              => 'service-worker.js',
+            'scope'                            => home_url( '/' ),
+            'service_worker_allowed'           => '/',
+            'background_color'                 => '#f8fafc',
+            'theme_color'                      => '#0b6bcb',
+            'icons'                            => [
+                [
+                    'src'   => plugins_url( 'assets/icon.svg', dirname( __DIR__ ) . '/travel-app.php' ),
+                    'sizes' => 'any',
+                    'type'  => 'image/svg+xml',
+                ],
+            ],
+            'precache'                         => [
+                plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/travel-app.php' ),
+                plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/travel-app.php' ),
+            ],
+            'cache_name'                       => 'travel-app-v8',
+            'cache_prefix'                     => 'travel-app-',
+            'cacheable_paths'                  => array_values( array_filter( [
+                $asset_path,
+                $upload_path,
+            ] ) ),
+            'cacheable_search_params'          => [
+                'travel_app_share=',
+            ],
+            'cache_message_type'               => 'travel-app-cache-url',
+            'cache_status_message_type'        => 'travel-app-cache-status',
+            'version_message_type'             => 'travel-app-version',
+            'sync_tag'                         => 'travel-app-sync',
+            'sync_message_type'                => 'travel-app-sync',
+            'client_cache_selector'            => '[data-offline-cache-url]',
+            'client_cache_url_attribute'       => 'data-offline-cache-url',
+            'client_cache_available_attribute' => 'data-offline-available',
+            'client_cache_status_event'        => 'travel-app-cache-status',
+            'client_version_event'             => 'travel-app-version',
+            'client_sync_event'                => 'travel-app-sync',
+            'head_tags'                        => false,
+        ];
     }
 
     public function enqueue_assets(): void {
@@ -102,14 +155,7 @@ class App extends BaseApp {
         wp_add_inline_script(
             'travel-app-offline-sync',
             'window.travelAppPwa=' . wp_json_encode( [
-                'serviceWorkerUrl' => (string) wp_parse_url( home_url( '/' . $this->get_url_path() . '/service-worker.js' ), PHP_URL_PATH ),
-                'scopeUrl'         => home_url( '/' ),
-                'scopePath'        => (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ),
-                'assetUrls'        => [
-                    plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/travel-app.php' ),
-                    plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/travel-app.php' ),
-                ],
-                'messages'         => [
+                'messages' => [
                     'offlineQueued' => __( 'Saved offline. Changes will sync when you are back online.', 'travel-app' ),
                     'syncing'       => __( 'Syncing offline changes...', 'travel-app' ),
                     'synced'        => __( 'Offline changes synced.', 'travel-app' ),
@@ -129,45 +175,25 @@ class App extends BaseApp {
             $args['token'] = $share_token;
         }
 
-        return add_query_arg( $args, home_url( '/' . $this->get_url_path() . '/manifest.webmanifest' ) );
+        return $this->app->get_pwa_manifest_url( $args );
     }
 
-    public function maybe_render_pwa_asset(): void {
-        $request_path = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH ) : '';
-        $base_path = (string) wp_parse_url( home_url( '/' . $this->get_url_path() . '/' ), PHP_URL_PATH );
-        $asset = trim( substr( $request_path, strlen( rtrim( $base_path, '/' ) ) ), '/' );
-
-        if ( 'manifest.webmanifest' === $asset ) {
-            $this->render_manifest();
-            exit;
-        }
-
-        if ( 'service-worker.js' === $asset ) {
-            $this->render_service_worker();
-            exit;
-        }
-
-        if ( 'icon.svg' === $asset ) {
-            $this->render_icon();
-            exit;
-        }
-    }
-
-    private function render_manifest(): void {
+    public function filter_pwa_manifest( array $manifest, array $config ): array {
         $trip_id = isset( $_GET['trip_id'] ) ? absint( $_GET['trip_id'] ) : 0;
         $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
-        $name = __( 'Travel Timeline', 'travel-app' );
-        $short_name = __( 'Timeline', 'travel-app' );
-        $start_url = home_url( '/' . $this->get_url_path() . '/' );
+        $manifest['name'] = __( 'Travel Timeline', 'travel-app' );
+        $manifest['short_name'] = __( 'Timeline', 'travel-app' );
+        $manifest['start_url'] = home_url( '/' . $this->get_url_path() . '/' );
+        $manifest['scope'] = home_url( '/' );
 
         if ( $trip_id > 0 ) {
             $trip = Trip::get( $trip_id );
             if ( $trip ) {
-                $name = $trip->title;
-                $short_name = $this->get_manifest_short_name( $trip->title );
-                $start_url = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
+                $manifest['name'] = $trip->title;
+                $manifest['short_name'] = $this->get_manifest_short_name( $trip->title );
+                $manifest['start_url'] = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
                 if ( '' !== $token ) {
-                    $start_url = add_query_arg(
+                    $manifest['start_url'] = add_query_arg(
                         [
                             'travel_app_share' => $trip_id,
                             'travel_app_token' => $token,
@@ -178,25 +204,7 @@ class App extends BaseApp {
             }
         }
 
-        nocache_headers();
-        status_header( 200 );
-        header( 'Content-Type: application/manifest+json; charset=utf-8' );
-        echo wp_json_encode( [
-            'name'             => $name,
-            'short_name'       => $short_name,
-            'start_url'        => $start_url,
-            'scope'            => home_url( '/' ),
-            'display'          => 'standalone',
-            'background_color' => '#f8fafc',
-            'theme_color'      => '#0b6bcb',
-            'icons'            => [
-                [
-                    'src'   => home_url( '/' . $this->get_url_path() . '/icon.svg' ),
-                    'sizes' => 'any',
-                    'type'  => 'image/svg+xml',
-                ],
-            ],
-        ] );
+        return $manifest;
     }
 
     private function get_manifest_short_name( string $name ): string {
@@ -210,224 +218,6 @@ class App extends BaseApp {
         }
 
         return strlen( $name ) > 12 ? rtrim( substr( $name, 0, 12 ) ) : $name;
-    }
-
-    private function render_service_worker(): void {
-        $scope_path = (string) wp_parse_url( home_url( '/' . $this->get_url_path() . '/' ), PHP_URL_PATH );
-        $asset_path = (string) wp_parse_url( plugins_url( 'assets/', dirname( __DIR__ ) . '/travel-app.php' ), PHP_URL_PATH );
-        $upload_dir = wp_upload_dir();
-        $upload_path = ! empty( $upload_dir['baseurl'] ) ? (string) wp_parse_url( (string) $upload_dir['baseurl'], PHP_URL_PATH ) : '';
-        $cache_name = 'travel-app-v7';
-
-        nocache_headers();
-        status_header( 200 );
-        header( 'Content-Type: application/javascript; charset=utf-8' );
-        header( 'Service-Worker-Allowed: /' );
-        echo "const CACHE_NAME = " . wp_json_encode( $cache_name ) . ";\n";
-        echo "const APP_SCOPE_PATH = " . wp_json_encode( $scope_path ) . ";\n";
-        echo "const ASSET_PATH = " . wp_json_encode( $asset_path ) . ";\n";
-        echo "const UPLOAD_PATH = " . wp_json_encode( $upload_path ) . ";\n";
-        ?>
-function isTravelAppRequest(url) {
-    return url.pathname.indexOf(APP_SCOPE_PATH) === 0
-        || url.pathname.indexOf(ASSET_PATH) === 0
-        || (UPLOAD_PATH && url.pathname.indexOf(UPLOAD_PATH) === 0)
-        || url.search.indexOf('travel_app_share=') !== -1;
-}
-
-self.addEventListener('install', function(event) {
-    self.skipWaiting();
-});
-
-self.addEventListener('activate', function(event) {
-    event.waitUntil(caches.keys().then(function(keys) {
-        return Promise.all(keys.filter(function(key) {
-            return key !== CACHE_NAME && key.indexOf('travel-app-') === 0;
-        }).map(function(key) {
-            return caches.delete(key);
-        }));
-    }).then(function() {
-        return self.clients.claim();
-    }));
-});
-
-self.addEventListener('fetch', function(event) {
-    var request = event.request;
-    var url = new URL(request.url);
-
-    if (request.method !== 'GET' || url.origin !== location.origin) {
-        return;
-    }
-
-    if (!isTravelAppRequest(url)) {
-        return;
-    }
-
-    event.respondWith(fetch(request).then(function(response) {
-        var copy = response.clone();
-        if (response.ok) {
-            caches.open(CACHE_NAME).then(function(cache) {
-                cache.put(request, copy);
-            });
-        }
-        return response;
-    }).catch(function() {
-        return caches.match(request).then(function(cached) {
-            if (cached) {
-                return cached;
-            }
-
-            if (request.mode === 'navigate') {
-                return caches.match(url.href).then(function(urlCached) {
-                    return urlCached || caches.match(APP_SCOPE_PATH);
-                });
-            }
-
-            return caches.match(APP_SCOPE_PATH);
-        });
-    }));
-});
-
-self.addEventListener('message', function(event) {
-    if (!event.data) {
-        return;
-    }
-
-    if (event.data.type === 'travel-app-version') {
-        if (event.source) {
-            event.source.postMessage({
-                type: 'travel-app-version',
-                version: CACHE_NAME
-            });
-        }
-        return;
-    }
-
-    if (event.data.type !== 'travel-app-cache-url') {
-        return;
-    }
-
-    var urls = Array.isArray(event.data.urls) ? event.data.urls : [event.data.url];
-    var requiredUrls = Array.isArray(event.data.requiredUrls) ? event.data.requiredUrls : urls;
-    urls = urls.filter(Boolean).map(function(url) {
-        return new URL(url, location.origin);
-    });
-    requiredUrls = requiredUrls.filter(Boolean).map(function(url) {
-        return new URL(url, location.origin);
-    });
-    function uniqueUrls(items) {
-        var seen = {};
-        return items.filter(function(url) {
-            if (seen[url.href]) {
-                return false;
-            }
-            seen[url.href] = true;
-            return true;
-        });
-    }
-    function sendCacheStatus(ok, cachedCount, totalCount, cachedUrls) {
-        if (event.source) {
-            event.source.postMessage({
-                type: 'travel-app-cache-status',
-                ok: !!ok,
-                cachedCount: cachedCount || 0,
-                totalCount: totalCount || 0,
-                cachedUrls: cachedUrls || []
-            });
-        }
-    }
-
-    urls = urls.filter(function(url) {
-        return url.origin === location.origin && isTravelAppRequest(url);
-    });
-    requiredUrls = requiredUrls.filter(function(url) {
-        return url.origin === location.origin && isTravelAppRequest(url);
-    });
-    urls = uniqueUrls(urls);
-    requiredUrls = uniqueUrls(requiredUrls);
-
-    if (!requiredUrls.length) {
-        sendCacheStatus(false);
-        return;
-    }
-
-    event.waitUntil(caches.open(CACHE_NAME).then(function(cache) {
-        return Promise.all(urls.map(function(url) {
-            return fetch(url.href, {
-                credentials: 'same-origin',
-                cache: 'reload'
-            }).then(function(response) {
-                if (response.ok) {
-                    return cache.put(url.href, response);
-                }
-            }).catch(function() {});
-        })).then(function() {
-            var cachedUrlResults = Promise.all(urls.map(function(url) {
-                return cache.match(url.href).then(function(cached) {
-                    return {
-                        href: url.href,
-                        cached: !!cached
-                    };
-                });
-            }));
-            var cachedUrlStatus = cachedUrlResults.then(function(results) {
-                var cachedUrls = [];
-                var cachedCount = results.reduce(function(total, result) {
-                    if (result.cached) {
-                        cachedUrls.push(result.href);
-                        return total + 1;
-                    }
-                    return total;
-                }, 0);
-                return {
-                    count: cachedCount,
-                    urls: cachedUrls
-                };
-            });
-            var requiredReady = Promise.all(requiredUrls.map(function(url) {
-                return cache.match(url.href).then(function(cached) {
-                    if (cached) {
-                        return;
-                    }
-                    return Promise.reject(new Error('Not cached'));
-                });
-            }));
-            return Promise.all([cachedUrlStatus, requiredReady]).then(function(results) {
-                sendCacheStatus(true, results[0].count, urls.length, results[0].urls);
-            }, function() {
-                return cachedUrlStatus.then(function(status) {
-                    sendCacheStatus(false, status.count, urls.length, status.urls);
-                }, function() {
-                    sendCacheStatus(false, 0, urls.length, []);
-                });
-            });
-        });
-    }).catch(function() {
-        sendCacheStatus(false, 0, urls.length, []);
-    }));
-});
-
-self.addEventListener('sync', function(event) {
-    if (event.tag === 'travel-app-sync' && self.clients) {
-        event.waitUntil(self.clients.matchAll().then(function(clients) {
-            clients.forEach(function(client) {
-                client.postMessage({ type: 'travel-app-sync' });
-            });
-        }));
-    }
-});
-        <?php
-    }
-
-    private function render_icon(): void {
-        status_header( 200 );
-        header( 'Content-Type: image/svg+xml; charset=utf-8' );
-        ?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0b6bcb"/>
-  <path fill="#fff" d="M136 152h240a32 32 0 0 1 32 32v184a32 32 0 0 1-32 32H136a32 32 0 0 1-32-32V184a32 32 0 0 1 32-32Zm0 80h240v-48H136v48Zm48-112h48v64h-48v-64Zm96 0h48v64h-48v-64ZM160 288h72v72h-72v-72Zm120 0h72v72h-72v-72Z"/>
-</svg>
-        <?php
     }
 
     public function get_error_notice_message( string $error_code, string $fallback = '' ): string {

@@ -90,8 +90,8 @@ class App extends BaseApp {
         $upload_path = ! empty( $upload_dir['baseurl'] ) ? (string) wp_parse_url( (string) $upload_dir['baseurl'], PHP_URL_PATH ) : '';
 
         return [
-            'name'                             => __( 'Travel Timeline', 'travel-app' ),
-            'short_name'                       => __( 'Timeline', 'travel-app' ),
+            'name'                             => 'Travel Timeline',
+            'short_name'                       => 'Timeline',
             'manifest_path'                    => 'manifest.webmanifest',
             'service_worker_path'              => 'service-worker.js',
             'scope'                            => home_url( '/' ),
@@ -337,10 +337,12 @@ class App extends BaseApp {
     }
 
     public function register_post_types(): void {
+        $translate_labels = did_action( 'init' );
+
         register_post_type( 'travel_app_item', [
             'labels'       => [
-                'name'          => __( 'Itinerary Items', 'travel-app' ),
-                'singular_name' => __( 'Itinerary Item', 'travel-app' ),
+                'name'          => $translate_labels ? __( 'Itinerary Items', 'travel-app' ) : 'Itinerary Items',
+                'singular_name' => $translate_labels ? __( 'Itinerary Item', 'travel-app' ) : 'Itinerary Item',
             ],
             'public'       => false,
             'show_ui'      => true,
@@ -351,8 +353,8 @@ class App extends BaseApp {
 
         register_post_type( 'travel_app_journal', [
             'labels'       => [
-                'name'          => __( 'Travel Journals', 'travel-app' ),
-                'singular_name' => __( 'Travel Journal', 'travel-app' ),
+                'name'          => $translate_labels ? __( 'Travel Journals', 'travel-app' ) : 'Travel Journals',
+                'singular_name' => $translate_labels ? __( 'Travel Journal', 'travel-app' ) : 'Travel Journal',
             ],
             'public'       => false,
             'show_ui'      => true,
@@ -363,10 +365,12 @@ class App extends BaseApp {
     }
 
     public function register_taxonomies(): void {
+        $translate_labels = did_action( 'init' );
+
         register_taxonomy( 'travel_app_trip', 'travel_app_item', [
             'labels'            => [
-                'name'          => __( 'Travel Plans', 'travel-app' ),
-                'singular_name' => __( 'Travel Plan', 'travel-app' ),
+                'name'          => $translate_labels ? __( 'Travel Plans', 'travel-app' ) : 'Travel Plans',
+                'singular_name' => $translate_labels ? __( 'Travel Plan', 'travel-app' ) : 'Travel Plan',
             ],
             'public'            => false,
             'hierarchical'      => false,

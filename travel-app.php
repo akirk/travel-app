@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Travel App
  * Description: A private travel organizer for WordPress.
- * Version: 1.0.0
+ * Version: 1.0.0+c9f86089c595
  * Author: Alex Kirk
  * Text Domain: travel-app
  * Requires PHP: 7.4

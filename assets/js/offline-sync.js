@@ -272,7 +272,7 @@
         });
     }
 
-    function registerServiceWorker() {
+    function bindPwaRuntime() {
         if (!window.isSecureContext) {
             setWorkerState('Needs HTTPS');
             setOfflineState('cache', 'Unavailable');
@@ -287,61 +287,44 @@
             return;
         }
 
-        if (!config.serviceWorkerUrl) {
-            setWorkerState('Missing URL');
-            setOfflineState('cache', 'Unavailable');
-            setOfflineState('files', 'Unavailable');
-            return;
-        }
+        setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Registering');
 
-        navigator.serviceWorker.addEventListener('message', function(event) {
-            if (event.data && event.data.type === 'travel-app-sync') {
-                flushQueue();
+        window.addEventListener('travel-app-sync', function() {
+            flushQueue();
+        });
+
+        window.addEventListener('travel-app-cache-status', function(event) {
+            var detail = event.detail || {};
+            setOfflineState('cache', detail.ok ? 'Ready offline' : 'Not cached');
+            if (typeof detail.cachedCount === 'number' && typeof detail.totalCount === 'number') {
+                setOfflineState('files', detail.cachedCount + ' of ' + detail.totalCount + ' files');
             }
-            if (event.data && event.data.type === 'travel-app-cache-status') {
-                setOfflineState('cache', event.data.ok ? 'Ready offline' : 'Not cached');
-                if (typeof event.data.cachedCount === 'number' && typeof event.data.totalCount === 'number') {
-                    setOfflineState('files', event.data.cachedCount + ' of ' + event.data.totalCount + ' files');
-                }
-                updateAttachmentAvailability(event.data.cachedUrls || []);
-            }
-            if (event.data && event.data.type === 'travel-app-version') {
-                setWorkerVersion(event.data.version || '');
-            }
+            updateAttachmentAvailability(detail.cachedUrls || []);
+        });
+
+        window.addEventListener('travel-app-version', function(event) {
+            var detail = event.detail || {};
+            setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Ready');
+            setWorkerVersion(detail.version || '');
         });
 
         navigator.serviceWorker.addEventListener('controllerchange', function() {
             setWorkerState('Active');
         });
 
-        navigator.serviceWorker.register(config.serviceWorkerUrl, {
-            scope: config.scopePath || '/'
-        }).then(function() {
-            return navigator.serviceWorker.ready;
-        }).then(function(registration) {
-            setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Ready');
-            if (registration.active) {
-                registration.active.postMessage({
-                    type: 'travel-app-version'
-                });
-                var requiredUrls = [window.location.href].concat(config.assetUrls || []);
-                var urls = requiredUrls.slice();
-                offlineCacheElements().forEach(function(element) {
-                    var url = offlineCacheUrl(element);
-                    if (url) {
-                        urls.push(url);
-                    }
-                });
-                registration.active.postMessage({
-                    type: 'travel-app-cache-url',
-                    urls: urls,
-                    requiredUrls: requiredUrls
-                });
-            }
-        }).catch(function(error) {
-            setWorkerState(error && error.message ? error.message : 'Registration failed');
-            setOfflineState('cache', 'Unavailable');
-            setOfflineState('files', 'Unavailable');
+        window.addEventListener('load', function() {
+            window.setTimeout(function() {
+                if (!window.wpAppPwa) {
+                    setWorkerState('Unavailable');
+                    setOfflineState('cache', 'Unavailable');
+                    setOfflineState('files', 'Unavailable');
+                    return;
+                }
+
+                if (navigator.serviceWorker.controller) {
+                    setWorkerState('Active');
+                }
+            }, 1000);
         });
     }
 
@@ -559,7 +542,7 @@
     bindOfflineSubmitHandler();
     bindOfflineForms();
     bindInlineEditors();
-    registerServiceWorker();
+    bindPwaRuntime();
     refreshQueueStatus();
     window.addEventListener('online', function() {
         setOfflineState('connection', 'Online');

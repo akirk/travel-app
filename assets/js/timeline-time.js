@@ -213,6 +213,24 @@
         });
     }
 
+    // Preview slots are marked for Mask Private Data without a key, so the mask identifies the value
+    // by data-private-value: the real value behind the text, which may be shortened or decorated.
+    // Pass an empty maskValue for generic labels that should never be masked.
+    function setMaskedText(node, text, maskValue) {
+        if (!node) {
+            return;
+        }
+
+        node.textContent = text || '';
+        node.setAttribute('data-private-value', (maskValue === undefined ? text : maskValue) || '');
+    }
+
+    function maskPrivateData(root) {
+        if (root && window.maskPrivateData && typeof window.maskPrivateData.process === 'function') {
+            window.maskPrivateData.process(root);
+        }
+    }
+
     function isTodayCheckout(item, currentDate) {
         return item
             && item.getAttribute('data-timeline-kind') === 'checkout'
@@ -244,14 +262,6 @@
         var label = slot.querySelector('[data-preview-label]');
         var isCurrentSlot = slot.getAttribute('data-preview-slot') === 'current';
 
-        function setPrivateText(node, value) {
-            if (!node) {
-                return;
-            }
-            node.textContent = value || '';
-            node.setAttribute('data-private-value', value || '');
-        }
-
         if (!source) {
             slot.hidden = true;
             slot.removeAttribute('href');
@@ -259,30 +269,28 @@
                 label.textContent = slot.getAttribute('data-slot-label') || '';
             }
             if (title) {
-                setPrivateText(title, slot.getAttribute('data-empty-title') || 'No item');
+                setMaskedText(title, slot.getAttribute('data-empty-title') || 'No item', '');
             }
             if (meta) {
-                setPrivateText(meta, '');
+                setMaskedText(meta, '');
             }
             if (previewLocation) {
-                setPrivateText(previewLocation, '');
+                setMaskedText(previewLocation, '');
             }
             if (end) {
-                setPrivateText(end, '');
+                setMaskedText(end, '');
             }
             if (countdown) {
                 countdown.textContent = '';
             }
-            if (window.maskPrivateData && typeof window.maskPrivateData.process === 'function') {
-                window.maskPrivateData.process(slot);
-            }
+            maskPrivateData(slot);
             return;
         }
 
         slot.hidden = false;
         slot.setAttribute('href', source.getAttribute('data-url') || '#');
         if (title) {
-            setPrivateText(title, source.getAttribute('data-title') || 'Untitled item');
+            setMaskedText(title, source.getAttribute('data-title') || 'Untitled item');
         }
         var location = source.getAttribute('data-location') || '';
         var endLocation = source.getAttribute('data-end-location') || '';
@@ -304,13 +312,13 @@
         var dateTimeLabel = '';
         if (meta) {
             if (isTravelInProgress) {
-                setPrivateText(meta, [
+                setMaskedText(meta, [
                     '→',
                     formatRelativeDateTime(endDate, endTime, source.getAttribute('data-end-label') || '', currentDate),
                     endLocation
                 ].filter(Boolean).join(' '));
             } else if (isLodgingInProgress) {
-                setPrivateText(meta, '');
+                setMaskedText(meta, '');
             } else {
                 var locationLabel = location && endLocation && location !== endLocation
                     ? location + ' → ' + endLocation
@@ -324,14 +332,14 @@
                     currentDate
                 );
 
-                setPrivateText(meta, [
+                setMaskedText(meta, [
                     dateTimeLabel,
                     isLodging ? '' : locationLabel
                 ].filter(Boolean).join(' '));
             }
         }
         if (previewLocation) {
-            setPrivateText(previewLocation, isLodging ? (location || endLocation) : '');
+            setMaskedText(previewLocation, isLodging ? (location || endLocation) : '');
         }
         if (end) {
             var endLabel = formatRelativeDateTime(
@@ -340,7 +348,7 @@
                 source.getAttribute('data-end-label') || '',
                 currentDate
             );
-            setPrivateText(end, endDate && !isTravelInProgress && !hasSameDayEndTimeInMeta(source, dateTimeLabel)
+            setMaskedText(end, endDate && !isTravelInProgress && !hasSameDayEndTimeInMeta(source, dateTimeLabel)
                 ? ['→', endLabel].filter(Boolean).join(' ')
                 : '');
         }
@@ -350,9 +358,7 @@
                 ? formatDuration(countdownTarget - currentTime)
                 : '';
         }
-        if (window.maskPrivateData && typeof window.maskPrivateData.process === 'function') {
-            window.maskPrivateData.process(slot);
-        }
+        maskPrivateData(slot);
     }
 
     function positionMarker(target, value, currentTime) {

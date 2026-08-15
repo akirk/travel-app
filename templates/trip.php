@@ -693,6 +693,9 @@ if ( count( $route_locations ) >= 2 ) {
             color: inherit;
             text-decoration: none;
         }
+        .url-preview.no-image {
+            grid-template-columns: minmax(0, 1fr);
+        }
         .url-preview:hover,
         .url-preview:focus,
         .url-preview:focus-visible,
@@ -711,6 +714,9 @@ if ( count( $route_locations ) >= 2 ) {
             object-fit: cover;
             border-radius: 6px;
             background: var(--wp-app-color-surface);
+        }
+        .url-preview-text {
+            min-width: 0;
         }
         .url-preview-title {
             font-size: 0.92rem;
@@ -1615,11 +1621,12 @@ if ( count( $route_locations ) >= 2 ) {
                                                     </div>
                                                 <?php endif; ?>
                                                 <?php if ( $has_url_preview ) : ?>
-                                                    <a class="url-preview" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer">
-                                                        <?php if ( ! empty( $url_preview['image'] ) ) : ?>
+                                                    <?php $has_url_preview_image = ! empty( $url_preview['image'] ); ?>
+                                                    <a class="url-preview<?php echo $has_url_preview_image ? '' : ' no-image'; ?>" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer">
+                                                        <?php if ( $has_url_preview_image ) : ?>
                                                             <img class="url-preview-image" src="<?php echo esc_url( (string) $url_preview['image'] ); ?>" alt="" loading="lazy">
                                                         <?php endif; ?>
-                                                        <div>
+                                                        <div class="url-preview-text">
                                                             <?php if ( ! empty( $url_preview['site_name'] ) ) : ?>
                                                                 <div class="url-preview-meta"><?php echo esc_html( (string) $url_preview['site_name'] ); ?></div>
                                                             <?php endif; ?>

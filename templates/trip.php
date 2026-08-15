@@ -827,10 +827,28 @@ if ( count( $route_locations ) >= 2 ) {
             padding: 14px 12px 12px;
         }
         .timeline-edit-panel .delete-segment-form {
-            border-top: 1px solid var(--wp-app-color-border);
+            display: none;
+        }
+        .form-secondary-actions {
             display: flex;
-            justify-content: flex-end;
-            padding: 12px;
+            align-items: center;
+            gap: 10px;
+        }
+        .delete-item-link {
+            appearance: none;
+            background: transparent;
+            border: 0;
+            color: #9f1f1f;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 650;
+            padding: 0;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .delete-item-link:hover,
+        .delete-item-link:focus-visible {
+            color: #7f1717;
         }
         .timeline-edit-panel .form-actions {
             justify-content: space-between;

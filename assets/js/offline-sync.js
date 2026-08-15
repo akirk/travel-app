@@ -492,6 +492,12 @@
         var deleteForm = panel.querySelector('.delete-segment-form');
         if (deleteForm) {
             populateDeleteSegmentForm(deleteForm, tripData, segment);
+            deleteForm.id = 'delete-segment-form-' + String(segment.id || '');
+
+            var deleteButton = panel.querySelector('.delete-item-link');
+            if (deleteButton) {
+                deleteButton.setAttribute('form', deleteForm.id);
+            }
         }
 
         return form;

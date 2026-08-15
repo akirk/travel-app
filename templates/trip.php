@@ -53,6 +53,9 @@ $journal_enabled = '1' === (string) get_term_meta( $trip_id, '_travel_app_journa
 $journal_entries_by_day = ( ! $is_readonly_timeline && $journal_enabled ) ? $travel_app->get_journal_entries_for_trip( $trip_id ) : [];
 $journal_category_id = absint( get_term_meta( $trip_id, '_travel_app_journal_category_id', true ) );
 $journal_tags = (string) get_term_meta( $trip_id, '_travel_app_journal_tags', true );
+$can_manage_trip_editors = ! $is_readonly_timeline && $travel_app->current_user_can_manage_trip_editors( $trip_id );
+$trip_editor_ids = $can_manage_trip_editors ? $travel_app->get_trip_editor_ids( $trip_id ) : [];
+$trip_editor_candidates = $can_manage_trip_editors ? $travel_app->get_trip_editor_candidates( $trip_id ) : [];
 $journal_categories = ! $is_readonly_timeline ? get_categories( [
     'hide_empty' => false,
 ] ) : [];
@@ -1850,6 +1853,32 @@ if ( count( $route_locations ) >= 2 ) {
                                 <button type="submit"><?php esc_html_e( 'Save Settings', 'travel-app' ); ?></button>
                             </div>
                         </form>
+                        <?php if ( $can_manage_trip_editors ) : ?>
+                            <form class="settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                                <input type="hidden" name="action" value="travel_app_update_trip">
+                                <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                                <input type="hidden" name="trip_title" value="<?php echo esc_attr( $trip_data['title'] ); ?>">
+                                <input type="hidden" name="trip_editors_present" value="1">
+                                <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
+                                <p class="settings-help"><?php esc_html_e( 'Choose WordPress users who can modify this travel plan.', 'travel-app' ); ?></p>
+                                <?php if ( empty( $trip_editor_candidates ) ) : ?>
+                                    <p class="settings-help"><?php esc_html_e( 'No other users are available.', 'travel-app' ); ?></p>
+                                <?php else : ?>
+                                    <?php foreach ( $trip_editor_candidates as $editor_candidate ) : ?>
+                                        <label class="setting-option">
+                                            <input type="checkbox" name="trip_editor_ids[]" value="<?php echo esc_attr( (string) $editor_candidate->ID ); ?>" <?php checked( in_array( (int) $editor_candidate->ID, $trip_editor_ids, true ) ); ?>>
+                                            <span>
+                                                <strong><?php echo esc_html( $editor_candidate->display_name ); ?></strong>
+                                                <span><?php echo esc_html( $editor_candidate->user_email ); ?></span>
+                                            </span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                                <div class="settings-form-actions">
+                                    <button type="submit"><?php esc_html_e( 'Save Editors', 'travel-app' ); ?></button>
+                                </div>
+                            </form>
+                        <?php endif; ?>
                     </details>
                 </section>
             <?php endif; ?>
@@ -1899,7 +1928,7 @@ if ( count( $route_locations ) >= 2 ) {
                 </section>
             <?php endif; ?>
 
-            <?php if ( ! $is_readonly_timeline ) : ?>
+            <?php if ( ! $is_readonly_timeline && current_user_can( 'delete_travel_app_trip', $trip_id ) ) : ?>
                 <section class="danger-zone" aria-labelledby="delete-heading">
                     <details>
                         <summary><h2 id="delete-heading"><?php esc_html_e( 'Delete Travel Plan', 'travel-app' ); ?></h2></summary>

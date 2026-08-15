@@ -246,7 +246,7 @@ class ItineraryItem {
         }
 
         $post = get_post( $item_id );
-        if ( ! $post || 'travel_app_item' !== $post->post_type || (int) $post->post_author !== get_current_user_id() ) {
+        if ( ! $post || 'travel_app_item' !== $post->post_type ) {
             return null;
         }
 
@@ -263,7 +263,6 @@ class ItineraryItem {
         $posts = get_posts( [
             'post_type'      => 'travel_app_item',
             'post_status'    => [ 'private', 'publish', 'draft' ],
-            'author'         => $user_id,
             'posts_per_page' => -1,
             'orderby'        => 'meta_value',
             'meta_key'       => '_travel_app_sort',
@@ -293,7 +292,7 @@ class ItineraryItem {
             return null;
         }
 
-        if ( (int) $attachment->post_parent !== $item->id || (int) $attachment->post_author !== get_current_user_id() ) {
+        if ( (int) $attachment->post_parent !== $item->id ) {
             return null;
         }
 

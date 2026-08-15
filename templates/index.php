@@ -704,7 +704,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         </select>
                     <?php endif; ?>
                     <p class="hint"><?php echo esc_html( $has_ai ? __( 'Enter only a trip name to create a new trip. AI extraction can also turn plain text into an entry for review; files and confirmations still work too.', 'travel-app' ) : __( 'Enter only a trip name to create a new trip, or use quick parsing, calendar parsing, or a basic parser for itinerary text.', 'travel-app' ) ); ?></p>
-                    <button type="submit"><?php esc_html_e( 'Import', 'travel-app' ); ?></button>
+                    <button type="submit"><?php esc_html_e( 'Create or Import', 'travel-app' ); ?></button>
                 </form>
                     <?php endif; ?>
             </aside>

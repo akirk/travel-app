@@ -20,6 +20,18 @@ $segments  = $trip_data['segments'] ?? [];
 $route_locations = [];
 $route_entries = [];
 
+$privacy_attr = static function( string $type, string $key = '' ): string {
+    $type = sanitize_key( $type );
+    $key = strtolower( preg_replace( '/[^a-zA-Z0-9_-]+/', '-', $key ) ?? '' );
+    $key = trim( $key, '-' );
+
+    if ( '' === $type ) {
+        return '';
+    }
+
+    return ' data-' . $type . ( '' !== $key ? '-' . $key : '' );
+};
+
 foreach ( $segments as $segment ) {
     foreach ( [ 'location', 'end_location' ] as $location_key ) {
         $location = trim( (string) ( $segment[ $location_key ] ?? '' ) );
@@ -31,6 +43,7 @@ foreach ( $segments as $segment ) {
         if ( empty( $route_locations ) || end( $route_locations ) !== $location ) {
             $route_locations[] = $location;
             $route_entries[] = [
+                'id'       => (int) ( $segment['id'] ?? count( $route_entries ) ),
                 'location' => $location,
                 'kind'     => 'end_location' === $location_key ? __( 'End location', 'travel-app' ) : __( 'Location', 'travel-app' ),
                 'title'    => (string) ( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ),
@@ -165,7 +178,7 @@ foreach ( $segments as $segment ) {
                 <h1><?php esc_html_e( 'Travel plan not found', 'travel-app' ); ?></h1>
                 <p class="meta"><?php esc_html_e( 'It may have been deleted, or it does not belong to your account.', 'travel-app' ); ?></p>
             <?php else : ?>
-                <h1><?php echo esc_html( sprintf( __( '%s Route Map', 'travel-app' ), $trip_data['title'] ) ); ?></h1>
+                <h1><span<?php echo $privacy_attr( 'title', (string) $trip_data['id'] ); ?>><?php echo esc_html( sprintf( __( '%s Route Map', 'travel-app' ), $trip_data['title'] ) ); ?></span></h1>
                 <p class="meta">
                     <span><?php echo esc_html( sprintf( _n( '%d waypoint', '%d waypoints', count( $route_entries ), 'travel-app' ), count( $route_entries ) ) ); ?></span>
                     <span><?php esc_html_e( 'Straight lines between itinerary locations', 'travel-app' ); ?></span>
@@ -219,6 +232,11 @@ foreach ( $segments as $segment ) {
                         "'": '&#039;'
                     }[character];
                 });
+            }
+
+            function privateAttr(type, key) {
+                key = String(key || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+                return ' data-' + type + (key ? '-' + key : '');
             }
 
             function wait(milliseconds) {
@@ -298,21 +316,29 @@ foreach ( $segments as $segment ) {
                         iconAnchor: [13, 13]
                     });
                     var entry = point.entry || {};
+                    var entryKey = 'segment-' + (entry.id || index);
                     var dateTime = [entry.date, entry.time].filter(Boolean).join(' ');
                     var meta = [entry.type, entry.kind, dateTime].filter(Boolean).join(' · ');
                     var title = escapeHtml(entry.title || '<?php echo esc_js( __( 'Untitled item', 'travel-app' ) ); ?>');
+                    var privateTitle = '<span' + privateAttr('title', String(entry.id || index) + '-item') + '>' + title + '</span>';
                     var popupHtml = [
                         '<div class="route-popup">',
-                        '<div class="route-popup-title">' + (entry.url ? '<a href="' + encodeURI(entry.url) + '">' + title + '</a>' : title) + '</div>',
+                        '<div class="route-popup-title">' + (entry.url ? '<a href="' + encodeURI(entry.url) + '">' + privateTitle + '</a>' : privateTitle) + '</div>',
                         meta ? '<div class="route-popup-meta">' + escapeHtml(meta) + '</div>' : '',
-                        '<div class="route-popup-location">' + escapeHtml(entry.location || '') + '</div>',
-                        entry.details ? '<div class="route-popup-details">' + escapeHtml(entry.details) + '</div>' : '',
+                        '<div class="route-popup-location"' + privateAttr('place', entryKey + '-location') + '>' + escapeHtml(entry.location || '') + '</div>',
+                        entry.details ? '<div class="route-popup-details"' + privateAttr('text', entryKey + '-details') + '>' + escapeHtml(entry.details) + '</div>' : '',
                         '</div>'
                     ].join('');
 
                     L.marker([point.lat, point.lon], { icon: marker })
                         .bindPopup(popupHtml)
                         .addTo(map);
+                });
+
+                map.on('popupopen', function(event) {
+                    if (window.privacyDemoOverlay && typeof window.privacyDemoOverlay.process === 'function' && event.popup) {
+                        window.privacyDemoOverlay.process(event.popup.getElement());
+                    }
                 });
 
                 var coordinates = routePoints.map(function(point) {

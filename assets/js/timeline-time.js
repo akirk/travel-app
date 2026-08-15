@@ -244,6 +244,14 @@
         var label = slot.querySelector('[data-preview-label]');
         var isCurrentSlot = slot.getAttribute('data-preview-slot') === 'current';
 
+        function setPrivateText(node, value) {
+            if (!node) {
+                return;
+            }
+            node.textContent = value || '';
+            node.setAttribute('data-private-value', value || '');
+        }
+
         if (!source) {
             slot.hidden = true;
             slot.removeAttribute('href');
@@ -251,19 +259,22 @@
                 label.textContent = slot.getAttribute('data-slot-label') || '';
             }
             if (title) {
-                title.textContent = slot.getAttribute('data-empty-title') || 'No item';
+                setPrivateText(title, slot.getAttribute('data-empty-title') || 'No item');
             }
             if (meta) {
-                meta.textContent = '';
+                setPrivateText(meta, '');
             }
             if (previewLocation) {
-                previewLocation.textContent = '';
+                setPrivateText(previewLocation, '');
             }
             if (end) {
-                end.textContent = '';
+                setPrivateText(end, '');
             }
             if (countdown) {
                 countdown.textContent = '';
+            }
+            if (window.maskPrivateData && typeof window.maskPrivateData.process === 'function') {
+                window.maskPrivateData.process(slot);
             }
             return;
         }
@@ -271,7 +282,7 @@
         slot.hidden = false;
         slot.setAttribute('href', source.getAttribute('data-url') || '#');
         if (title) {
-            title.textContent = source.getAttribute('data-title') || 'Untitled item';
+            setPrivateText(title, source.getAttribute('data-title') || 'Untitled item');
         }
         var location = source.getAttribute('data-location') || '';
         var endLocation = source.getAttribute('data-end-location') || '';
@@ -293,13 +304,13 @@
         var dateTimeLabel = '';
         if (meta) {
             if (isTravelInProgress) {
-                meta.textContent = [
+                setPrivateText(meta, [
                     '→',
                     formatRelativeDateTime(endDate, endTime, source.getAttribute('data-end-label') || '', currentDate),
                     endLocation
-                ].filter(Boolean).join(' ');
+                ].filter(Boolean).join(' '));
             } else if (isLodgingInProgress) {
-                meta.textContent = '';
+                setPrivateText(meta, '');
             } else {
                 var locationLabel = location && endLocation && location !== endLocation
                     ? location + ' → ' + endLocation
@@ -313,14 +324,14 @@
                     currentDate
                 );
 
-                meta.textContent = [
+                setPrivateText(meta, [
                     dateTimeLabel,
                     isLodging ? '' : locationLabel
-                ].filter(Boolean).join(' ');
+                ].filter(Boolean).join(' '));
             }
         }
         if (previewLocation) {
-            previewLocation.textContent = isLodging ? (location || endLocation) : '';
+            setPrivateText(previewLocation, isLodging ? (location || endLocation) : '');
         }
         if (end) {
             var endLabel = formatRelativeDateTime(
@@ -329,15 +340,18 @@
                 source.getAttribute('data-end-label') || '',
                 currentDate
             );
-            end.textContent = endDate && !isTravelInProgress && !hasSameDayEndTimeInMeta(source, dateTimeLabel)
+            setPrivateText(end, endDate && !isTravelInProgress && !hasSameDayEndTimeInMeta(source, dateTimeLabel)
                 ? ['→', endLabel].filter(Boolean).join(' ')
-                : '';
+                : '');
         }
         if (countdown) {
             var countdownTarget = isTravelInProgress || isLodgingInProgress ? endTimeValue : parseDateTime(source.getAttribute('data-datetime') || '');
             countdown.textContent = currentTime && countdownTarget
                 ? formatDuration(countdownTarget - currentTime)
                 : '';
+        }
+        if (window.maskPrivateData && typeof window.maskPrivateData.process === 'function') {
+            window.maskPrivateData.process(slot);
         }
     }
 

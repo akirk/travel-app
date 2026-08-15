@@ -1,28 +1,28 @@
 {
-	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
-	"meta": {
-		"title": "Travel App",
-		"description": "A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.",
-		"author": "Alex Kirk",
-		"categories": [
-			"Apps",
-			"Travel"
-		]
-	},
-	"landingPage": "/travel-app/",
-	"steps": [
-		{
-			"step": "installPlugin",
-			"pluginData": {
-				"resource": "git:directory",
-				"url": "https://github.com/akirk/travel-app",
-				"ref": "dist/main",
-				"refType": "branch"
-			},
-			"options": {
-				"activate": true,
-				"targetFolderName": "travel-app"
-			}
-		}
-	]
+    "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+    "meta": {
+        "title": "Travel App",
+        "description": "A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.",
+        "author": "Alex Kirk",
+        "categories": [
+            "Apps",
+            "Travel"
+        ]
+    },
+    "landingPage": "/travel-app/",
+    "steps": [
+        {
+            "step": "installPlugin",
+            "pluginData": {
+                "resource": "git:directory",
+                "url": "https://github.com/akirk/travel-app",
+                "ref": "dist/privacy-mask-attributes",
+                "refType": "branch"
+            },
+            "options": {
+                "activate": true,
+                "targetFolderName": "travel-app"
+            }
+        }
+    ]
 }

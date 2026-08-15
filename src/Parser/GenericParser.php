@@ -23,9 +23,11 @@ class GenericParser {
         $lines = array_values( array_filter( array_map( 'trim', preg_split( '/\R/', $text ) ) ) );
         $title = $this->first_matching_line( $lines, '/\b(confirmation|reservation|booking|itinerary|flight|hotel|train)\b/i' );
         $dates = $this->extract_dates( $text );
+        $title_from_single_plain_line = false;
 
         if ( '' === $title && 1 === count( $lines ) ) {
             $title = $lines[0];
+            $title_from_single_plain_line = true;
         }
 
         if ( '' === $title ) {
@@ -46,7 +48,7 @@ class GenericParser {
             }
         }
 
-        if ( empty( $segments ) ) {
+        if ( empty( $segments ) && ! $title_from_single_plain_line ) {
             $segments[] = [
                 'type'     => 'other',
                 'title'    => $title,

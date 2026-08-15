@@ -82,7 +82,7 @@ final class GenericParserTest extends TestCase {
 
         self::assertSame( 'fallback', $parsed['parser'] );
         self::assertSame( 'Summer in Vienna', $parsed['title'] );
-        self::assertSame( 'Summer in Vienna', $parsed['segments'][0]['title'] );
+        self::assertSame( [], $parsed['segments'] );
     }
 
     public function test_ai_parse_uses_single_plain_line_as_trip_title_when_ai_leaves_title_empty(): void {

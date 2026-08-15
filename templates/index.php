@@ -18,6 +18,8 @@ $has_ai     = function_exists( 'wp_ai_client_prompt' );
 $has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\AI_Assistant' );
 $delegated_owner_options = $travel_app->get_delegated_trip_owner_options();
 $demo_mode_enabled = $travel_app->is_demo_mode_enabled();
+$is_playground = $travel_app->is_playground();
+$all_trips_calendar_url = $is_playground ? '' : $travel_app->get_user_calendar_url( get_current_user_id(), true );
 $today      = current_time( 'Y-m-d' );
 $segment_type_labels = [
     'flight'   => __( 'Flight', 'travel-app' ),
@@ -231,6 +233,31 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
         .quick-plan-choice strong { display: block; overflow-wrap: anywhere; }
         .quick-plan-confirm { color: var(--wp-app-color-muted); font-size: 0.9rem; }
         .quick-plan-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+        .calendar-subscription {
+            display: grid;
+            gap: 10px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--wp-app-color-border);
+        }
+        .calendar-subscription h3 { margin-bottom: 0; }
+        .calendar-button {
+            appearance: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 6px;
+            padding: 9px 12px;
+            background: transparent;
+            color: var(--wp-app-color-text);
+            font: inherit;
+            font-weight: 700;
+            line-height: 1.2;
+            text-decoration: none;
+            cursor: pointer;
+        }
         label { display: block; font-weight: 650; margin-bottom: 7px; }
         .drop-zone {
             display: grid;
@@ -706,6 +733,14 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                     <p class="hint"><?php echo esc_html( $has_ai ? __( 'Enter only a trip name to create a new trip. AI extraction can also turn plain text into an entry for review; files and confirmations still work too.', 'travel-app' ) : __( 'Enter only a trip name to create a new trip, or use quick parsing, calendar parsing, or a basic parser for itinerary text.', 'travel-app' ) ); ?></p>
                     <button type="submit"><?php esc_html_e( 'Create or Import', 'travel-app' ); ?></button>
                 </form>
+                <?php if ( '' !== $all_trips_calendar_url && ! $is_playground ) : ?>
+                    <div class="calendar-subscription" data-calendar-subscription>
+                        <h3><?php esc_html_e( 'Calendar Subscription', 'travel-app' ); ?></h3>
+                        <p class="hint"><?php esc_html_e( 'Add this URL to your calendar app to see all your trips there.', 'travel-app' ); ?></p>
+                        <button class="calendar-button" type="button" data-copy-url="<?php echo esc_attr( $all_trips_calendar_url ); ?>"><?php esc_html_e( 'Copy URL', 'travel-app' ); ?></button>
+                        <p class="hint" data-copy-status aria-live="polite"></p>
+                    </div>
+                <?php endif; ?>
                     <?php endif; ?>
             </aside>
         </div>
@@ -768,6 +803,47 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             });
 
             fileInput.addEventListener('change', showFileName);
+        }());
+
+        (function() {
+            var control = document.querySelector('[data-calendar-subscription]');
+            if (!control) {
+                return;
+            }
+
+            var button = control.querySelector('[data-copy-url]');
+            var status = control.querySelector('[data-copy-status]');
+            if (!button) {
+                return;
+            }
+
+            function confirmCopied() {
+                button.textContent = '<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>';
+                if (status) {
+                    status.textContent = '<?php echo esc_js( __( 'Calendar subscription link copied.', 'travel-app' ) ); ?>';
+                }
+                window.setTimeout(function() {
+                    button.textContent = '<?php echo esc_js( __( 'Copy URL', 'travel-app' ) ); ?>';
+                }, 1800);
+            }
+
+            button.addEventListener('click', function() {
+                var url = button.getAttribute('data-copy-url') || '';
+                if (!url) {
+                    return;
+                }
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(url).then(confirmCopied).catch(function() {
+                        window.prompt('<?php echo esc_js( __( 'Copy this link:', 'travel-app' ) ); ?>', url);
+                        confirmCopied();
+                    });
+                    return;
+                }
+
+                window.prompt('<?php echo esc_js( __( 'Copy this link:', 'travel-app' ) ); ?>', url);
+                confirmCopied();
+            });
         }());
     </script>
 </body>

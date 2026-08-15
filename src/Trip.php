@@ -97,8 +97,8 @@ class Trip {
         return new self( $term, $segments_user_id );
     }
 
-    public static function for_current_user(): array {
-        if ( ! is_user_logged_in() ) {
+    public static function for_user( int $user_id ): array {
+        if ( $user_id <= 0 ) {
             return [];
         }
 
@@ -106,27 +106,17 @@ class Trip {
             'relation' => 'OR',
             [
                 'key'   => '_travel_app_user_id',
-                'value' => (string) get_current_user_id(),
+                'value' => (string) $user_id,
             ],
             [
                 'key'   => '_travel_app_editor_user_ids',
-                'value' => (string) get_current_user_id(),
+                'value' => (string) $user_id,
             ],
         ];
-
-        $global_editor_owner_ids = App::get_instance()->get_global_editor_owner_ids_for_user();
-        if ( ! empty( $global_editor_owner_ids ) ) {
-            $meta_query[] = [
-                'key'     => '_travel_app_user_id',
-                'value'   => array_map( 'strval', $global_editor_owner_ids ),
-                'compare' => 'IN',
-            ];
-        }
 
         $terms = get_terms( [
             'taxonomy'   => 'travel_app_trip',
             'hide_empty' => false,
-            'number'     => 50,
             'meta_query' => $meta_query,
         ] );
 
@@ -143,6 +133,34 @@ class Trip {
         return array_values( array_map( static function( \WP_Term $term ): self {
             return new self( $term );
         }, $terms ) );
+    }
+
+    public static function for_current_user(): array {
+        if ( ! is_user_logged_in() ) {
+            return [];
+        }
+
+        $trips = [];
+        foreach ( self::for_user( get_current_user_id() ) as $trip ) {
+            $trips[ $trip->id ] = $trip;
+        }
+
+        $global_editor_owner_ids = App::get_instance()->get_global_editor_owner_ids_for_user();
+        if ( empty( $global_editor_owner_ids ) ) {
+            return array_values( $trips );
+        }
+
+        foreach ( $global_editor_owner_ids as $owner_id ) {
+            foreach ( self::for_user( (int) $owner_id ) as $trip ) {
+                $trips[ $trip->id ] = $trip;
+            }
+        }
+
+        usort( $trips, static function( self $a, self $b ): int {
+            return strcmp( $b->starts_at, $a->starts_at );
+        } );
+
+        return array_values( $trips );
     }
 
     public static function get( int $trip_id ): ?self {

@@ -17,11 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/vendor/autoload.php';
 
 function is_playground(): bool {
-    $is_wasm = isset( $_SERVER['SERVER_SOFTWARE'] ) && false !== strpos( (string) $_SERVER['SERVER_SOFTWARE'], 'PHP.wasm' );
-    $is_playground_path = false !== strpos( ABSPATH, '/wordpress' );
-    $has_playground_function = function_exists( 'post_message_to_js' );
-
-    return $is_wasm && $is_playground_path && $has_playground_function;
+    return defined( 'PLAYGROUND_AUTO_LOGIN_AS_USER' );
 }
 
 // Autoloader for plugin classes.

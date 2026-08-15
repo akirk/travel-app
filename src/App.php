@@ -73,6 +73,7 @@ class App extends BaseApp {
         add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
         add_filter( 'wp_app_pwa_manifest_travel-app', [ $this, 'filter_pwa_manifest' ], 10, 2 );
         add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
+        add_action( 'template_redirect', [ $this, 'maybe_render_user_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_timeline' ], 0 );
     }
@@ -1747,6 +1748,46 @@ class App extends BaseApp {
         exit;
     }
 
+    public function maybe_render_user_calendar(): void {
+        $user_id = isset( $_GET['travel_app_trips_calendar'] ) ? absint( $_GET['travel_app_trips_calendar'] ) : 0;
+        $token = isset( $_GET['travel_app_token'] ) ? sanitize_text_field( wp_unslash( $_GET['travel_app_token'] ) ) : '';
+
+        if ( $user_id <= 0 || '' === $token ) {
+            return;
+        }
+
+        if ( ! $this->user_calendar_token_matches( $user_id, $token ) ) {
+            wp_die(
+                esc_html__( 'This calendar could not be found.', 'travel-app' ),
+                esc_html__( 'Calendar not found', 'travel-app' ),
+                [ 'response' => 404 ]
+            );
+        }
+
+        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+            define( 'DONOTCACHEPAGE', true );
+        }
+
+        $user = get_user_by( 'id', $user_id );
+        $display_name = $user ? trim( (string) $user->display_name ) : '';
+        $calendar_name = '' !== $display_name
+            ? sprintf(
+                /* translators: %s: user display name. */
+                __( '%s Travel Plans', 'travel-app' ),
+                $display_name
+            )
+            : __( 'Travel Plans', 'travel-app' );
+        $ics = $this->render_user_trips_ics( $user_id, $calendar_name );
+
+        nocache_headers();
+        header( 'Content-Type: text/calendar; charset=utf-8' );
+        header( 'Content-Disposition: inline; filename="travel-plans.ics"' );
+        header( 'Content-Length: ' . strlen( $ics ) );
+
+        echo $ics;
+        exit;
+    }
+
     public function handle_update_trip(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
             wp_die( esc_html__( 'You must be logged in to edit travel plans.', 'travel-app' ), 403 );
@@ -2690,6 +2731,29 @@ class App extends BaseApp {
         );
     }
 
+    public function get_user_calendar_url( int $user_id = 0, bool $create = false ): string {
+        $user_id = $user_id > 0 ? $user_id : get_current_user_id();
+        if ( $user_id <= 0 || get_current_user_id() !== $user_id ) {
+            return '';
+        }
+
+        $token = $this->get_user_calendar_token( $user_id );
+        if ( '' === $token && $create ) {
+            $token = $this->create_user_calendar_token( $user_id );
+        }
+        if ( '' === $token ) {
+            return '';
+        }
+
+        return add_query_arg(
+            [
+                'travel_app_trips_calendar' => $user_id,
+                'travel_app_token'          => $token,
+            ],
+            home_url( '/' )
+        );
+    }
+
     public function get_trip_share_mode_by_token( int $trip_id, string $token ): string {
         if ( ! Trip::get( $trip_id ) || '' === $token ) {
             return '';
@@ -2761,57 +2825,85 @@ class App extends BaseApp {
         $mode = $this->normalize_share_mode( $mode );
         $segments_user_id = Trip::get_owner_id( $trip_id );
         $trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
+        $calendar_name = (string) ( $trip_data['title'] ?? __( 'Travel Plan', 'travel-app' ) );
+
+        return $this->render_trips_ics( [ $trip_data ], $calendar_name, $mode, false );
+    }
+
+    private function render_user_trips_ics( int $user_id, string $calendar_name ): string {
+        $trips = array_map( static function( Trip $trip ): array {
+            return $trip->with_segments_user_id( $trip->owner_id() )->to_array();
+        }, Trip::for_user( $user_id ) );
+
+        return $this->render_trips_ics( $trips, $calendar_name, 'fellow', true );
+    }
+
+    private function render_trips_ics( array $trips, string $calendar_name, string $mode = 'fellow', bool $include_trip_title = false ): string {
+        $mode = $this->normalize_share_mode( $mode );
         $lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
             'PRODID:-//Travel App//Travel App//EN',
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
-            'X-WR-CALNAME:' . $this->escape_ics_text( (string) ( $trip_data['title'] ?? __( 'Travel Plan', 'travel-app' ) ) ),
+            'X-WR-CALNAME:' . $this->escape_ics_text( '' !== trim( $calendar_name ) ? $calendar_name : __( 'Travel Plans', 'travel-app' ) ),
         ];
 
-        foreach ( (array) ( $trip_data['segments'] ?? [] ) as $segment ) {
-            if ( ! is_array( $segment ) || '' === (string) ( $segment['date'] ?? '' ) ) {
+        foreach ( $trips as $trip_data ) {
+            if ( ! is_array( $trip_data ) ) {
                 continue;
             }
 
-            $event_times = $this->get_segment_ics_times( $segment );
-            if ( empty( $event_times ) ) {
-                continue;
-            }
+            $trip_id = absint( $trip_data['id'] ?? 0 );
+            $trip_title = trim( (string) ( $trip_data['title'] ?? '' ) );
+            foreach ( (array) ( $trip_data['segments'] ?? [] ) as $segment ) {
+                if ( ! is_array( $segment ) || '' === (string) ( $segment['date'] ?? '' ) ) {
+                    continue;
+                }
 
-            $uid_source = home_url( '/travel-app/trip/' . $trip_id . '/#segment-' . (int) ( $segment['id'] ?? 0 ) );
-            $is_fellow_share = 'fellow' === $mode;
-            $is_transport_segment = $this->is_transport_segment( $segment );
-            $description_parts = $is_fellow_share ? array_filter( [
-                (string) ( $segment['details'] ?? '' ),
-                (string) ( $segment['url'] ?? '' ),
-            ] ) : [];
-            $location = ( $is_fellow_share || $is_transport_segment ) ? trim( (string) ( $segment['location'] ?? '' ) ) : '';
-            $end_location = ( $is_fellow_share || $is_transport_segment ) ? trim( (string) ( $segment['end_location'] ?? '' ) ) : '';
-            if ( '' !== $end_location && '' !== $location ) {
-                $location .= ' - ' . $end_location;
-            } elseif ( '' !== $end_location ) {
-                $location = $end_location;
-            }
+                $event_times = $this->get_segment_ics_times( $segment );
+                if ( empty( $event_times ) ) {
+                    continue;
+                }
 
-            $lines[] = 'BEGIN:VEVENT';
-            $lines[] = 'UID:' . $this->escape_ics_text( md5( $uid_source ) . '@travel-app' );
-            $lines[] = 'DTSTAMP:' . gmdate( 'Ymd\THis\Z' );
-            $lines[] = 'SUMMARY:' . $this->escape_ics_text( (string) ( $segment['title'] ?? __( 'Untitled item', 'travel-app' ) ) );
-            foreach ( $event_times as $event_time_line ) {
-                $lines[] = $event_time_line;
+                $uid_source = home_url( '/travel-app/trip/' . $trip_id . '/#segment-' . (int) ( $segment['id'] ?? 0 ) );
+                $is_fellow_share = 'fellow' === $mode;
+                $is_transport_segment = $this->is_transport_segment( $segment );
+                $description_parts = $is_fellow_share ? array_filter( [
+                    (string) ( $segment['details'] ?? '' ),
+                    (string) ( $segment['url'] ?? '' ),
+                ] ) : [];
+                $location = ( $is_fellow_share || $is_transport_segment ) ? trim( (string) ( $segment['location'] ?? '' ) ) : '';
+                $end_location = ( $is_fellow_share || $is_transport_segment ) ? trim( (string) ( $segment['end_location'] ?? '' ) ) : '';
+                if ( '' !== $end_location && '' !== $location ) {
+                    $location .= ' - ' . $end_location;
+                } elseif ( '' !== $end_location ) {
+                    $location = $end_location;
+                }
+
+                $summary = (string) ( $segment['title'] ?? __( 'Untitled item', 'travel-app' ) );
+                if ( $include_trip_title && '' !== $trip_title ) {
+                    $summary = $trip_title . ': ' . $summary;
+                }
+
+                $lines[] = 'BEGIN:VEVENT';
+                $lines[] = 'UID:' . $this->escape_ics_text( md5( $uid_source ) . '@travel-app' );
+                $lines[] = 'DTSTAMP:' . gmdate( 'Ymd\THis\Z' );
+                $lines[] = 'SUMMARY:' . $this->escape_ics_text( $summary );
+                foreach ( $event_times as $event_time_line ) {
+                    $lines[] = $event_time_line;
+                }
+                if ( '' !== $location ) {
+                    $lines[] = 'LOCATION:' . $this->escape_ics_text( $location );
+                }
+                if ( ! empty( $description_parts ) ) {
+                    $lines[] = 'DESCRIPTION:' . $this->escape_ics_text( implode( "\n\n", $description_parts ) );
+                }
+                if ( $is_fellow_share && '' !== (string) ( $segment['url'] ?? '' ) ) {
+                    $lines[] = 'URL:' . $this->escape_ics_text( (string) $segment['url'] );
+                }
+                $lines[] = 'END:VEVENT';
             }
-            if ( '' !== $location ) {
-                $lines[] = 'LOCATION:' . $this->escape_ics_text( $location );
-            }
-            if ( ! empty( $description_parts ) ) {
-                $lines[] = 'DESCRIPTION:' . $this->escape_ics_text( implode( "\n\n", $description_parts ) );
-            }
-            if ( $is_fellow_share && '' !== (string) ( $segment['url'] ?? '' ) ) {
-                $lines[] = 'URL:' . $this->escape_ics_text( (string) $segment['url'] );
-            }
-            $lines[] = 'END:VEVENT';
         }
 
         $lines[] = 'END:VCALENDAR';
@@ -2969,6 +3061,36 @@ class App extends BaseApp {
 
     private function get_trip_share_token_meta_key( string $mode ): string {
         return 'public' === $this->normalize_share_mode( $mode ) ? '_travel_app_public_share_token' : '_travel_app_share_token';
+    }
+
+    private function get_user_calendar_token( int $user_id ): string {
+        return (string) get_user_meta( $user_id, '_travel_app_calendar_token', true );
+    }
+
+    private function create_user_calendar_token( int $user_id ): string {
+        if ( $user_id <= 0 || get_current_user_id() !== $user_id ) {
+            return '';
+        }
+
+        $token = $this->get_user_calendar_token( $user_id );
+        if ( '' !== $token ) {
+            return $token;
+        }
+
+        $token = wp_generate_password( 32, false, false );
+        update_user_meta( $user_id, '_travel_app_calendar_token', $token );
+
+        return $token;
+    }
+
+    private function user_calendar_token_matches( int $user_id, string $token ): bool {
+        if ( $user_id <= 0 || '' === $token ) {
+            return false;
+        }
+
+        $stored_token = $this->get_user_calendar_token( $user_id );
+
+        return '' !== $stored_token && hash_equals( $stored_token, $token );
     }
 
     public function get_trip_summary_parts( array $trip_data, ?string $today = null, bool $include_relative = true ): array {

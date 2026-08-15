@@ -455,6 +455,12 @@
         setField(form, 'segment_url_preview_description', preview.description || '');
     }
 
+    function populateDeleteSegmentForm(form, tripData, segment) {
+        setField(form, 'trip_id', tripData.id || '');
+        setField(form, 'segment_index', segment.id || '');
+        setField(form, '_wpnonce', segment.delete_nonce || '');
+    }
+
     function replaceContent(element, content) {
         while (element.firstChild) {
             element.removeChild(element.firstChild);
@@ -482,6 +488,17 @@
 
         populateSegmentForm(form, tripData, segment);
         bindOfflineForm(form);
+
+        var deleteForm = panel.querySelector('.delete-segment-form');
+        if (deleteForm) {
+            populateDeleteSegmentForm(deleteForm, tripData, segment);
+            deleteForm.id = 'delete-segment-form-' + String(segment.id || '');
+
+            var deleteButton = panel.querySelector('.delete-item-link');
+            if (deleteButton) {
+                deleteButton.setAttribute('form', deleteForm.id);
+            }
+        }
 
         return form;
     }

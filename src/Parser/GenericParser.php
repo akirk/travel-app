@@ -16,13 +16,19 @@ class GenericParser {
             return $fallback;
         }
 
-        return $parsed;
+        return $this->use_single_line_as_title_if_empty( $parsed, $text );
     }
 
     private function fallback_parse( string $text ): array {
         $lines = array_values( array_filter( array_map( 'trim', preg_split( '/\R/', $text ) ) ) );
         $title = $this->first_matching_line( $lines, '/\b(confirmation|reservation|booking|itinerary|flight|hotel|train)\b/i' );
         $dates = $this->extract_dates( $text );
+        $title_from_single_plain_line = false;
+
+        if ( '' === $title && 1 === count( $lines ) ) {
+            $title = $lines[0];
+            $title_from_single_plain_line = true;
+        }
 
         if ( '' === $title ) {
             $title = __( 'Imported Travel Plan', 'travel-app' );
@@ -42,7 +48,7 @@ class GenericParser {
             }
         }
 
-        if ( empty( $segments ) ) {
+        if ( empty( $segments ) && ! $title_from_single_plain_line ) {
             $segments[] = [
                 'type'     => 'other',
                 'title'    => $title,
@@ -60,6 +66,19 @@ class GenericParser {
             'segments'    => $segments,
             'parser'      => 'fallback',
         ];
+    }
+
+    private function use_single_line_as_title_if_empty( array $parsed, string $text ): array {
+        if ( '' !== trim( (string) ( $parsed['title'] ?? '' ) ) ) {
+            return $parsed;
+        }
+
+        $lines = array_values( array_filter( array_map( 'trim', preg_split( '/\R/', $text ) ) ) );
+        if ( 1 === count( $lines ) ) {
+            $parsed['title'] = $lines[0];
+        }
+
+        return $parsed;
     }
 
     private function first_matching_line( array $lines, string $pattern ): string {

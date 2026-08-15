@@ -74,4 +74,28 @@ final class GenericParserTest extends TestCase {
         self::assertSame( 'The AI response did not include JSON.', $parsed['parser_error']['message'] );
         self::assertNotEmpty( $parsed['segments'] );
     }
+
+    public function test_fallback_uses_single_plain_line_as_trip_title(): void {
+        $GLOBALS['travel_app_generic_parser_response'] = 'not json';
+
+        $parsed = ( new GenericParser() )->parse( 'Summer in Vienna' );
+
+        self::assertSame( 'fallback', $parsed['parser'] );
+        self::assertSame( 'Summer in Vienna', $parsed['title'] );
+        self::assertSame( [], $parsed['segments'] );
+    }
+
+    public function test_ai_parse_uses_single_plain_line_as_trip_title_when_ai_leaves_title_empty(): void {
+        $GLOBALS['travel_app_generic_parser_response'] = json_encode( [
+            'title'     => '',
+            'starts_at' => '',
+            'ends_at'   => '',
+            'segments'  => [],
+        ] );
+
+        $parsed = ( new GenericParser() )->parse( 'Summer in Vienna' );
+
+        self::assertSame( 'wp-ai-client', $parsed['parser'] );
+        self::assertSame( 'Summer in Vienna', $parsed['title'] );
+    }
 }

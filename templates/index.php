@@ -691,7 +691,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <span class="drop-file-name" id="itinerary_file_name"><?php esc_html_e( 'ICS or text file', 'travel-app' ); ?></span>
                         <input type="file" id="itinerary_file" name="itinerary_file" accept=".ics,.txt,text/calendar,text/plain">
                     </label>
-                    <label for="itinerary_text"><?php esc_html_e( 'Paste confirmation, file text, or a typed entry', 'travel-app' ); ?></label>
+                    <label for="itinerary_text"><?php esc_html_e( 'Enter a trip name, paste a confirmation, or type an entry', 'travel-app' ); ?></label>
                     <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'travel-app' ); ?>"></textarea>
                     <?php if ( count( $delegated_owner_options ) > 1 ) : ?>
                         <label for="travel_app_owner_user_id"><?php esc_html_e( 'Create for', 'travel-app' ); ?></label>
@@ -703,8 +703,8 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                             <?php endforeach; ?>
                         </select>
                     <?php endif; ?>
-                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'AI extraction can turn plain text into an entry for review; files and confirmations still work too.', 'travel-app' ) : __( 'Uses quick parsing, calendar parsing, or a basic parser.', 'travel-app' ) ); ?></p>
-                    <button type="submit"><?php esc_html_e( 'Import', 'travel-app' ); ?></button>
+                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'Enter only a trip name to create a new trip. AI extraction can also turn plain text into an entry for review; files and confirmations still work too.', 'travel-app' ) : __( 'Enter only a trip name to create a new trip, or use quick parsing, calendar parsing, or a basic parser for itinerary text.', 'travel-app' ) ); ?></p>
+                    <button type="submit"><?php esc_html_e( 'Create or Import', 'travel-app' ); ?></button>
                 </form>
                     <?php endif; ?>
             </aside>

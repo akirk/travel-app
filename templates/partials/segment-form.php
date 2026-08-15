@@ -91,7 +91,16 @@
         <textarea name="segment_details"><?php echo esc_textarea( (string) ( $segment['details'] ?? '' ) ); ?></textarea>
     </label>
     <div class="form-actions">
-        <button class="ghost-button" type="button" data-inline-edit-cancel><?php esc_html_e( 'Cancel', 'travel-app' ); ?></button>
+        <span class="form-secondary-actions">
+            <button class="ghost-button" type="button" data-inline-edit-cancel><?php esc_html_e( 'Cancel', 'travel-app' ); ?></button>
+            <button class="delete-item-link" type="submit" form="<?php echo esc_attr( 'delete-segment-form-' . (string) $index ); ?>"><?php esc_html_e( 'Delete Item', 'travel-app' ); ?></button>
+        </span>
         <button type="submit"><?php esc_html_e( 'Save Item', 'travel-app' ); ?></button>
     </div>
+</form>
+<form id="<?php echo esc_attr( 'delete-segment-form-' . (string) $index ); ?>" class="delete-segment-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo esc_js( __( 'Delete this itinerary item?', 'travel-app' ) ); ?>');">
+    <input type="hidden" name="action" value="travel_app_delete_segment">
+    <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+    <input type="hidden" name="segment_index" value="<?php echo esc_attr( (string) $index ); ?>">
+    <?php wp_nonce_field( 'travel_app_delete_segment_' . $trip_data['id'] . '_' . $index ); ?>
 </form>

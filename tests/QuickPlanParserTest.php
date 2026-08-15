@@ -42,6 +42,14 @@ final class QuickPlanParserTest extends TestCase {
         self::assertSame( '19:00', $segment['time'] );
     }
 
+    public function test_parses_month_name_date_with_current_year(): void {
+        $segment = ( new QuickPlanParser() )->parse( 'Dinner, August 21, 6pm' );
+
+        self::assertSame( 'Dinner', $segment['title'] );
+        self::assertSame( gmdate( 'Y' ) . '-08-21', $segment['date'] );
+        self::assertSame( '18:00', $segment['time'] );
+    }
+
     public function test_parses_iso_dates(): void {
         $segment = ( new QuickPlanParser() )->parse( 'Flight LH123 at Frankfurt 2026-08-03 06:45' );
 

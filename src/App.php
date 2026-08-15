@@ -279,6 +279,24 @@ class App extends BaseApp {
         return (bool) apply_filters( 'travel_app_demo_mode_enabled', $enabled );
     }
 
+    /**
+     * Build a Mask Private Data marker attribute, e.g. ' data-place-42-location'.
+     *
+     * The key should start with the database ID of the record the value belongs to, so the
+     * same value keeps the same replacement across pages. Pass an empty key for values
+     * rendered client-side, where the mask falls back to data-private-value instead.
+     */
+    public static function mask_attr( string $type, string $key = '' ): string {
+        $type = sanitize_key( $type );
+        if ( '' === $type ) {
+            return '';
+        }
+
+        $key = trim( strtolower( (string) preg_replace( '/[^a-zA-Z0-9_-]+/', '-', $key ) ), '-' );
+
+        return ' data-' . $type . ( '' !== $key ? '-' . $key : '' );
+    }
+
     public function is_playground(): bool {
         return function_exists( __NAMESPACE__ . '\is_playground' ) && is_playground();
     }

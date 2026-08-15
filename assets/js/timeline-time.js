@@ -213,6 +213,24 @@
         });
     }
 
+    // Preview slots are marked for Mask Private Data without a key, so the mask identifies the value
+    // by data-private-value: the real value behind the text, which may be shortened or decorated.
+    // Pass an empty maskValue for generic labels that should never be masked.
+    function setMaskedText(node, text, maskValue) {
+        if (!node) {
+            return;
+        }
+
+        node.textContent = text || '';
+        node.setAttribute('data-private-value', (maskValue === undefined ? text : maskValue) || '');
+    }
+
+    function maskPrivateData(root) {
+        if (root && window.maskPrivateData && typeof window.maskPrivateData.process === 'function') {
+            window.maskPrivateData.process(root);
+        }
+    }
+
     function isTodayCheckout(item, currentDate) {
         return item
             && item.getAttribute('data-timeline-kind') === 'checkout'
@@ -251,27 +269,28 @@
                 label.textContent = slot.getAttribute('data-slot-label') || '';
             }
             if (title) {
-                title.textContent = slot.getAttribute('data-empty-title') || 'No item';
+                setMaskedText(title, slot.getAttribute('data-empty-title') || 'No item', '');
             }
             if (meta) {
-                meta.textContent = '';
+                setMaskedText(meta, '');
             }
             if (previewLocation) {
-                previewLocation.textContent = '';
+                setMaskedText(previewLocation, '');
             }
             if (end) {
-                end.textContent = '';
+                setMaskedText(end, '');
             }
             if (countdown) {
                 countdown.textContent = '';
             }
+            maskPrivateData(slot);
             return;
         }
 
         slot.hidden = false;
         slot.setAttribute('href', source.getAttribute('data-url') || '#');
         if (title) {
-            title.textContent = source.getAttribute('data-title') || 'Untitled item';
+            setMaskedText(title, source.getAttribute('data-title') || 'Untitled item');
         }
         var location = source.getAttribute('data-location') || '';
         var endLocation = source.getAttribute('data-end-location') || '';
@@ -293,13 +312,13 @@
         var dateTimeLabel = '';
         if (meta) {
             if (isTravelInProgress) {
-                meta.textContent = [
+                setMaskedText(meta, [
                     '→',
                     formatRelativeDateTime(endDate, endTime, source.getAttribute('data-end-label') || '', currentDate),
                     endLocation
-                ].filter(Boolean).join(' ');
+                ].filter(Boolean).join(' '));
             } else if (isLodgingInProgress) {
-                meta.textContent = '';
+                setMaskedText(meta, '');
             } else {
                 var locationLabel = location && endLocation && location !== endLocation
                     ? location + ' → ' + endLocation
@@ -313,14 +332,14 @@
                     currentDate
                 );
 
-                meta.textContent = [
+                setMaskedText(meta, [
                     dateTimeLabel,
                     isLodging ? '' : locationLabel
-                ].filter(Boolean).join(' ');
+                ].filter(Boolean).join(' '));
             }
         }
         if (previewLocation) {
-            previewLocation.textContent = isLodging ? (location || endLocation) : '';
+            setMaskedText(previewLocation, isLodging ? (location || endLocation) : '');
         }
         if (end) {
             var endLabel = formatRelativeDateTime(
@@ -329,9 +348,9 @@
                 source.getAttribute('data-end-label') || '',
                 currentDate
             );
-            end.textContent = endDate && !isTravelInProgress && !hasSameDayEndTimeInMeta(source, dateTimeLabel)
+            setMaskedText(end, endDate && !isTravelInProgress && !hasSameDayEndTimeInMeta(source, dateTimeLabel)
                 ? ['→', endLabel].filter(Boolean).join(' ')
-                : '';
+                : '');
         }
         if (countdown) {
             var countdownTarget = isTravelInProgress || isLodgingInProgress ? endTimeValue : parseDateTime(source.getAttribute('data-datetime') || '');
@@ -339,6 +358,7 @@
                 ? formatDuration(countdownTarget - currentTime)
                 : '';
         }
+        maskPrivateData(slot);
     }
 
     function positionMarker(target, value, currentTime) {

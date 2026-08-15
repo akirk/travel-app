@@ -50,6 +50,12 @@ if ( ! $is_readonly_timeline ) {
 $is_trip_active = $travel_app->is_trip_active( $trip_data );
 $show_now_next_section = '0' !== (string) get_term_meta( $trip_id, '_travel_app_show_now_next', true );
 $journal_enabled = '1' === (string) get_term_meta( $trip_id, '_travel_app_journal_enabled', true );
+$journal_entries_by_day = ( ! $is_readonly_timeline && $journal_enabled ) ? $travel_app->get_journal_entries_for_trip( $trip_id ) : [];
+$journal_category_id = absint( get_term_meta( $trip_id, '_travel_app_journal_category_id', true ) );
+$journal_tags = (string) get_term_meta( $trip_id, '_travel_app_journal_tags', true );
+$journal_categories = ! $is_readonly_timeline ? get_categories( [
+    'hide_empty' => false,
+] ) : [];
 $fellow_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
 $public_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
 $fellow_calendar_url = ! $is_shared_timeline ? $travel_app->get_trip_calendar_url( (int) $trip_data['id'], 'fellow' ) : '';
@@ -498,6 +504,12 @@ if ( count( $route_locations ) >= 2 ) {
         }
         .day-journal-form {
             margin: 0;
+        }
+        .day-journal-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: flex-end;
         }
         .day-journal-button {
             min-height: 30px;
@@ -997,6 +1009,7 @@ if ( count( $route_locations ) >= 2 ) {
             align-items: center;
         }
         .route-zone,
+        .travel-journaling-zone,
         .settings-zone,
         .sharing-zone,
         .danger-zone {
@@ -1006,12 +1019,14 @@ if ( count( $route_locations ) >= 2 ) {
             color: var(--wp-app-color-muted);
         }
         .route-zone h2,
+        .travel-journaling-zone h2,
         .settings-zone h2,
         .sharing-zone h2,
         .danger-zone h2 {
             color: var(--wp-app-color-text);
         }
         .route-zone details summary,
+        .travel-journaling-zone details summary,
         .settings-zone details summary,
         .sharing-zone details summary,
         .danger-zone details summary {
@@ -1020,6 +1035,7 @@ if ( count( $route_locations ) >= 2 ) {
             font-weight: 700;
         }
         .route-zone details summary h2,
+        .travel-journaling-zone details summary h2,
         .settings-zone details summary h2,
         .sharing-zone details summary h2,
         .danger-zone details summary h2 {
@@ -1031,6 +1047,12 @@ if ( count( $route_locations ) >= 2 ) {
             display: grid;
             gap: 14px;
             margin-top: 14px;
+        }
+        .settings-help {
+            margin: 12px 0 0;
+            color: var(--wp-app-color-muted);
+            font-size: 0.92rem;
+            line-height: 1.5;
         }
         .setting-option {
             display: flex;
@@ -1510,17 +1532,36 @@ if ( count( $route_locations ) >= 2 ) {
                             <div class="time-marker"><span class="time-marker-label"></span></div>
                         <?php endif; ?>
                         <?php foreach ( $segments_by_day as $day => $day_segments ) : ?>
+                            <?php
+                            $journal_entry = $journal_entries_by_day[ $day ] ?? [];
+                            $journal_exists = ! empty( $journal_entry );
+                            ?>
                             <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" data-date="<?php echo esc_attr( $day ); ?>">
                                 <div class="day-heading-row">
                                     <h3 class="day-heading"><?php echo esc_html( $travel_app->format_date_label( $day ) ); ?></h3>
                                     <?php if ( ! $is_readonly_timeline && $journal_enabled ) : ?>
-                                        <form class="day-journal-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                                            <input type="hidden" name="action" value="travel_app_open_journal_entry">
-                                            <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
-                                            <input type="hidden" name="journal_date" value="<?php echo esc_attr( $day ); ?>">
-                                            <?php wp_nonce_field( 'travel_app_open_journal_entry_' . $trip_data['id'] ); ?>
-                                            <button class="day-journal-button" type="submit"><?php esc_html_e( 'Journal', 'travel-app' ); ?></button>
-                                        </form>
+                                        <div class="day-journal-actions">
+                                            <form class="day-journal-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                                                <input type="hidden" name="action" value="travel_app_open_journal_entry">
+                                                <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                                                <input type="hidden" name="journal_date" value="<?php echo esc_attr( $day ); ?>">
+                                                <?php wp_nonce_field( 'travel_app_open_journal_entry_' . $trip_data['id'] ); ?>
+                                                <button class="day-journal-button" type="submit">
+                                                    <?php echo esc_html( $journal_exists ? __( 'Edit Journal', 'travel-app' ) : __( 'Start Journal', 'travel-app' ) ); ?>
+                                                </button>
+                                            </form>
+                                            <?php if ( $journal_exists ) : ?>
+                                                <form class="day-journal-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                                                    <input type="hidden" name="action" value="travel_app_prepare_journal_post">
+                                                    <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                                                    <input type="hidden" name="journal_id" value="<?php echo esc_attr( (string) ( $journal_entry['id'] ?? 0 ) ); ?>">
+                                                    <?php wp_nonce_field( 'travel_app_prepare_journal_post_' . $trip_data['id'] . '_' . (int) ( $journal_entry['id'] ?? 0 ) ); ?>
+                                                    <button class="day-journal-button" type="submit">
+                                                        <?php echo esc_html( ! empty( $journal_entry['post_id'] ) ? __( 'Update Linked Post', 'travel-app' ) : __( 'Prepare for Publishing', 'travel-app' ) ); ?>
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
                                 <?php foreach ( $day_segments as $segment ) : ?>
@@ -1797,7 +1838,6 @@ if ( count( $route_locations ) >= 2 ) {
                             <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
                             <input type="hidden" name="trip_title" value="<?php echo esc_attr( $trip_data['title'] ); ?>">
                             <input type="hidden" name="trip_show_now_next_present" value="1">
-                            <input type="hidden" name="trip_journal_enabled_present" value="1">
                             <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
                             <label class="setting-option">
                                 <input type="checkbox" name="trip_show_now_next" value="1" <?php checked( $show_now_next_section ); ?>>
@@ -1806,15 +1846,53 @@ if ( count( $route_locations ) >= 2 ) {
                                     <span><?php esc_html_e( 'Display the current and next itinerary items above the timeline while this trip is active.', 'travel-app' ); ?></span>
                                 </span>
                             </label>
+                            <div class="settings-form-actions">
+                                <button type="submit"><?php esc_html_e( 'Save Settings', 'travel-app' ); ?></button>
+                            </div>
+                        </form>
+                    </details>
+                </section>
+            <?php endif; ?>
+
+            <?php if ( ! $is_readonly_timeline ) : ?>
+                <section class="travel-journaling-zone" aria-labelledby="travel-journaling-heading">
+                    <details>
+                        <summary><h2 id="travel-journaling-heading"><?php esc_html_e( 'Travel Journaling', 'travel-app' ); ?></h2></summary>
+                        <p class="settings-help">
+                            <?php esc_html_e( 'You can create journal entries per day. Those entries start off completely private. When you want to publish one, use the Prepare for Publishing button. This will create a draft post that you can then publish.', 'travel-app' ); ?>
+                        </p>
+                        <form class="settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                            <input type="hidden" name="action" value="travel_app_update_trip">
+                            <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
+                            <input type="hidden" name="trip_title" value="<?php echo esc_attr( $trip_data['title'] ); ?>">
+                            <input type="hidden" name="trip_journal_enabled_present" value="1">
+                            <?php wp_nonce_field( 'travel_app_update_trip_' . $trip_data['id'] ); ?>
                             <label class="setting-option">
                                 <input type="checkbox" name="trip_journal_enabled" value="1" <?php checked( $journal_enabled ); ?>>
                                 <span>
                                     <strong><?php esc_html_e( 'Enable Travel Journaling', 'travel-app' ); ?></strong>
-                                    <span><?php esc_html_e( 'Show a journal button on each day that opens a linked Gutenberg draft seeded with that day\'s itinerary headings.', 'travel-app' ); ?></span>
                                 </span>
                             </label>
+                            <?php if ( $journal_enabled ) : ?>
+                                <input type="hidden" name="trip_journal_publishing_defaults_present" value="1">
+                                <label for="trip_journal_category_id">
+                                    <?php esc_html_e( 'Journal post category', 'travel-app' ); ?>
+                                    <select id="trip_journal_category_id" name="trip_journal_category_id">
+                                        <option value="0"><?php esc_html_e( 'No default category', 'travel-app' ); ?></option>
+                                        <?php foreach ( $journal_categories as $journal_category ) : ?>
+                                            <option value="<?php echo esc_attr( (string) $journal_category->term_id ); ?>" <?php selected( $journal_category_id, (int) $journal_category->term_id ); ?>>
+                                                <?php echo esc_html( $journal_category->name ); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </label>
+                                <label for="trip_journal_tags">
+                                    <?php esc_html_e( 'Journal post tags', 'travel-app' ); ?>
+                                    <input type="text" id="trip_journal_tags" name="trip_journal_tags" value="<?php echo esc_attr( $journal_tags ); ?>" placeholder="<?php esc_attr_e( 'travel, trip-name', 'travel-app' ); ?>">
+                                </label>
+                            <?php endif; ?>
                             <div class="settings-form-actions">
-                                <button type="submit"><?php esc_html_e( 'Save Settings', 'travel-app' ); ?></button>
+                                <button type="submit"><?php esc_html_e( 'Save Travel Journaling', 'travel-app' ); ?></button>
                             </div>
                         </form>
                     </details>

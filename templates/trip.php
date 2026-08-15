@@ -37,6 +37,16 @@ if ( $is_shared_timeline ) {
 }
 $trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
 $segments  = $trip_data['segments'] ?? [];
+$traveller_label = '';
+$owner_id = absint( $trip_data['owner_id'] ?? 0 );
+if ( $owner_id > 0 && $owner_id !== get_current_user_id() ) {
+    $owner_name = trim( (string) ( $trip_data['owner_name'] ?? '' ) );
+    $traveller_label = sprintf(
+        /* translators: %s: travel plan owner display name. */
+        __( 'Traveller: %s', 'travel-app' ),
+        '' !== $owner_name ? $owner_name : __( 'another user', 'travel-app' )
+    );
+}
 $editable_trip_data = [];
 if ( ! $is_readonly_timeline ) {
     $editable_trip_data = $trip_data;
@@ -1168,6 +1178,9 @@ if ( count( $route_locations ) >= 2 ) {
                     </form>
                 <?php endif; ?>
                 <div class="meta">
+                    <?php if ( '' !== $traveller_label ) : ?>
+                        <span><?php echo esc_html( $traveller_label ); ?></span>
+                    <?php endif; ?>
                     <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, null, ! $is_static_download ) as $summary_part ) : ?>
                         <span><?php echo esc_html( $summary_part ); ?></span>
                     <?php endforeach; ?>

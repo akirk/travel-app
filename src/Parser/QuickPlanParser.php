@@ -61,6 +61,8 @@ class QuickPlanParser {
         $patterns = [
             '/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,)?\s+\d{4}\b/i',
             '/\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?(?:,)?\s+\d{4}\b/i',
+            '/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,)?(?=\s|$)/i',
+            '/\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?(?:,)?(?=\s|$)/i',
             '/\b\d{4}-\d{1,2}-\d{1,2}\b/',
             '/\b\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4}\b/',
             '/\b\d{1,2}\.\s*\d{1,2}\.(?!\d)(?=\s|$)/',

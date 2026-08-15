@@ -50,6 +50,7 @@ class App extends BaseApp {
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_travel_app_import', [ $this, 'handle_import' ] );
+        add_action( 'admin_post_travel_app_update_user_settings', [ $this, 'handle_update_user_settings' ] );
         add_action( 'admin_post_travel_app_update_trip', [ $this, 'handle_update_trip' ] );
         add_action( 'admin_post_travel_app_open_journal_entry', [ $this, 'handle_open_journal_entry' ] );
         add_action( 'admin_post_travel_app_prepare_journal_post', [ $this, 'handle_prepare_journal_post' ] );
@@ -238,6 +239,7 @@ class App extends BaseApp {
             'edit_forbidden'           => __( 'This travel plan cannot be edited.', 'travel-app' ),
             'empty'                    => __( 'Paste itinerary text or upload a file to import.', 'travel-app' ),
             'empty_title'              => __( 'Travel plan title cannot be empty.', 'travel-app' ),
+            'invalid_trip_owner'       => __( 'You cannot create travel plans for that user.', 'travel-app' ),
             'missing_itinerary_text'   => __( 'Paste itinerary text to import.', 'travel-app' ),
             'quick_plan_invalid'       => __( 'Review the parsed fields and choose where to save the item.', 'travel-app' ),
             'segment_delete_failed'    => __( 'This itinerary item could not be deleted.', 'travel-app' ),
@@ -328,15 +330,53 @@ class App extends BaseApp {
     protected function setup_routes(): void {
         $this->app->route( 'trip/{id}', 'trip.php' );
         $this->app->route( 'trip/{id}/map', 'map.php' );
+        $this->app->route( 'settings', 'settings.php' );
     }
 
     protected function setup_menu(): void {
-        /*
-         * Add WpApp masterbar/menu entries here. BaseApp calls this method
-         * during init(), after routes have been registered.
-         *
-         * $this->app->add_menu_item( 'overview', 'Overview', home_url( '/travel-app/overview' ) );
-         */
+        $current_trip = $this->get_masterbar_current_trip();
+        if ( $current_trip ) {
+            $this->app->add_menu_item(
+                'trip-' . $current_trip->id,
+                $this->get_masterbar_trip_label( $current_trip ),
+                home_url( '/' . $this->get_url_path() . '/trip/' . $current_trip->id . '/' )
+            );
+        }
+
+        $this->app->add_menu_item( 'settings', __( 'Settings', 'travel-app' ), home_url( '/' . $this->get_url_path() . '/settings/' ) );
+    }
+
+    private function get_masterbar_current_trip(): ?Trip {
+        if ( ! is_user_logged_in() ) {
+            return null;
+        }
+
+        $today = current_time( 'Y-m-d' );
+        $current_trips = array_values( array_filter( Trip::for_current_user(), static function( Trip $trip ) use ( $today ): bool {
+            return $trip->starts_at && $trip->starts_at <= $today && ( '' === $trip->ends_at || $trip->ends_at >= $today );
+        } ) );
+
+        if ( empty( $current_trips ) ) {
+            return null;
+        }
+
+        usort( $current_trips, static function( Trip $a, Trip $b ): int {
+            if ( $a->starts_at !== $b->starts_at ) {
+                return strcmp( $a->starts_at, $b->starts_at );
+            }
+
+            return strcmp( $a->title, $b->title );
+        } );
+
+        return $current_trips[0];
+    }
+
+    private function get_masterbar_trip_label( Trip $trip ): string {
+        $title = '' !== trim( $trip->title ) ? $trip->title : __( 'Travel Plan', 'travel-app' );
+        $date = $trip->starts_at ? substr( $trip->starts_at, 5 ) : '';
+        $label = '' !== $date ? $date . ' ' . $title : $title;
+
+        return strlen( $label ) > 38 ? rtrim( substr( $label, 0, 35 ) ) . '...' : $label;
     }
 
     public function register_post_types(): void {
@@ -407,11 +447,203 @@ class App extends BaseApp {
             return [ 'exist' ];
         }
 
-        if ( $trip->owner_id() !== $user_id ) {
-            return [ 'do_not_allow' ];
+        if ( $trip->owner_id() === $user_id ) {
+            return [ 'read' ];
         }
 
-        return [ 'read' ];
+        if ( in_array( $cap, [ 'read_travel_app_trip', 'edit_travel_app_trip' ], true ) && $this->is_trip_editor( $trip_id, $user_id ) ) {
+            return [ 'read' ];
+        }
+
+        if ( in_array( $cap, [ 'read_travel_app_trip', 'edit_travel_app_trip' ], true ) && $this->user_can_edit_trips_for_owner( $user_id, $trip->owner_id() ) ) {
+            return [ 'read' ];
+        }
+
+        return [ 'do_not_allow' ];
+    }
+
+    public function get_delegation_capability_options(): array {
+        return [
+            'read'              => __( 'Any logged-in user', 'travel-app' ),
+            'edit_posts'        => __( 'Contributors and above', 'travel-app' ),
+            'publish_posts'     => __( 'Authors and above', 'travel-app' ),
+            'edit_others_posts' => __( 'Editors and above', 'travel-app' ),
+            'manage_options'    => __( 'Administrators only', 'travel-app' ),
+        ];
+    }
+
+    private function normalize_delegation_capability( string $capability, string $fallback = 'read' ): string {
+        $capability = sanitize_key( $capability );
+        $options = $this->get_delegation_capability_options();
+
+        return isset( $options[ $capability ] ) ? $capability : $fallback;
+    }
+
+    public function get_delegated_trip_creation_capability( int $owner_user_id ): string {
+        return $this->normalize_delegation_capability(
+            (string) get_user_meta( $owner_user_id, '_travel_app_delegated_trip_creation_capability', true ),
+            'edit_others_posts'
+        );
+    }
+
+    public function get_global_trip_editor_capability( int $owner_user_id ): string {
+        $capability = sanitize_key( (string) get_user_meta( $owner_user_id, '_travel_app_global_trip_editor_capability', true ) );
+
+        if ( 'none' === $capability || '' === $capability ) {
+            return 'none';
+        }
+
+        return $this->normalize_delegation_capability( $capability, 'none' );
+    }
+
+    private function user_has_delegation_capability( int $actor_user_id, string $capability ): bool {
+        return $actor_user_id > 0 && 'none' !== $capability && user_can( $actor_user_id, $capability );
+    }
+
+    public function user_allows_delegated_trip_creation( int $owner_user_id, ?int $actor_user_id = null ): bool {
+        if ( $owner_user_id <= 0 || '1' !== (string) get_user_meta( $owner_user_id, '_travel_app_allow_delegated_trip_creation', true ) ) {
+            return false;
+        }
+
+        if ( null === $actor_user_id ) {
+            return true;
+        }
+
+        return $this->user_has_delegation_capability( $actor_user_id, $this->get_delegated_trip_creation_capability( $owner_user_id ) );
+    }
+
+    public function user_can_edit_trips_for_owner( int $actor_user_id, int $owner_user_id ): bool {
+        if ( $actor_user_id <= 0 || $owner_user_id <= 0 || $actor_user_id === $owner_user_id ) {
+            return false;
+        }
+
+        return $this->user_has_delegation_capability( $actor_user_id, $this->get_global_trip_editor_capability( $owner_user_id ) );
+    }
+
+    public function get_global_editor_owner_ids_for_user( ?int $actor_user_id = null ): array {
+        $actor_user_id = $actor_user_id ?? get_current_user_id();
+        if ( $actor_user_id <= 0 ) {
+            return [];
+        }
+
+        $owner_ids = [];
+        foreach ( get_users( [ 'fields' => 'ids' ] ) as $owner_user_id ) {
+            $owner_user_id = (int) $owner_user_id;
+            if ( $this->user_can_edit_trips_for_owner( $actor_user_id, $owner_user_id ) ) {
+                $owner_ids[] = $owner_user_id;
+            }
+        }
+
+        return array_values( array_unique( $owner_ids ) );
+    }
+
+    public function get_delegated_trip_owner_options( ?int $actor_user_id = null ): array {
+        $actor_user_id = $actor_user_id ?? get_current_user_id();
+        if ( $actor_user_id <= 0 ) {
+            return [];
+        }
+
+        $options = [];
+        $actor = get_user_by( 'id', $actor_user_id );
+        if ( $actor ) {
+            $options[] = $actor;
+        }
+
+        $delegating_users = get_users( [
+            'fields'     => 'all',
+            'exclude'    => [ $actor_user_id ],
+            'meta_key'   => '_travel_app_allow_delegated_trip_creation',
+            'meta_value' => '1',
+            'orderby'    => 'display_name',
+            'order'      => 'ASC',
+        ] );
+
+        foreach ( $delegating_users as $user ) {
+            if ( $user instanceof \WP_User && $this->user_allows_delegated_trip_creation( (int) $user->ID, $actor_user_id ) ) {
+                $options[] = $user;
+            }
+        }
+
+        return $options;
+    }
+
+    private function resolve_import_owner_id(): int {
+        $actor_user_id = get_current_user_id();
+        $owner_user_id = isset( $_POST['travel_app_owner_user_id'] ) ? absint( $_POST['travel_app_owner_user_id'] ) : $actor_user_id;
+
+        if ( $owner_user_id === $actor_user_id ) {
+            return $actor_user_id;
+        }
+
+        return $this->user_allows_delegated_trip_creation( $owner_user_id, $actor_user_id ) ? $owner_user_id : 0;
+    }
+
+    public function get_trip_editor_ids( int $trip_id ): array {
+        $raw_ids = get_term_meta( $trip_id, '_travel_app_editor_user_ids', false );
+        if ( 1 === count( $raw_ids ) && is_array( $raw_ids[0] ) ) {
+            $raw_ids = $raw_ids[0];
+        }
+
+        $ids = array_filter( array_map( 'absint', (array) $raw_ids ) );
+        $owner_id = Trip::get_owner_id( $trip_id );
+
+        return array_values( array_diff( array_unique( $ids ), [ $owner_id ] ) );
+    }
+
+    public function is_trip_editor( int $trip_id, int $user_id ): bool {
+        return $user_id > 0 && in_array( $user_id, $this->get_trip_editor_ids( $trip_id ), true );
+    }
+
+    public function current_user_can_manage_trip_editors( int $trip_id ): bool {
+        return get_current_user_id() > 0 && Trip::get_owner_id( $trip_id ) === get_current_user_id();
+    }
+
+    public function get_trip_editor_candidates( int $trip_id ): array {
+        $owner_id = Trip::get_owner_id( $trip_id );
+        if ( $owner_id <= 0 ) {
+            return [];
+        }
+
+        return get_users( [
+            'fields'  => 'all',
+            'exclude' => [ $owner_id ],
+            'orderby' => 'display_name',
+            'order'   => 'ASC',
+        ] );
+    }
+
+    public function get_trip_traveller_label( array $trip_data ): string {
+        $owner_id = absint( $trip_data['owner_id'] ?? 0 );
+        if ( $owner_id <= 0 || $owner_id === get_current_user_id() ) {
+            return '';
+        }
+
+        $owner = get_user_by( 'id', $owner_id );
+        $display_name = $owner ? trim( (string) $owner->display_name ) : '';
+
+        return sprintf(
+            /* translators: %s: travel plan owner display name. */
+            __( 'Traveller: %s', 'travel-app' ),
+            '' !== $display_name ? $display_name : __( 'another user', 'travel-app' )
+        );
+    }
+
+    private function update_trip_editors( int $trip_id, array $editor_ids ) {
+        if ( ! $this->current_user_can_manage_trip_editors( $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
+        }
+
+        $owner_id = Trip::get_owner_id( $trip_id );
+        $editor_ids = array_values( array_diff( array_unique( array_filter( array_map( 'absint', $editor_ids ) ) ), [ $owner_id ] ) );
+
+        delete_term_meta( $trip_id, '_travel_app_editor_user_ids' );
+        foreach ( $editor_ids as $editor_id ) {
+            if ( get_user_by( 'id', $editor_id ) ) {
+                add_term_meta( $trip_id, '_travel_app_editor_user_ids', $editor_id, false );
+            }
+        }
+
+        return true;
     }
 
     private function request_has_trip_share_token( int $trip_id ): bool {
@@ -1226,10 +1458,16 @@ class App extends BaseApp {
             exit;
         }
 
+        $owner_user_id = $import_trip_id ? Trip::get_owner_id( $import_trip_id ) : $this->resolve_import_owner_id();
+        if ( $owner_user_id <= 0 ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'invalid_trip_owner', $redirect ) );
+            exit;
+        }
+
         $draft_key = isset( $_POST['quick_plan_draft'] ) ? sanitize_key( wp_unslash( $_POST['quick_plan_draft'] ) ) : '';
         if ( '' !== $draft_key ) {
             $target = isset( $_POST['quick_plan_target'] ) ? sanitize_text_field( wp_unslash( $_POST['quick_plan_target'] ) ) : '';
-            $this->save_quick_plan_draft_submission( $draft_key, $target, $redirect );
+            $this->save_quick_plan_draft_submission( $draft_key, $target, $redirect, $owner_user_id );
         }
 
         $text = isset( $_POST['itinerary_text'] ) ? (string) wp_unslash( $_POST['itinerary_text'] ) : '';
@@ -1291,7 +1529,7 @@ class App extends BaseApp {
                 }
 
                 if ( 'quick-plan' === (string) ( $parsed['parser'] ?? '' ) ) {
-                    $trip_id = $this->save_trip( $parsed, $text );
+                    $trip_id = $this->save_trip( $parsed, $text, $owner_user_id );
 
                     if ( is_wp_error( $trip_id ) ) {
                         wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
@@ -1303,7 +1541,7 @@ class App extends BaseApp {
                 }
             }
         }
-        $trip_id = $this->save_trip( $parsed, $text );
+        $trip_id = $this->save_trip( $parsed, $text, $owner_user_id );
 
         if ( is_wp_error( $trip_id ) ) {
             wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
@@ -1314,7 +1552,45 @@ class App extends BaseApp {
         exit;
     }
 
-    private function save_quick_plan_draft_submission( string $draft_key, string $target, string $redirect ): void {
+    public function handle_update_user_settings(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_die( esc_html__( 'You must be logged in to update Travel App settings.', 'travel-app' ), 403 );
+        }
+
+        check_admin_referer( 'travel_app_update_user_settings' );
+
+        update_user_meta(
+            get_current_user_id(),
+            '_travel_app_allow_delegated_trip_creation',
+            isset( $_POST['allow_delegated_trip_creation'] ) ? '1' : '0'
+        );
+        update_user_meta(
+            get_current_user_id(),
+            '_travel_app_delegated_trip_creation_capability',
+            $this->normalize_delegation_capability(
+                isset( $_POST['delegated_trip_creation_capability'] ) ? (string) wp_unslash( $_POST['delegated_trip_creation_capability'] ) : 'edit_others_posts',
+                'edit_others_posts'
+            )
+        );
+        update_user_meta(
+            get_current_user_id(),
+            '_travel_app_global_trip_editor_capability',
+            $this->normalize_delegation_capability(
+                isset( $_POST['global_trip_editor_capability'] ) ? (string) wp_unslash( $_POST['global_trip_editor_capability'] ) : 'none',
+                'none'
+            )
+        );
+
+        $redirect = wp_get_referer();
+        if ( ! $redirect ) {
+            $redirect = home_url( '/' . $this->get_url_path() . '/settings/' );
+        }
+
+        wp_safe_redirect( add_query_arg( 'settings_updated', '1', $redirect ) );
+        exit;
+    }
+
+    private function save_quick_plan_draft_submission( string $draft_key, string $target, string $redirect, int $owner_user_id ): void {
         $draft = $this->get_quick_plan_draft( $draft_key );
         if ( empty( $draft ) ) {
             wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
@@ -1343,7 +1619,7 @@ class App extends BaseApp {
                 'ends_at'   => (string) ( $segment['end_date'] ?: $segment['date'] ),
                 'segments'  => [ $segment ],
                 'parser'    => sanitize_key( (string) ( $draft['parser'] ?? 'quick-plan' ) ),
-            ], (string) ( $draft['text'] ?? '' ) );
+            ], (string) ( $draft['text'] ?? '' ), $owner_user_id );
             $item_id = 0;
         } else {
             $trip_id = absint( $target );
@@ -1495,6 +1771,13 @@ class App extends BaseApp {
             $category_id = isset( $_POST['trip_journal_category_id'] ) ? absint( $_POST['trip_journal_category_id'] ) : 0;
             $tags = isset( $_POST['trip_journal_tags'] ) ? sanitize_text_field( wp_unslash( $_POST['trip_journal_tags'] ) ) : '';
             $updated = $this->update_user_trip_journal_publishing_defaults( $trip_id, $category_id, $tags );
+        }
+
+        if ( ! is_wp_error( $updated ) && isset( $_POST['trip_editors_present'] ) ) {
+            $editor_ids = isset( $_POST['trip_editor_ids'] ) && is_array( $_POST['trip_editor_ids'] )
+                ? array_map( 'absint', wp_unslash( $_POST['trip_editor_ids'] ) )
+                : [];
+            $updated = $this->update_trip_editors( $trip_id, $editor_ids );
         }
 
         if ( is_wp_error( $updated ) ) {
@@ -2166,6 +2449,10 @@ class App extends BaseApp {
     }
 
     private function upload_user_trip_item_attachments( int $trip_id, int $index ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
+        }
+
         $item = ItineraryItem::get_user_item( $trip_id, $index );
         if ( ! $item ) {
             return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
@@ -2231,6 +2518,10 @@ class App extends BaseApp {
     }
 
     private function delete_user_trip_item_attachment( int $trip_id, int $index, int $attachment_id ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
+        }
+
         $attachment = ItineraryItem::get_user_attachment( $trip_id, $index, $attachment_id );
         if ( ! $attachment ) {
             return new \WP_Error( 'attachment_not_found', __( 'This attachment could not be found.', 'travel-app' ) );
@@ -3107,6 +3398,8 @@ class App extends BaseApp {
         }
 
         $this->update_item_meta( (int) $item_id, $segment );
+        update_post_meta( (int) $item_id, '_travel_app_owner_user_id', Trip::get_owner_id( $trip_id ) );
+        update_post_meta( (int) $item_id, '_travel_app_created_by_user_id', get_current_user_id() );
 
         return (int) $item_id;
     }
@@ -3130,11 +3423,13 @@ class App extends BaseApp {
         $this->get_url_preview_service()->sync_item_preview( $item_id, $segment, $previous_url );
     }
 
-    private function save_trip( array $parsed, string $source_text ) {
+    private function save_trip( array $parsed, string $source_text, ?int $owner_user_id = null ) {
+        $owner_user_id = $owner_user_id ?: get_current_user_id();
+        $actor_user_id = get_current_user_id();
         $title = $parsed['title'] ?: __( 'Imported Travel Plan', 'travel-app' );
 
         $trip = wp_insert_term( $title, 'travel_app_trip', [
-            'slug' => sanitize_title( $title . '-' . get_current_user_id() . '-' . time() ),
+            'slug' => sanitize_title( $title . '-' . $owner_user_id . '-' . time() ),
         ] );
 
         if ( is_wp_error( $trip ) ) {
@@ -3142,12 +3437,17 @@ class App extends BaseApp {
         }
 
         $trip_id = (int) $trip['term_id'];
-        update_term_meta( $trip_id, '_travel_app_user_id', get_current_user_id() );
+        update_term_meta( $trip_id, '_travel_app_user_id', $owner_user_id );
+        update_term_meta( $trip_id, '_travel_app_created_by_user_id', $actor_user_id );
         update_term_meta( $trip_id, '_travel_app_starts_at', $parsed['starts_at'] );
         update_term_meta( $trip_id, '_travel_app_ends_at', $parsed['ends_at'] );
         update_term_meta( $trip_id, '_travel_app_parser', $parsed['parser'] );
         update_term_meta( $trip_id, '_travel_app_parser_error', $parsed['parser_error'] ?? [] );
         update_term_meta( $trip_id, '_travel_app_source_text', $source_text );
+
+        if ( $owner_user_id !== $actor_user_id ) {
+            add_term_meta( $trip_id, '_travel_app_editor_user_ids', $actor_user_id, false );
+        }
 
         $created_items = [];
         foreach ( $parsed['segments'] as $segment ) {

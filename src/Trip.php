@@ -102,16 +102,32 @@ class Trip {
             return [];
         }
 
+        $meta_query = [
+            'relation' => 'OR',
+            [
+                'key'   => '_travel_app_user_id',
+                'value' => (string) get_current_user_id(),
+            ],
+            [
+                'key'   => '_travel_app_editor_user_ids',
+                'value' => (string) get_current_user_id(),
+            ],
+        ];
+
+        $global_editor_owner_ids = App::get_instance()->get_global_editor_owner_ids_for_user();
+        if ( ! empty( $global_editor_owner_ids ) ) {
+            $meta_query[] = [
+                'key'     => '_travel_app_user_id',
+                'value'   => array_map( 'strval', $global_editor_owner_ids ),
+                'compare' => 'IN',
+            ];
+        }
+
         $terms = get_terms( [
             'taxonomy'   => 'travel_app_trip',
             'hide_empty' => false,
             'number'     => 50,
-            'meta_query' => [
-                [
-                    'key'   => '_travel_app_user_id',
-                    'value' => (string) get_current_user_id(),
-                ],
-            ],
+            'meta_query' => $meta_query,
         ] );
 
         if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
@@ -177,12 +193,16 @@ class Trip {
         $segments = array_map( static function( ItineraryItem $item ): array {
             return $item->to_array();
         }, ItineraryItem::get_for_trip( $this->id, $this->segments_user_id ) );
+        $owner_id = $this->owner_id();
+        $owner = $owner_id > 0 ? get_user_by( 'id', $owner_id ) : false;
 
         $trip = [];
         foreach ( array_keys( self::schema_properties() ) as $field ) {
             $trip[ $field ] = $this->{$field};
         }
 
+        $trip['owner_id'] = $owner_id;
+        $trip['owner_name'] = $owner ? (string) $owner->display_name : '';
         $trip['is_active'] = $this->is_active();
         $trip['segments'] = $segments;
         $trip['segment_count'] = count( $segments );

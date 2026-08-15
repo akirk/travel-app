@@ -127,17 +127,19 @@ $settings_updated = isset( $_GET['settings_updated'] );
                         <span><?php esc_html_e( 'Other users on this WordPress site can create trips for you. They can edit those trips on your behalf, and you can change access later in each trip\'s settings.', 'travel-app' ); ?></span>
                     </span>
                 </label>
-                <div class="setting-field">
-                    <label for="delegated_trip_creation_capability"><?php esc_html_e( 'Minimum permission to create trips for me', 'travel-app' ); ?></label>
-                    <select id="delegated_trip_creation_capability" name="delegated_trip_creation_capability">
-                        <?php foreach ( $delegation_capability_options as $capability => $label ) : ?>
-                            <option value="<?php echo esc_attr( $capability ); ?>" <?php selected( $delegated_trip_creation_capability, $capability ); ?>>
-                                <?php echo esc_html( $label ); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <span class="setting-help"><?php esc_html_e( 'Only users at this level or higher will see you as a Create for option.', 'travel-app' ); ?></span>
-                </div>
+                <?php if ( $allow_delegated_trip_creation ) : ?>
+                    <div class="setting-field">
+                        <label for="delegated_trip_creation_capability"><?php esc_html_e( 'Minimum permission to create trips for me', 'travel-app' ); ?></label>
+                        <select id="delegated_trip_creation_capability" name="delegated_trip_creation_capability">
+                            <?php foreach ( $delegation_capability_options as $capability => $label ) : ?>
+                                <option value="<?php echo esc_attr( $capability ); ?>" <?php selected( $delegated_trip_creation_capability, $capability ); ?>>
+                                    <?php echo esc_html( $label ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <span class="setting-help"><?php esc_html_e( 'Only users at this level or higher will see you as a Create for option.', 'travel-app' ); ?></span>
+                    </div>
+                <?php endif; ?>
                 <div class="setting-field">
                     <label for="global_trip_editor_capability"><?php esc_html_e( 'Who can modify my travel plans', 'travel-app' ); ?></label>
                     <select id="global_trip_editor_capability" name="global_trip_editor_capability">

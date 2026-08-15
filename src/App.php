@@ -482,7 +482,7 @@ class App extends BaseApp {
     public function get_delegated_trip_creation_capability( int $owner_user_id ): string {
         return $this->normalize_delegation_capability(
             (string) get_user_meta( $owner_user_id, '_travel_app_delegated_trip_creation_capability', true ),
-            'read'
+            'edit_others_posts'
         );
     }
 
@@ -1552,8 +1552,8 @@ class App extends BaseApp {
             get_current_user_id(),
             '_travel_app_delegated_trip_creation_capability',
             $this->normalize_delegation_capability(
-                isset( $_POST['delegated_trip_creation_capability'] ) ? (string) wp_unslash( $_POST['delegated_trip_creation_capability'] ) : 'read',
-                'read'
+                isset( $_POST['delegated_trip_creation_capability'] ) ? (string) wp_unslash( $_POST['delegated_trip_creation_capability'] ) : 'edit_others_posts',
+                'edit_others_posts'
             )
         );
         update_user_meta(

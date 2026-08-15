@@ -44,6 +44,7 @@ if ( ! $is_readonly_timeline ) {
     $editable_trip_data['segments'] = array_map( static function( array $editable_segment ) use ( $trip_data ): array {
         $editable_index = (int) ( $editable_segment['id'] ?? 0 );
         $editable_segment['edit_nonce'] = wp_create_nonce( 'travel_app_update_segment_' . (int) $trip_data['id'] . '_' . $editable_index );
+        $editable_segment['delete_nonce'] = wp_create_nonce( 'travel_app_delete_segment_' . (int) $trip_data['id'] . '_' . $editable_index );
 
         return $editable_segment;
     }, $segments );
@@ -824,6 +825,12 @@ if ( count( $route_locations ) >= 2 ) {
         }
         .timeline-edit-panel .edit-form {
             padding: 14px 12px 12px;
+        }
+        .timeline-edit-panel .delete-segment-form {
+            border-top: 1px solid var(--wp-app-color-border);
+            display: flex;
+            justify-content: flex-end;
+            padding: 12px;
         }
         .timeline-edit-panel .form-actions {
             justify-content: space-between;

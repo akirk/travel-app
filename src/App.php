@@ -612,6 +612,22 @@ class App extends BaseApp {
         ] );
     }
 
+    public function get_trip_traveller_label( array $trip_data ): string {
+        $owner_id = absint( $trip_data['owner_id'] ?? 0 );
+        if ( $owner_id <= 0 || $owner_id === get_current_user_id() ) {
+            return '';
+        }
+
+        $owner = get_user_by( 'id', $owner_id );
+        $display_name = $owner ? trim( (string) $owner->display_name ) : '';
+
+        return sprintf(
+            /* translators: %s: travel plan owner display name. */
+            __( 'Traveller: %s', 'travel-app' ),
+            '' !== $display_name ? $display_name : __( 'another user', 'travel-app' )
+        );
+    }
+
     private function update_trip_editors( int $trip_id, array $editor_ids ) {
         if ( ! $this->current_user_can_manage_trip_editors( $trip_id ) ) {
             return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );

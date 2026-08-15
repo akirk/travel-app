@@ -96,20 +96,6 @@ $get_trip_url = static function( array $trip_data ): string {
     return home_url( '/travel-app/trip/' . absint( $trip_data['id'] ?? 0 ) . '/' );
 };
 
-$get_owner_label = static function( array $trip_data ): string {
-    $owner_id = absint( $trip_data['owner_id'] ?? 0 );
-    if ( $owner_id <= 0 || $owner_id === get_current_user_id() ) {
-        return '';
-    }
-
-    $owner_name = trim( (string) ( $trip_data['owner_name'] ?? '' ) );
-    return sprintf(
-        /* translators: %s: travel plan owner display name. */
-        __( 'Traveller: %s', 'travel-app' ),
-        '' !== $owner_name ? $owner_name : __( 'another user', 'travel-app' )
-    );
-};
-
 $get_timeline_preview = static function( array $trip_data ) use ( $today ): array {
     $segments = isset( $trip_data['segments'] ) && is_array( $trip_data['segments'] ) ? $trip_data['segments'] : [];
     usort( $segments, static function( array $a, array $b ): int {
@@ -444,7 +430,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <article class="current-card">
                             <h3><a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><?php echo esc_html( $current_trip['title'] ); ?></a></h3>
                             <div class="trip-meta">
-                                <?php $current_trip_owner_label = $get_owner_label( $current_trip ); ?>
+                                <?php $current_trip_owner_label = $travel_app->get_trip_traveller_label( $current_trip ); ?>
                                 <?php if ( '' !== $current_trip_owner_label ) : ?>
                                     <span><?php echo esc_html( $current_trip_owner_label ); ?></span>
                                 <?php endif; ?>
@@ -508,7 +494,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                 <a class="trip-card <?php echo (int) $trip_data['id'] === $imported ? 'highlight' : ''; ?>" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><?php echo esc_html( $trip_data['title'] ); ?></h3>
                                     <div class="trip-meta">
-                                        <?php $trip_owner_label = $get_owner_label( $trip_data ); ?>
+                                        <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
                                             <span><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
@@ -532,7 +518,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                 <a class="trip-card" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><?php echo esc_html( $trip_data['title'] ); ?></h3>
                                     <div class="trip-meta">
-                                        <?php $trip_owner_label = $get_owner_label( $trip_data ); ?>
+                                        <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
                                             <span><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>

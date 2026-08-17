@@ -41,7 +41,7 @@ class App extends BaseApp {
             // App identity
             'app_name'     => 'Travel App',
             // 'my_apps'      => true,
-            // 'my_apps_icon' => null,
+            'my_apps_icon' => 'dashicons-location-alt',
 
             // Progressive Web App support
             'pwa'          => $this->get_pwa_config(),

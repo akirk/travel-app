@@ -1,0 +1,32 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"meta": {
+		"title": "Travel App (Demo)",
+		"description": "A private travel organizer for WordPress, pre-loaded with a sample multi-country trip so you can explore the timeline right away.",
+		"author": "Alex Kirk",
+		"categories": [
+			"Apps",
+			"Travel"
+		]
+	},
+	"landingPage": "/travel-app/",
+	"steps": [
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "git:directory",
+				"url": "https://github.com/akirk/travel-app",
+				"ref": "dist/main",
+				"refType": "branch"
+			},
+			"options": {
+				"activate": true,
+				"targetFolderName": "travel-app"
+			}
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php\nrequire_once '/wordpress/wp-load.php';\n\nif ( ! taxonomy_exists( 'travel_app_trip' ) || ! post_type_exists( 'travel_app_item' ) ) {\n\treturn;\n}\n\n$owner = get_user_by( 'login', 'admin' );\n$owner_id = $owner ? $owner->ID : 1;\n\n$trip_title = 'Vienna – Hamburg – Denmark Loop';\n$trip = wp_insert_term( $trip_title, 'travel_app_trip', [\n\t'slug' => sanitize_title( $trip_title . '-' . $owner_id . '-demo' ),\n] );\n\nif ( is_wp_error( $trip ) ) {\n\treturn;\n}\n\n$trip_id = (int) $trip['term_id'];\nupdate_term_meta( $trip_id, '_travel_app_user_id', $owner_id );\nupdate_term_meta( $trip_id, '_travel_app_created_by_user_id', $owner_id );\n\n$segments = [\n\t[\n\t\t'type'     => 'flight',\n\t\t'title'    => 'OS 123 Vienna → Hamburg',\n\t\t'date'     => '2026-06-12',\n\t\t'time'     => '08:15',\n\t\t'end_time' => '09:45',\n\t\t'location' => 'VIE',\n\t\t'end_location' => 'HAM',\n\t\t'details'  => \"Economy, seat 14C.\\nCarry-on only.\",\n\t],\n\t[\n\t\t'type'     => 'lodging',\n\t\t'title'    => 'Hotel am Fischmarkt, Hamburg',\n\t\t'date'     => '2026-06-12',\n\t\t'end_date' => '2026-06-14',\n\t\t'time'     => '15:00',\n\t\t'end_time' => '11:00',\n\t\t'location' => 'Hotel am Fischmarkt, Hamburg',\n\t\t'details'  => 'Breakfast included. Free cancellation until June 5.',\n\t],\n\t[\n\t\t'type'     => 'activity',\n\t\t'title'    => 'Speicherstadt walking tour',\n\t\t'date'     => '2026-06-13',\n\t\t'time'     => '10:00',\n\t\t'end_time' => '12:00',\n\t\t'location' => 'Speicherstadt, Hamburg',\n\t\t'details'  => 'Meet at the Wasserschloss bridge.',\n\t],\n\t[\n\t\t'type'     => 'car',\n\t\t'title'    => 'Rental car: Hamburg Airport → Ribe',\n\t\t'date'     => '2026-06-14',\n\t\t'time'     => '12:00',\n\t\t'location' => 'Hamburg Airport',\n\t\t'end_location' => 'Ribe, Denmark',\n\t\t'details'  => 'Compact car, unlimited mileage.',\n\t],\n\t[\n\t\t'type'     => 'lodging',\n\t\t'title'    => 'Weis Stue Guesthouse, Ribe',\n\t\t'date'     => '2026-06-14',\n\t\t'end_date' => '2026-06-16',\n\t\t'time'     => '15:00',\n\t\t'end_time' => '10:00',\n\t\t'location' => 'Weis Stue Guesthouse, Ribe, Denmark',\n\t\t'details'  => \"Denmark's oldest town. Ask for a room facing the square.\",\n\t],\n\t[\n\t\t'type'     => 'activity',\n\t\t'title'    => 'Wadden Sea tidal flat walk',\n\t\t'date'     => '2026-06-15',\n\t\t'time'     => '14:00',\n\t\t'end_time' => '17:00',\n\t\t'location' => 'Vester Vedsted, Denmark',\n\t\t'details'  => 'Rubber boots provided. Start time depends on the tide.',\n\t],\n\t[\n\t\t'type'     => 'car',\n\t\t'title'    => 'Drive: Ribe → Kiel',\n\t\t'date'     => '2026-06-16',\n\t\t'time'     => '10:00',\n\t\t'location' => 'Ribe, Denmark',\n\t\t'end_location' => 'Kiel, Germany',\n\t\t'details'  => 'Border crossing near Flensburg, no stop needed.',\n\t],\n\t[\n\t\t'type'     => 'lodging',\n\t\t'title'    => 'Hotel Hafenblick, Kiel',\n\t\t'date'     => '2026-06-16',\n\t\t'end_date' => '2026-06-17',\n\t\t'time'     => '15:00',\n\t\t'end_time' => '11:00',\n\t\t'location' => 'Hotel Hafenblick, Kiel',\n\t\t'details'  => '',\n\t],\n\t[\n\t\t'type'     => 'train',\n\t\t'title'    => 'RE Kiel Hbf → Hamburg Hbf',\n\t\t'date'     => '2026-06-17',\n\t\t'time'     => '08:20',\n\t\t'end_time' => '09:35',\n\t\t'location' => 'Kiel Hbf',\n\t\t'end_location' => 'Hamburg Hbf',\n\t\t'details'  => 'Rental car dropped off at Kiel station beforehand.',\n\t],\n\t[\n\t\t'type'     => 'flight',\n\t\t'title'    => 'OS 128 Hamburg → Vienna',\n\t\t'date'     => '2026-06-17',\n\t\t'time'     => '18:40',\n\t\t'end_time' => '20:05',\n\t\t'location' => 'HAM',\n\t\t'end_location' => 'VIE',\n\t\t'details'  => 'Economy, seat 22A.',\n\t],\n];\n\n$dates = [];\nforeach ( $segments as $segment ) {\n\t$segment = wp_parse_args( $segment, [\n\t\t'end_date'     => '',\n\t\t'end_time'     => '',\n\t\t'location'     => '',\n\t\t'end_location' => '',\n\t\t'details'      => '',\n\t] );\n\n\t$item_id = wp_insert_post( [\n\t\t'post_type'    => 'travel_app_item',\n\t\t'post_status'  => 'private',\n\t\t'post_author'  => $owner_id,\n\t\t'post_title'   => $segment['title'],\n\t\t'post_content' => $segment['details'],\n\t], true );\n\n\tif ( is_wp_error( $item_id ) ) {\n\t\tcontinue;\n\t}\n\n\twp_set_object_terms( $item_id, [ $trip_id ], 'travel_app_trip', false );\n\n\tupdate_post_meta( $item_id, '_travel_app_type', $segment['type'] );\n\tupdate_post_meta( $item_id, '_travel_app_date', $segment['date'] );\n\tupdate_post_meta( $item_id, '_travel_app_end_date', $segment['end_date'] );\n\tupdate_post_meta( $item_id, '_travel_app_time', $segment['time'] );\n\tupdate_post_meta( $item_id, '_travel_app_end_time', $segment['end_time'] );\n\tupdate_post_meta( $item_id, '_travel_app_starts_at_utc', '' );\n\tupdate_post_meta( $item_id, '_travel_app_ends_at_utc', '' );\n\tupdate_post_meta( $item_id, '_travel_app_timezone', '' );\n\tupdate_post_meta( $item_id, '_travel_app_location', $segment['location'] );\n\tupdate_post_meta( $item_id, '_travel_app_end_location', $segment['end_location'] );\n\tupdate_post_meta( $item_id, '_travel_app_url', '' );\n\tupdate_post_meta( $item_id, '_travel_app_sort', trim( $segment['date'] . ' ' . $segment['time'] ) );\n\tupdate_post_meta( $item_id, '_travel_app_owner_user_id', $owner_id );\n\tupdate_post_meta( $item_id, '_travel_app_created_by_user_id', $owner_id );\n\n\t$dates[] = $segment['date'];\n\tif ( '' !== $segment['end_date'] ) {\n\t\t$dates[] = $segment['end_date'];\n\t}\n}\n\nsort( $dates );\nupdate_term_meta( $trip_id, '_travel_app_starts_at', $dates[0] ?? '' );\nupdate_term_meta( $trip_id, '_travel_app_ends_at', $dates ? end( $dates ) : '' );\n"
+		}
+	]
+}

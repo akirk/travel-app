@@ -3,6 +3,7 @@
 A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.
 
 [Try Travel App in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/blueprint.json)
+· [Try it with demo data](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/demo.json)
 
 Paste or upload booking confirmations, TripIt calendar exports, and itinerary notes to turn them into structured trip timelines. Each trip has editable itinerary items for flights, lodging, trains, rental cars, activities, and other travel details.
 

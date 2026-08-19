@@ -125,7 +125,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Add Playground link(s) to PR description
+      - name: Add Playground link to PR description
         uses: actions/github-script@v9
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -133,48 +133,32 @@ jobs:
           script: |
             const fs = require('fs');
             const distRef = `dist/${process.env.HEAD_REF}`;
+            const playgroundUrl = (file) => `https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/refs/heads/${distRef}/${file}`;
 
-            const blueprints = [
-              {
-                marker: 'playground-link',
-                heading: 'WordPress Playground',
-                intro: 'Test this PR in WordPress Playground:',
-                file: 'blueprint.json',
-              },
-            ];
+            const links = [`[Try this PR](${playgroundUrl('blueprint.json')})`];
             if (fs.existsSync('demo.json')) {
-              blueprints.push({
-                marker: 'demo-playground-link',
-                heading: 'WordPress Playground (with demo data)',
-                intro: 'Test this PR in WordPress Playground, pre-loaded with sample data:',
-                file: 'demo.json',
-              });
+              links.push(`[Try with demo data](${playgroundUrl('demo.json')})`);
             }
 
-            let body = context.payload.pull_request.body || '';
-
-            for (const { marker, heading, intro, file } of blueprints) {
-              const playgroundUrl = `https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/refs/heads/${distRef}/${file}`;
-              const section = [
-                `<!-- ${marker}:start -->`,
-                `## ${heading}`,
-                '',
-                intro,
-                '',
-                playgroundUrl,
-                '',
-                `The linked blueprint loads the generated \`${distRef}\` branch, including Composer dependencies.`,
-                `<!-- ${marker}:end -->`,
-              ].join('\n');
-
-              const existingSection = new RegExp(`<!-- ${marker}:start -->[\\s\\S]*?<!-- ${marker}:end -->`);
-              body = existingSection.test(body)
-                ? body.replace(existingSection, section)
-                : [body.trimEnd(), section].filter(Boolean).join('\n\n');
-            }
+            const markerStart = '<!-- playground-link:start -->';
+            const markerEnd = '<!-- playground-link:end -->';
+            const playgroundSection = [
+              markerStart,
+              '## WordPress Playground',
+              '',
+              `Test this PR in WordPress Playground: ${links.join(' · ')}`,
+              '',
+              `The linked blueprint loads the generated \`${distRef}\` branch, including Composer dependencies.`,
+              markerEnd,
+            ].join('\n');
 
             const { owner, repo } = context.repo;
             const pull_number = context.issue.number;
+            const currentBody = context.payload.pull_request.body || '';
+            const existingSection = /<!-- (?:[a-z0-9-]+-)?playground-link:start -->[\s\S]*?<!-- (?:[a-z0-9-]+-)?playground-link:end -->/;
+            const body = existingSection.test(currentBody)
+              ? currentBody.replace(existingSection, playgroundSection)
+              : [currentBody.trimEnd(), playgroundSection].filter(Boolean).join('\n\n');
 
             await github.rest.pulls.update({
               owner,

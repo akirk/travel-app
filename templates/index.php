@@ -1,6 +1,7 @@
 <?php
 use TravelApp\App;
 use TravelApp\LodgingCoverage;
+use TravelApp\Parser\AiParser;
 use TravelApp\Trip;
 
 $travel_app = App::get_instance();
@@ -14,7 +15,7 @@ $quick_plan_draft_key = isset( $_GET['quick_plan_draft'] ) ? sanitize_key( wp_un
 $quick_plan_draft = '' !== $quick_plan_draft_key ? $travel_app->get_quick_plan_draft( $quick_plan_draft_key ) : [];
 $quick_plan_segment = isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] ) ? $quick_plan_draft['segment'] : [];
 $quick_plan_matches = isset( $quick_plan_draft['matches'] ) && is_array( $quick_plan_draft['matches'] ) ? $quick_plan_draft['matches'] : [];
-$has_ai     = function_exists( 'wp_ai_client_prompt' );
+$has_ai     = AiParser::is_available();
 $has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\AI_Assistant' );
 $delegated_owner_options = $travel_app->get_delegated_trip_owner_options();
 $demo_mode_enabled = $travel_app->is_demo_mode_enabled();

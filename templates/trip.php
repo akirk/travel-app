@@ -1,6 +1,7 @@
 <?php
 use TravelApp\App;
 use TravelApp\LodgingCoverage;
+use TravelApp\Parser\AiParser;
 use TravelApp\Trip;
 
 global $wp_app_route;
@@ -29,7 +30,7 @@ $quick_plan_draft_target = isset( $quick_plan_draft['target_trip_id'] ) ? absint
 $quick_plan_segment = $quick_plan_draft_target === $trip_id && isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] )
     ? $quick_plan_draft['segment']
     : [];
-$has_ai = function_exists( 'wp_ai_client_prompt' );
+$has_ai = AiParser::is_available();
 
 $segments_user_id = null;
 if ( $is_shared_timeline ) {

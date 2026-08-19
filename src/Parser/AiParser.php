@@ -3,6 +3,22 @@
 namespace TravelApp\Parser;
 
 class AiParser {
+    public static function is_available(): bool {
+        if ( ! function_exists( 'wp_ai_client_prompt' ) || ! class_exists( '\WordPress\AiClient\AiClient' ) ) {
+            return false;
+        }
+
+        $registry = \WordPress\AiClient\AiClient::defaultRegistry();
+
+        foreach ( $registry->getRegisteredProviderIds() as $provider_id ) {
+            if ( $registry->isProviderConfigured( $provider_id ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function parse( string $text ) {
         if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
             return new \WP_Error( 'ai_client_unavailable', __( 'WordPress AI Client is unavailable.', 'travel-app' ) );

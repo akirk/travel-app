@@ -155,10 +155,12 @@ jobs:
             const { owner, repo } = context.repo;
             const pull_number = context.issue.number;
             const currentBody = context.payload.pull_request.body || '';
-            const existingSection = /<!-- (?:[a-z0-9-]+-)?playground-link:start -->[\s\S]*?<!-- (?:[a-z0-9-]+-)?playground-link:end -->/;
-            const body = existingSection.test(currentBody)
-              ? currentBody.replace(existingSection, playgroundSection)
-              : [currentBody.trimEnd(), playgroundSection].filter(Boolean).join('\n\n');
+            // Matches any current or historical marker in this family (e.g. a stale
+            // "demo-playground-link" block from before links were consolidated), so
+            // every run leaves exactly one section behind, however many existed before.
+            const existingSections = /<!-- (?:[a-z0-9-]+-)?playground-link:start -->[\s\S]*?<!-- (?:[a-z0-9-]+-)?playground-link:end -->/g;
+            const withoutSections = currentBody.replace(existingSections, '').replace(/\n{3,}/g, '\n\n').trim();
+            const body = [withoutSections, playgroundSection].filter(Boolean).join('\n\n');
 
             await github.rest.pulls.update({
               owner,

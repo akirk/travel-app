@@ -5,6 +5,7 @@
  * Version: 1.0.0
  * Author: Alex Kirk
  * Text Domain: travel-app
+ * Tested up to: 7.1
  * Requires PHP: 7.4
  */
 

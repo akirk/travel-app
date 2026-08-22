@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Travel App
  * Description: A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.
- * Version: 1.0.0
+ * Version: 1.0.0+fd0913199f2c
  * Author: Alex Kirk
  * Text Domain: travel-app
  * Tested up to: 7.1

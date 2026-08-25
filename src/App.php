@@ -431,8 +431,35 @@ class App extends BaseApp {
         ] );
     }
 
+    public static function require_login_for_rest( $result, $server, $request ) {
+        if ( is_user_logged_in() ) {
+            return $result;
+        }
+
+        if ( 0 === strpos( $request->get_route(), '/wp/v2/travel_app_trip' ) ) {
+            return new \WP_Error(
+                'rest_login_required',
+                __( 'Authentication is required to read this data.', 'travel-app' ),
+                [ 'status' => rest_authorization_required_code() ]
+            );
+        }
+
+        return $result;
+    }
+
     public function register_taxonomies(): void {
         $translate_labels = did_action( 'init' );
+
+        // travel_app_trip is show_in_rest (needed for the editor), so core would
+        // serve trip names to anonymous callers over /wp/v2/travel_app_trip.
+        // Gate it via wp-app's Access: single-trip reads are checked as
+        // read_travel_app_trip WITH the trip id, so map_trip_meta_cap (owner,
+        // editor, or valid share token) applies to REST too; the listing needs a
+        // coarse cap (login). Older wp-app without Access -> request filter.
+        $rest_gate = class_exists( '\\WpApp\\Rest\\Access' );
+        if ( ! $rest_gate ) {
+            add_filter( 'rest_pre_dispatch', [ __CLASS__, 'require_login_for_rest' ], 10, 3 );
+        }
 
         register_taxonomy( 'travel_app_trip', 'travel_app_item', [
             'labels'            => [
@@ -443,6 +470,7 @@ class App extends BaseApp {
             'hierarchical'      => false,
             'show_ui'           => true,
             'show_in_rest'      => true,
+            'rest_controller_class' => $rest_gate ? \WpApp\Rest\Access::protect_taxonomy( 'travel_app_trip', 'read_travel_app_trip', 'read' ) : null,
             'show_admin_column' => true,
         ] );
     }

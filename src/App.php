@@ -831,6 +831,50 @@ class App extends BaseApp {
             ],
         ] );
 
+        wp_register_ability( 'travel-app/create-travel-plan', [
+            'label'               => __( 'Create Travel Plan', 'travel-app' ),
+            'description'         => 'Creates a new, empty travel plan for the current user from a title and optional dates, without parsing any itinerary text. Add itinerary items afterwards with travel-app/add-itinerary-item.',
+            'category'            => 'travel-app',
+            'input_schema'        => [
+                'type'                 => 'object',
+                'properties'           => [
+                    'title'     => [
+                        'type'        => 'string',
+                        'description' => 'Travel plan title, for example the destination or occasion.',
+                    ],
+                    'starts_at' => [
+                        'type'        => 'string',
+                        'description' => 'Optional first day of the trip as YYYY-MM-DD.',
+                    ],
+                    'ends_at'   => [
+                        'type'        => 'string',
+                        'description' => 'Optional last day of the trip as YYYY-MM-DD. Defaults to starts_at when omitted.',
+                    ],
+                ],
+                'required'             => [ 'title' ],
+                'additionalProperties' => false,
+            ],
+            'output_schema'       => [
+                'type'       => 'object',
+                'properties' => [
+                    'created' => [ 'type' => 'boolean' ],
+                    'trip'    => Trip::schema(),
+                ],
+            ],
+            'execute_callback'    => [ $this, 'create_ability_trip' ],
+            'permission_callback' => function() {
+                return current_user_can( 'read' );
+            },
+            'meta'                => [
+                'annotations' => [
+                    'instructions' => 'Use this when the user wants a new trip but has no booking text to import. Do not invent dates; leave them out unless the user gave them. Return the Travel App URL afterwards.',
+                    'readonly'     => false,
+                    'destructive'  => false,
+                    'idempotent'   => false,
+                ],
+            ],
+        ] );
+
         wp_register_ability( 'travel-app/get-trip', [
             'label'               => __( 'Get Travel Plan', 'travel-app' ),
             'description'         => 'Returns full details for one saved travel plan owned by the current user, including itinerary items, attachments, existing share links, and app URLs.',
@@ -1268,6 +1312,8 @@ class App extends BaseApp {
     public function get_ai_assistant_ability_instructions( string $instructions, string $ability_id, $args, $result ): string {
         if ( 'travel-app/import-itinerary' === $ability_id && ! empty( $result['id'] ) ) {
             $instructions = 'Tell the user the travel plan was saved. Summarize title, dates, and travel segments, then link to the Travel App URL if present. If missing_fields or parser_error is present, report which fields were not filled and why.';
+        } elseif ( 'travel-app/create-travel-plan' === $ability_id && ! empty( $result['trip']['url'] ) ) {
+            $instructions = 'Tell the user the empty travel plan was created, include the Travel App URL, and offer to add itinerary items to it.';
         } elseif ( in_array( $ability_id, [ 'travel-app/add-itinerary-item', 'travel-app/update-itinerary-item', 'travel-app/delete-itinerary-item', 'travel-app/update-travel-plan' ], true ) && ! empty( $result['trip']['url'] ) ) {
             $instructions = 'Tell the user what changed and include the Travel App URL for review.';
         } elseif ( 'travel-app/create-share-link' === $ability_id && ! empty( $result['url'] ) ) {
@@ -1307,6 +1353,62 @@ class App extends BaseApp {
 
         $trip = Trip::from_term( $trip_id );
         return $trip ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [];
+    }
+
+    public function create_ability_trip( $input ) {
+        $input = is_array( $input ) ? $input : [];
+        $title = sanitize_text_field( isset( $input['title'] ) ? (string) $input['title'] : '' );
+
+        if ( '' === $title ) {
+            return new \WP_Error( 'missing_title', __( 'Enter a title for the travel plan.', 'travel-app' ) );
+        }
+
+        $dates = [];
+        foreach ( [ 'starts_at', 'ends_at' ] as $key ) {
+            $value = isset( $input[ $key ] ) ? trim( (string) $input[ $key ] ) : '';
+            if ( '' !== $value && ! $this->is_valid_ability_date( $value ) ) {
+                return new \WP_Error( 'invalid_date', __( 'Dates must be given as YYYY-MM-DD.', 'travel-app' ) );
+            }
+            $dates[ $key ] = $value;
+        }
+
+        if ( '' === $dates['ends_at'] ) {
+            $dates['ends_at'] = $dates['starts_at'];
+        }
+
+        if ( '' === $dates['starts_at'] && '' !== $dates['ends_at'] ) {
+            $dates['starts_at'] = $dates['ends_at'];
+        }
+
+        if ( $dates['ends_at'] < $dates['starts_at'] ) {
+            return new \WP_Error( 'invalid_date_range', __( 'The end date must not be before the start date.', 'travel-app' ) );
+        }
+
+        $trip_id = $this->save_trip( [
+            'title'        => $title,
+            'starts_at'    => $dates['starts_at'],
+            'ends_at'      => $dates['ends_at'],
+            'segments'     => [],
+            'parser'       => 'manual',
+            'parser_error' => [],
+        ], '' );
+
+        if ( is_wp_error( $trip_id ) ) {
+            return $trip_id;
+        }
+
+        return [
+            'created' => true,
+            'trip'    => ( $trip = Trip::from_term( $trip_id ) ) ? $trip->to_ability_array( [ $this, 'get_trip_share_url' ] ) : [],
+        ];
+    }
+
+    private function is_valid_ability_date( string $value ): bool {
+        if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m ) ) {
+            return false;
+        }
+
+        return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] );
     }
 
     public function get_ability_trip( $input ) {
@@ -3630,7 +3732,9 @@ class App extends BaseApp {
             $created_items[] = $item_id;
         }
 
-        $this->update_trip_bounds_from_items( $trip_id );
+        if ( ! empty( $created_items ) ) {
+            $this->update_trip_bounds_from_items( $trip_id );
+        }
 
         return $trip_id;
     }

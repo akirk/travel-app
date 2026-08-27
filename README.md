@@ -5,6 +5,8 @@ A private travel organizer for WordPress: turn booking confirmations into itiner
 [Try Travel App in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/blueprint.json)
 · [Try it with demo data](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/demo.json)
 
+[Try it in OpenStation](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/blueprint-openstation.json) — the same app opened in desktop mode with the [OpenStation](https://github.com/WordPress/openstation) plugin.
+
 Paste or upload booking confirmations, TripIt calendar exports, and itinerary notes to turn them into structured trip timelines. Each trip has editable itinerary items for flights, lodging, trains, rental cars, activities, and other travel details.
 
 ICS calendar files use a dedicated calendar parser. Other text uses the WordPress AI Client (`wp_ai_client_prompt()`) when an AI connector is configured, with a basic local parser as fallback. Saved travel plans have detail pages and can be deleted from the app. When AI Assistant is active, the app exposes WordPress Abilities for listing, creating, importing, inspecting, renaming, sharing, and editing travel plans and itinerary items.

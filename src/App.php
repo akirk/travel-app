@@ -39,12 +39,15 @@ class App extends BaseApp {
             // 'add_app_node'                 => false,
 
             // App identity
-            'app_name'     => 'Travel App',
-            // 'my_apps'      => true,
-            'my_apps_icon' => 'dashicons-location-alt',
+            'app_name'   => 'Travel App',
+            // 'launcher'   => true,
+            'app_icon'   => 'dashicons-location-alt',
+            // Owned content: REST reads are gated with the app's capability and
+            // OpenStation keeps these menus out of its dock.
+            'post_types' => [ 'travel_app_item', 'travel_app_journal' ],
 
             // Progressive Web App support
-            'pwa'          => $this->get_pwa_config(),
+            'pwa'        => $this->get_pwa_config(),
         ] );
 
         add_action( 'init', [ $this, 'register_post_types' ] );

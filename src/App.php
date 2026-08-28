@@ -3745,7 +3745,65 @@ class App extends BaseApp {
     public function activate(): void {
         $this->register_post_types();
         $this->register_taxonomies();
+        $this->migrate_from_travel_app();
         flush_rewrite_rules();
+    }
+
+    /**
+     * Rename data stored under the plugin's former "travel_app" keys.
+     *
+     * Post types, the trip taxonomy, post/term/user meta keys, and the
+     * travel_app_trip capabilities in roles and per-user capability lists are
+     * rewritten in place to their "traveler" equivalents. Safe to run
+     * repeatedly: each statement only touches rows still using an old key.
+     */
+    public function migrate_from_travel_app(): void {
+        global $wpdb;
+
+        $wpdb->query( "UPDATE {$wpdb->posts} SET post_type = 'traveler_item' WHERE post_type = 'travel_app_item'" );
+        $wpdb->query( "UPDATE {$wpdb->posts} SET post_type = 'traveler_journal' WHERE post_type = 'travel_app_journal'" );
+        $wpdb->query( "UPDATE {$wpdb->term_taxonomy} SET taxonomy = 'traveler_trip' WHERE taxonomy = 'travel_app_trip'" );
+
+        foreach ( [ $wpdb->postmeta, $wpdb->termmeta, $wpdb->usermeta ] as $table ) {
+            $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( '_traveler_', SUBSTRING( meta_key, 13 ) ) WHERE meta_key LIKE '\\_travel\\_app\\_%'" );
+            $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( 'traveler_', SUBSTRING( meta_key, 12 ) ) WHERE meta_key LIKE 'travel\\_app\\_%'" );
+        }
+
+        $cap_map = [
+            'read_travel_app_trip'   => 'read_traveler_trip',
+            'edit_travel_app_trip'   => 'edit_traveler_trip',
+            'delete_travel_app_trip' => 'delete_traveler_trip',
+        ];
+
+        $roles = wp_roles();
+        foreach ( $roles->role_objects as $role ) {
+            foreach ( $cap_map as $old_cap => $new_cap ) {
+                if ( isset( $role->capabilities[ $old_cap ] ) ) {
+                    $role->add_cap( $new_cap, (bool) $role->capabilities[ $old_cap ] );
+                    $role->remove_cap( $old_cap );
+                }
+            }
+        }
+
+        $user_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value LIKE %s",
+            $wpdb->get_blog_prefix() . 'capabilities',
+            '%travel_app_trip%'
+        ) );
+        foreach ( $user_ids as $user_id ) {
+            $user = get_user_by( 'id', (int) $user_id );
+            if ( ! $user ) {
+                continue;
+            }
+            foreach ( $cap_map as $old_cap => $new_cap ) {
+                if ( isset( $user->caps[ $old_cap ] ) ) {
+                    $user->add_cap( $new_cap, (bool) $user->caps[ $old_cap ] );
+                    $user->remove_cap( $old_cap );
+                }
+            }
+        }
+
+        wp_cache_flush();
     }
 
     public function deactivate(): void {

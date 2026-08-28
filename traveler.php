@@ -1,15 +1,15 @@
 <?php
 /**
- * Plugin Name: Travel App
+ * Plugin Name: Traveler
  * Description: A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.
  * Version: 1.0.0
  * Author: Alex Kirk
- * Text Domain: travel-app
+ * Text Domain: traveler
  * Tested up to: 7.1
  * Requires PHP: 7.4
  */
 
-namespace TravelApp;
+namespace Traveler;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -23,7 +23,7 @@ function is_playground(): bool {
 
 // Autoloader for plugin classes.
 spl_autoload_register( function( $class ) {
-    $prefix = 'TravelApp\\';
+    $prefix = 'Traveler\\';
     $len = strlen( $prefix );
     if ( strncmp( $prefix, $class, $len ) !== 0 ) {
         return;

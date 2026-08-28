@@ -1,11 +1,11 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use TravelApp\Parser\AiParser;
+use Traveler\Parser\AiParser;
 
 final class AiParserTest extends TestCase {
     public function test_parses_ai_json_response(): void {
-        $GLOBALS['travel_app_generic_parser_response'] = json_encode( [
+        $GLOBALS['traveler_generic_parser_response'] = json_encode( [
             'title'     => 'AI Parsed Hamburg',
             'starts_at' => '2026-08-01',
             'ends_at'   => '2026-08-01',
@@ -25,11 +25,11 @@ final class AiParserTest extends TestCase {
         self::assertSame( 'wp-ai-client', $parsed['parser'] );
         self::assertSame( 'AI Parsed Hamburg', $parsed['title'] );
         self::assertSame( 'AI Harbor Tour', $parsed['segments'][0]['title'] );
-        self::assertStringContainsString( 'Harbor tour in Hamburg', $GLOBALS['travel_app_generic_parser_last_prompt'] );
+        self::assertStringContainsString( 'Harbor tour in Hamburg', $GLOBALS['traveler_generic_parser_last_prompt'] );
     }
 
     public function test_prompt_includes_current_date_time_context(): void {
-        $GLOBALS['travel_app_generic_parser_response'] = json_encode( [
+        $GLOBALS['traveler_generic_parser_response'] = json_encode( [
             'title'     => 'Yearless Trip',
             'starts_at' => '',
             'ends_at'   => '',
@@ -40,12 +40,12 @@ final class AiParserTest extends TestCase {
 
         self::assertMatchesRegularExpression(
             '/Current date and time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]{3} [+-]\d{2}:\d{2}\. Use this when the source omits a year or uses relative dates\./',
-            $GLOBALS['travel_app_generic_parser_last_prompt']
+            $GLOBALS['traveler_generic_parser_last_prompt']
         );
     }
 
     public function test_prompt_keeps_details_overview_focused(): void {
-        $GLOBALS['travel_app_generic_parser_response'] = json_encode( [
+        $GLOBALS['traveler_generic_parser_response'] = json_encode( [
             'title'     => 'Overview Trip',
             'starts_at' => '',
             'ends_at'   => '',
@@ -54,14 +54,14 @@ final class AiParserTest extends TestCase {
 
         ( new AiParser() )->parse( 'Hotel confirmation ABC123' );
 
-        self::assertStringContainsString( 'Keep details short and itinerary-focused', $GLOBALS['travel_app_generic_parser_last_prompt'] );
-        self::assertStringContainsString( 'Do not put confirmation codes', $GLOBALS['travel_app_generic_parser_last_prompt'] );
-        self::assertStringContainsString( 'Admission Tickets (4 Persons)', $GLOBALS['travel_app_generic_parser_last_prompt'] );
-        self::assertStringContainsString( 'leave title empty', $GLOBALS['travel_app_generic_parser_last_prompt'] );
+        self::assertStringContainsString( 'Keep details short and itinerary-focused', $GLOBALS['traveler_generic_parser_last_prompt'] );
+        self::assertStringContainsString( 'Do not put confirmation codes', $GLOBALS['traveler_generic_parser_last_prompt'] );
+        self::assertStringContainsString( 'Admission Tickets (4 Persons)', $GLOBALS['traveler_generic_parser_last_prompt'] );
+        self::assertStringContainsString( 'leave title empty', $GLOBALS['traveler_generic_parser_last_prompt'] );
     }
 
     public function test_extracts_json_object_from_wrapped_ai_text(): void {
-        $GLOBALS['travel_app_generic_parser_response'] = 'Here is the parsed trip: ' . json_encode( [
+        $GLOBALS['traveler_generic_parser_response'] = 'Here is the parsed trip: ' . json_encode( [
             'title'     => 'Wrapped AI Trip',
             'starts_at' => '2026-08-01',
             'ends_at'   => '',
@@ -75,7 +75,7 @@ final class AiParserTest extends TestCase {
     }
 
     public function test_returns_error_when_ai_response_has_no_json(): void {
-        $GLOBALS['travel_app_generic_parser_response'] = 'not json';
+        $GLOBALS['traveler_generic_parser_response'] = 'not json';
 
         $parsed = ( new AiParser() )->parse( 'Trip text' );
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace TravelApp;
+namespace Traveler;
 
 class UrlPreviewService {
     public function normalize_preview( $preview ): array {
@@ -14,7 +14,7 @@ class UrlPreviewService {
     }
 
     public function get_item_preview( int $item_id ): array {
-        $preview = get_post_meta( $item_id, '_travel_app_url_preview', true );
+        $preview = get_post_meta( $item_id, '_traveler_url_preview', true );
         if ( ! is_array( $preview ) ) {
             return [];
         }
@@ -29,7 +29,7 @@ class UrlPreviewService {
     }
 
     public function get_item_preview_debug( int $item_id ): array {
-        $debug = get_post_meta( $item_id, '_travel_app_url_preview_debug', true );
+        $debug = get_post_meta( $item_id, '_traveler_url_preview_debug', true );
         if ( ! is_array( $debug ) ) {
             return [];
         }
@@ -42,16 +42,16 @@ class UrlPreviewService {
     public function sync_item_preview( int $item_id, array $segment, string $previous_url ): void {
         $manual_preview = $this->prepare_manual_preview( (string) $segment['url'], (array) $segment['url_preview'] );
         if ( ! empty( $manual_preview ) ) {
-            update_post_meta( $item_id, '_travel_app_url_preview', $manual_preview );
-            update_post_meta( $item_id, '_travel_app_url_preview_debug', [
+            update_post_meta( $item_id, '_traveler_url_preview', $manual_preview );
+            update_post_meta( $item_id, '_traveler_url_preview_debug', [
                 'status'     => 'manual',
-                'message'    => __( 'Preview metadata was entered manually.', 'travel-app' ),
+                'message'    => __( 'Preview metadata was entered manually.', 'traveler' ),
                 'fetched_at' => current_time( 'mysql' ),
             ] );
             return;
         }
 
-        if ( $segment['url'] !== $previous_url || ( '' !== $segment['url'] && ! get_post_meta( $item_id, '_travel_app_url_preview', true ) ) ) {
+        if ( $segment['url'] !== $previous_url || ( '' !== $segment['url'] && ! get_post_meta( $item_id, '_traveler_url_preview', true ) ) ) {
             $this->refresh_item_preview( $item_id, $segment );
         }
     }
@@ -75,22 +75,22 @@ class UrlPreviewService {
     private function refresh_item_preview( int $item_id, array $segment ): void {
         $url = (string) ( $segment['url'] ?? '' );
         if ( '' === $url ) {
-            delete_post_meta( $item_id, '_travel_app_url_preview' );
-            delete_post_meta( $item_id, '_travel_app_url_preview_debug' );
+            delete_post_meta( $item_id, '_traveler_url_preview' );
+            delete_post_meta( $item_id, '_traveler_url_preview_debug' );
             return;
         }
 
         if ( $this->is_google_maps_url( $url ) ) {
             $maps_details = $this->get_google_maps_url_details( $url );
             if ( ! empty( $maps_details['address'] ) && empty( $segment['location'] ) ) {
-                update_post_meta( $item_id, '_travel_app_location', $maps_details['address'] );
+                update_post_meta( $item_id, '_traveler_location', $maps_details['address'] );
                 $segment['location'] = $maps_details['address'];
             }
 
-            update_post_meta( $item_id, '_travel_app_url_preview', $this->get_google_maps_url_preview( $segment, $maps_details ) );
-            update_post_meta( $item_id, '_travel_app_url_preview_debug', [
+            update_post_meta( $item_id, '_traveler_url_preview', $this->get_google_maps_url_preview( $segment, $maps_details ) );
+            update_post_meta( $item_id, '_traveler_url_preview_debug', [
                 'status'     => 'google_maps',
-                'message'    => __( 'Google Maps URL preview was derived from the item details.', 'travel-app' ),
+                'message'    => __( 'Google Maps URL preview was derived from the item details.', 'traveler' ),
                 'fetched_at' => current_time( 'mysql' ),
             ] );
             return;
@@ -98,14 +98,14 @@ class UrlPreviewService {
 
         $debug = [];
         $preview = $this->fetch_url_preview( $url, $debug );
-        update_post_meta( $item_id, '_travel_app_url_preview_debug', $debug );
+        update_post_meta( $item_id, '_traveler_url_preview_debug', $debug );
 
         if ( empty( $preview ) ) {
-            delete_post_meta( $item_id, '_travel_app_url_preview' );
+            delete_post_meta( $item_id, '_traveler_url_preview' );
             return;
         }
 
-        update_post_meta( $item_id, '_travel_app_url_preview', $preview );
+        update_post_meta( $item_id, '_traveler_url_preview', $preview );
     }
 
     private function is_google_maps_url( string $url ): bool {
@@ -118,7 +118,7 @@ class UrlPreviewService {
     private function get_google_maps_url_preview( array $segment, array $maps_details = [] ): array {
         $url = (string) ( $segment['url'] ?? '' );
         $location = trim( (string) ( $maps_details['address'] ?? $segment['location'] ?? '' ) );
-        $title = trim( (string) ( $maps_details['title'] ?? $segment['title'] ?? '' ) ) ?: $location ?: __( 'Google Maps location', 'travel-app' );
+        $title = trim( (string) ( $maps_details['title'] ?? $segment['title'] ?? '' ) ) ?: $location ?: __( 'Google Maps location', 'traveler' );
 
         return [
             'title'       => sanitize_text_field( $title ),
@@ -136,7 +136,7 @@ class UrlPreviewService {
             'headers'     => [
                 'Accept'          => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language' => str_replace( '_', '-', determine_locale() ) . ',en;q=0.8',
-                'User-Agent'      => 'Mozilla/5.0 (compatible; TravelApp/1.0; +' . home_url( '/' ) . ')',
+                'User-Agent'      => 'Mozilla/5.0 (compatible; Traveler/1.0; +' . home_url( '/' ) . ')',
             ],
         ] );
 
@@ -177,7 +177,7 @@ class UrlPreviewService {
 
         if ( ! wp_http_validate_url( $url ) ) {
             $debug['status'] = 'invalid_url';
-            $debug['message'] = __( 'The URL did not pass WordPress HTTP validation.', 'travel-app' );
+            $debug['message'] = __( 'The URL did not pass WordPress HTTP validation.', 'traveler' );
             return [];
         }
 
@@ -188,7 +188,7 @@ class UrlPreviewService {
             'headers'             => [
                 'Accept'          => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language' => str_replace( '_', '-', determine_locale() ) . ',en;q=0.8',
-                'User-Agent'      => 'Mozilla/5.0 (compatible; TravelApp/1.0; +' . home_url( '/' ) . ')',
+                'User-Agent'      => 'Mozilla/5.0 (compatible; Traveler/1.0; +' . home_url( '/' ) . ')',
             ],
         ] );
 
@@ -202,7 +202,7 @@ class UrlPreviewService {
         $debug['response_code'] = (string) $response_code;
         if ( $response_code < 200 || $response_code >= 300 ) {
             $debug['status'] = 'http_error';
-            $debug['message'] = sprintf( __( 'Unexpected HTTP status %d.', 'travel-app' ), $response_code );
+            $debug['message'] = sprintf( __( 'Unexpected HTTP status %d.', 'traveler' ), $response_code );
             return [];
         }
 
@@ -211,7 +211,7 @@ class UrlPreviewService {
         $debug['content_type'] = $content_type;
         if ( '' !== $content_type && false === stripos( $content_type, 'text/html' ) && false === stripos( $content_type, 'application/xhtml+xml' ) ) {
             $debug['status'] = 'unsupported_content_type';
-            $debug['message'] = __( 'The URL did not return HTML content.', 'travel-app' );
+            $debug['message'] = __( 'The URL did not return HTML content.', 'traveler' );
             return [];
         }
 
@@ -220,19 +220,19 @@ class UrlPreviewService {
         $debug['body_snippet'] = wp_strip_all_tags( substr( $body, 0, 500 ) );
         if ( '' === $body ) {
             $debug['status'] = 'empty_body';
-            $debug['message'] = __( 'The URL returned an empty response body.', 'travel-app' );
+            $debug['message'] = __( 'The URL returned an empty response body.', 'traveler' );
             return [];
         }
 
         if ( false !== stripos( $body, 'awsWafCookieDomainList' ) || false !== stripos( $body, 'aws-waf-token' ) ) {
             $debug['status'] = 'blocked_by_waf';
-            $debug['message'] = __( 'The URL returned an AWS WAF challenge instead of preview metadata.', 'travel-app' );
+            $debug['message'] = __( 'The URL returned an AWS WAF challenge instead of preview metadata.', 'traveler' );
             return [];
         }
 
         if ( ! class_exists( '\DOMDocument' ) ) {
             $debug['status'] = 'missing_dom';
-            $debug['message'] = __( 'The PHP DOM extension is unavailable.', 'travel-app' );
+            $debug['message'] = __( 'The PHP DOM extension is unavailable.', 'traveler' );
             return [];
         }
 
@@ -244,12 +244,12 @@ class UrlPreviewService {
         $debug['site_name'] = $metadata['site_name'];
         if ( '' === $metadata['title'] && '' === $metadata['description'] && '' === $metadata['image'] ) {
             $debug['status'] = 'no_preview_fields';
-            $debug['message'] = __( 'No title, description, or image metadata was found.', 'travel-app' );
+            $debug['message'] = __( 'No title, description, or image metadata was found.', 'traveler' );
             return [];
         }
 
         $debug['status'] = 'ok';
-        $debug['message'] = __( 'Preview metadata was saved.', 'travel-app' );
+        $debug['message'] = __( 'Preview metadata was saved.', 'traveler' );
         return $metadata;
     }
 

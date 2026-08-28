@@ -1,34 +1,34 @@
 <?php
-use TravelApp\App;
-use TravelApp\LodgingCoverage;
-use TravelApp\Parser\AiParser;
-use TravelApp\Trip;
+use Traveler\App;
+use Traveler\LodgingCoverage;
+use Traveler\Parser\AiParser;
+use Traveler\Trip;
 
-$travel_app = App::get_instance();
+$traveler = App::get_instance();
 $trips      = array_map( static function( Trip $trip ): array {
     return $trip->to_array();
 }, Trip::for_current_user() );
 $imported   = isset( $_GET['imported'] ) ? absint( $_GET['imported'] ) : 0;
 $deleted    = isset( $_GET['deleted'] ) ? absint( $_GET['deleted'] ) : 0;
-$error      = isset( $_GET['travel_app_error'] ) ? sanitize_key( wp_unslash( $_GET['travel_app_error'] ) ) : '';
+$error      = isset( $_GET['traveler_error'] ) ? sanitize_key( wp_unslash( $_GET['traveler_error'] ) ) : '';
 $quick_plan_draft_key = isset( $_GET['quick_plan_draft'] ) ? sanitize_key( wp_unslash( $_GET['quick_plan_draft'] ) ) : '';
-$quick_plan_draft = '' !== $quick_plan_draft_key ? $travel_app->get_quick_plan_draft( $quick_plan_draft_key ) : [];
+$quick_plan_draft = '' !== $quick_plan_draft_key ? $traveler->get_quick_plan_draft( $quick_plan_draft_key ) : [];
 $quick_plan_segment = isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] ) ? $quick_plan_draft['segment'] : [];
 $quick_plan_matches = isset( $quick_plan_draft['matches'] ) && is_array( $quick_plan_draft['matches'] ) ? $quick_plan_draft['matches'] : [];
 $has_ai     = AiParser::is_available();
 $has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\AI_Assistant' );
-$delegated_owner_options = $travel_app->get_delegated_trip_owner_options();
-$demo_mode_enabled = $travel_app->is_demo_mode_enabled();
-$is_playground = $travel_app->is_playground();
-$all_trips_calendar_url = $is_playground ? '' : $travel_app->get_user_calendar_url( get_current_user_id(), true );
+$delegated_owner_options = $traveler->get_delegated_trip_owner_options();
+$demo_mode_enabled = $traveler->is_demo_mode_enabled();
+$is_playground = $traveler->is_playground();
+$all_trips_calendar_url = $is_playground ? '' : $traveler->get_user_calendar_url( get_current_user_id(), true );
 $today      = current_time( 'Y-m-d' );
 $segment_type_labels = [
-    'flight'   => __( 'Flight', 'travel-app' ),
-    'lodging'  => __( 'Lodging', 'travel-app' ),
-    'train'    => __( 'Train', 'travel-app' ),
-    'car'      => __( 'Rental car', 'travel-app' ),
-    'activity' => __( 'Activity', 'travel-app' ),
-    'other'    => __( 'Other', 'travel-app' ),
+    'flight'   => __( 'Flight', 'traveler' ),
+    'lodging'  => __( 'Lodging', 'traveler' ),
+    'train'    => __( 'Train', 'traveler' ),
+    'car'      => __( 'Rental car', 'traveler' ),
+    'activity' => __( 'Activity', 'traveler' ),
+    'other'    => __( 'Other', 'traveler' ),
 ];
 $front_demo_control_id = 'front-page-demo';
 $demo_seed_trip = null;
@@ -89,14 +89,14 @@ $quick_plan_selectable_trips = array_values( array_merge( $current_trips, $upcom
 $past_trips_by_year = [];
 foreach ( $past_trips as $trip_data ) {
     $year = substr( (string) ( ( $trip_data['ends_at'] ?? '' ) ?: ( $trip_data['starts_at'] ?? '' ) ), 0, 4 );
-    $year = preg_match( '/^\d{4}$/', $year ) ? $year : __( 'Earlier', 'travel-app' );
+    $year = preg_match( '/^\d{4}$/', $year ) ? $year : __( 'Earlier', 'traveler' );
     $past_trips_by_year[ $year ][] = $trip_data;
 }
 
 $featured_trip = $current_trips[0] ?? ( $demo_mode_enabled ? ( $upcoming_trips[0] ?? $past_trips[0] ?? null ) : null );
 
 $get_trip_url = static function( array $trip_data ): string {
-    return home_url( '/travel-app/trip/' . absint( $trip_data['id'] ?? 0 ) . '/' );
+    return home_url( '/traveler/trip/' . absint( $trip_data['id'] ?? 0 ) . '/' );
 };
 
 $get_timeline_preview = static function( array $trip_data ) use ( $today ): array {
@@ -145,7 +145,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( __( 'Travel App', 'travel-app' ) ); ?></title>
+    <title><?php echo wp_app_title( __( 'Traveler', 'traveler' ) ); ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <?php wp_app_head(); ?>
     <style>
@@ -409,27 +409,27 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
     <main>
         <header class="app-header">
             <div>
-                <h1><?php esc_html_e( 'Travel App', 'travel-app' ); ?></h1>
-                <p class="lede"><?php esc_html_e( 'A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.', 'travel-app' ); ?></p>
+                <h1><?php esc_html_e( 'Traveler', 'traveler' ); ?></h1>
+                <p class="lede"><?php esc_html_e( 'A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.', 'traveler' ); ?></p>
             </div>
-            <div class="status-stack" aria-label="<?php esc_attr_e( 'Integration status', 'travel-app' ); ?>">
+            <div class="status-stack" aria-label="<?php esc_attr_e( 'Integration status', 'traveler' ); ?>">
                 <span class="status <?php echo $has_ai ? 'available' : 'unavailable'; ?>">
-                    <?php echo esc_html( $has_ai ? __( 'WordPress AI parser available', 'travel-app' ) : __( 'Fallback parser active', 'travel-app' ) ); ?>
+                    <?php echo esc_html( $has_ai ? __( 'WordPress AI parser available', 'traveler' ) : __( 'Fallback parser active', 'traveler' ) ); ?>
                 </span>
                 <span class="status <?php echo $has_ai_assistant ? 'available' : 'unavailable'; ?>">
-                    <?php echo esc_html( $has_ai_assistant ? __( 'AI Assistant connected', 'travel-app' ) : __( 'AI Assistant not detected', 'travel-app' ) ); ?>
+                    <?php echo esc_html( $has_ai_assistant ? __( 'AI Assistant connected', 'traveler' ) : __( 'AI Assistant not detected', 'traveler' ) ); ?>
                 </span>
             </div>
         </header>
 
         <?php if ( $imported ) : ?>
-            <div class="notice" role="status"><?php esc_html_e( 'Travel plan imported.', 'travel-app' ); ?></div>
+            <div class="notice" role="status"><?php esc_html_e( 'Travel plan imported.', 'traveler' ); ?></div>
         <?php elseif ( $deleted ) : ?>
-            <div class="notice" role="status"><?php esc_html_e( 'Travel plan deleted.', 'travel-app' ); ?></div>
+            <div class="notice" role="status"><?php esc_html_e( 'Travel plan deleted.', 'traveler' ); ?></div>
         <?php elseif ( isset( $_GET['settings_updated'] ) ) : ?>
-            <div class="notice" role="status"><?php esc_html_e( 'Settings saved.', 'travel-app' ); ?></div>
+            <div class="notice" role="status"><?php esc_html_e( 'Settings saved.', 'traveler' ); ?></div>
         <?php elseif ( $error ) : ?>
-            <div class="notice error" role="alert"><?php echo esc_html( $travel_app->get_error_notice_message( $error, __( 'The itinerary could not be imported.', 'travel-app' ) ) ); ?></div>
+            <div class="notice error" role="alert"><?php echo esc_html( $traveler->get_error_notice_message( $error, __( 'The itinerary could not be imported.', 'traveler' ) ) ); ?></div>
         <?php endif; ?>
 
         <?php if ( $demo_mode_enabled && ! empty( $trips ) ) : ?>
@@ -444,25 +444,25 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             <div class="trip-sections">
                 <?php if ( empty( $trips ) ) : ?>
                     <section class="panel">
-                        <div class="empty"><?php esc_html_e( 'No travel plans yet. Import a confirmation or calendar file to build your first itinerary.', 'travel-app' ); ?></div>
+                        <div class="empty"><?php esc_html_e( 'No travel plans yet. Import a confirmation or calendar file to build your first itinerary.', 'traveler' ); ?></div>
                     </section>
                 <?php endif; ?>
 
                 <?php if ( $featured_trip ) : ?>
                     <section class="panel" aria-labelledby="current-trip-heading" data-ai-assistant-important>
                         <div class="section-title">
-                            <h2 id="current-trip-heading"><?php echo esc_html( ! empty( $current_trips ) ? __( 'Current Trip', 'travel-app' ) : __( 'Trip Preview', 'travel-app' ) ); ?></h2>
+                            <h2 id="current-trip-heading"><?php echo esc_html( ! empty( $current_trips ) ? __( 'Current Trip', 'traveler' ) : __( 'Trip Preview', 'traveler' ) ); ?></h2>
                         </div>
                         <?php $current_trip = $featured_trip; ?>
                         <?php $current_trip_timeline_segments = LodgingCoverage::timeline_segments( $current_trip['segments'] ?? [] ); ?>
                         <article class="current-card">
                             <h3><a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><span<?php echo App::mask_attr( 'title', (string) ( $current_trip['id'] ?? '' ) ); ?>><?php echo esc_html( $current_trip['title'] ); ?></span></a></h3>
                             <div class="trip-meta">
-                                <?php $current_trip_owner_label = $travel_app->get_trip_traveller_label( $current_trip ); ?>
+                                <?php $current_trip_owner_label = $traveler->get_trip_traveller_label( $current_trip ); ?>
                                 <?php if ( '' !== $current_trip_owner_label ) : ?>
                                     <span<?php echo App::mask_attr( 'person', (string) ( $current_trip['owner_id'] ?? '' ) ); ?>><?php echo esc_html( $current_trip_owner_label ); ?></span>
                                 <?php endif; ?>
-                                <?php foreach ( $travel_app->get_trip_summary_parts( $current_trip, $today ) as $summary_part ) : ?>
+                                <?php foreach ( $traveler->get_trip_summary_parts( $current_trip, $today ) as $summary_part ) : ?>
                                     <span><?php echo esc_html( $summary_part ); ?></span>
                                 <?php endforeach; ?>
                             </div>
@@ -478,29 +478,29 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     $step_effective_end_date = '' !== $step_end_date ? $step_end_date : ( '' !== $step_end_time ? $step_date : '' );
                                     $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['time'] ?? '' ) ?: '00:00' ) );
                                     $step_time_label = ( '' !== $step_effective_end_date && $step_effective_end_date === $step_date && '' !== $step_end_time )
-                                        ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
+                                        ? $traveler->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
                                         : (string) ( $step['time'] ?? '' );
-                                    $step_start_label = trim( $travel_app->format_date_label( $step_date ) . ' ' . (string) ( $step['time'] ?? '' ) );
+                                    $step_start_label = trim( $traveler->format_date_label( $step_date ) . ' ' . (string) ( $step['time'] ?? '' ) );
                                     $step_end_label = '' !== $step_effective_end_date && $step_effective_end_date !== $step_date
-                                        ? trim( $travel_app->format_date_label( $step_effective_end_date ) . ' ' . $step_end_time )
+                                        ? trim( $traveler->format_date_label( $step_effective_end_date ) . ' ' . $step_end_time )
                                         : '';
                                     $step_title = (string) ( $step['title'] ?? '' );
                                     if ( 'checkout' === $step_timeline_kind ) {
                                         $step_title = '' !== $step_title
-                                            ? sprintf( __( 'Check out: %s', 'travel-app' ), $step_title )
-                                            : __( 'Check out', 'travel-app' );
+                                            ? sprintf( __( 'Check out: %s', 'traveler' ), $step_title )
+                                            : __( 'Check out', 'traveler' );
                                     } elseif ( 'return' === $step_timeline_kind ) {
                                         $step_title = '' !== $step_title
-                                            ? sprintf( __( 'Return car: %s', 'travel-app' ), $step_title )
-                                            : __( 'Return car', 'travel-app' );
+                                            ? sprintf( __( 'Return car: %s', 'traveler' ), $step_title )
+                                            : __( 'Return car', 'traveler' );
                                     }
                                     ?>
-                                    <span hidden data-preview-item data-url="<?php echo esc_url( home_url( '/travel-app/trip/' . $current_trip['id'] . '/#' . $step_anchor ) ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-timeline-kind="<?php echo esc_attr( $step_timeline_kind ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( $step_date ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( $step_effective_end_date ); ?>" data-end-time="<?php echo esc_attr( $step_end_time ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( (string) ( $step['location'] ?? '' ) ); ?>" data-end-location="<?php echo esc_attr( (string) ( $step['end_location'] ?? '' ) ); ?>" data-title="<?php echo esc_attr( $step_title ); ?>"></span>
+                                    <span hidden data-preview-item data-url="<?php echo esc_url( home_url( '/traveler/trip/' . $current_trip['id'] . '/#' . $step_anchor ) ); ?>" data-datetime="<?php echo esc_attr( $step_datetime ); ?>" data-timeline-kind="<?php echo esc_attr( $step_timeline_kind ); ?>" data-type="<?php echo esc_attr( (string) ( $step['type'] ?? '' ) ); ?>" data-date="<?php echo esc_attr( $step_date ); ?>" data-time-label="<?php echo esc_attr( $step_time_label ); ?>" data-date-time-label="<?php echo esc_attr( $step_start_label ); ?>" data-end-date="<?php echo esc_attr( $step_effective_end_date ); ?>" data-end-time="<?php echo esc_attr( $step_end_time ); ?>" data-end-label="<?php echo esc_attr( $step_end_label ); ?>" data-location="<?php echo esc_attr( (string) ( $step['location'] ?? '' ) ); ?>" data-end-location="<?php echo esc_attr( (string) ( $step['end_location'] ?? '' ) ); ?>" data-title="<?php echo esc_attr( $step_title ); ?>"></span>
                                 <?php endforeach; ?>
-                                <?php foreach ( [ 'current' => __( 'Current', 'travel-app' ), 'next' => __( 'Next', 'travel-app' ) ] as $key => $label ) : ?>
-                                    <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">
+                                <?php foreach ( [ 'current' => __( 'Current', 'traveler' ), 'next' => __( 'Next', 'traveler' ) ] as $key => $label ) : ?>
+                                    <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'traveler' ); ?>">
                                         <div class="mini-label"><?php echo esc_html( $label ); ?></div>
-                                        <div class="mini-title" data-preview-title<?php echo App::mask_attr( 'title' ); ?>><?php esc_html_e( 'No item', 'travel-app' ); ?></div>
+                                        <div class="mini-title" data-preview-title<?php echo App::mask_attr( 'title' ); ?>><?php esc_html_e( 'No item', 'traveler' ); ?></div>
                                         <div class="mini-countdown" data-preview-countdown></div>
                                         <div class="mini-location" data-preview-meta<?php echo App::mask_attr( 'text' ); ?>></div>
                                         <div class="mini-location" data-preview-location<?php echo App::mask_attr( 'place' ); ?>></div>
@@ -515,18 +515,18 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                 <?php if ( ! empty( $upcoming_trips ) ) : ?>
                     <section class="panel" aria-labelledby="upcoming-heading">
                         <div class="section-title">
-                            <h2 id="upcoming-heading"><?php esc_html_e( 'Upcoming Trips', 'travel-app' ); ?></h2>
+                            <h2 id="upcoming-heading"><?php esc_html_e( 'Upcoming Trips', 'traveler' ); ?></h2>
                         </div>
                         <div class="trip-list">
                             <?php foreach ( $upcoming_trips as $trip_data ) : ?>
                                 <a class="trip-card <?php echo (int) $trip_data['id'] === $imported ? 'highlight' : ''; ?>" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><span<?php echo App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
                                     <div class="trip-meta">
-                                        <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
+                                        <?php $trip_owner_label = $traveler->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
                                             <span<?php echo App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
-                                        <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
+                                        <?php foreach ( $traveler->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
                                             <span><?php echo esc_html( $summary_part ); ?></span>
                                         <?php endforeach; ?>
                                     </div>
@@ -546,11 +546,11 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                 <a class="trip-card" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><span<?php echo App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
                                     <div class="trip-meta">
-                                        <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
+                                        <?php $trip_owner_label = $traveler->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
                                             <span<?php echo App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
-                                        <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
+                                        <?php foreach ( $traveler->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
                                             <span><?php echo esc_html( $summary_part ); ?></span>
                                         <?php endforeach; ?>
                                     </div>
@@ -562,18 +562,18 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             </div>
 
             <aside class="panel import-panel" aria-labelledby="import-trip-heading">
-                <h2 id="import-trip-heading"><?php esc_html_e( 'Import', 'travel-app' ); ?></h2>
+                <h2 id="import-trip-heading"><?php esc_html_e( 'Import', 'traveler' ); ?></h2>
                     <?php if ( ! empty( $quick_plan_segment ) ) : ?>
                         <?php
                         $quick_plan_trip_title = isset( $quick_plan_draft['trip_title'] )
                             ? (string) $quick_plan_draft['trip_title']
-                            : ( ! empty( $quick_plan_segment['location'] ) ? (string) $quick_plan_segment['location'] : __( 'Quick Travel Plan', 'travel-app' ) );
+                            : ( ! empty( $quick_plan_segment['location'] ) ? (string) $quick_plan_segment['location'] : __( 'Quick Travel Plan', 'traveler' ) );
                         $quick_plan_parser = (string) ( $quick_plan_draft['parser'] ?? 'quick-plan' );
                         $quick_plan_parser_labels = [
-                            'wp-ai-client' => __( 'AI extraction', 'travel-app' ),
-                            'quick-plan'   => __( 'quick planner fallback', 'travel-app' ),
-                            'fallback'     => __( 'basic parser fallback', 'travel-app' ),
-                            'ics'          => __( 'calendar parser', 'travel-app' ),
+                            'wp-ai-client' => __( 'AI extraction', 'traveler' ),
+                            'quick-plan'   => __( 'quick planner fallback', 'traveler' ),
+                            'fallback'     => __( 'basic parser fallback', 'traveler' ),
+                            'ics'          => __( 'calendar parser', 'traveler' ),
                         ];
                         $quick_plan_parser_label = $quick_plan_parser_labels[ $quick_plan_parser ] ?? $quick_plan_parser;
                         $quick_plan_parser_error = isset( $quick_plan_draft['parser_error'] ) && is_array( $quick_plan_draft['parser_error'] )
@@ -583,15 +583,15 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         $quick_plan_parser_error_message = (string) ( $quick_plan_parser_error['message'] ?? '' );
                         ?>
                         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                            <input type="hidden" name="action" value="travel_app_import">
+                            <input type="hidden" name="action" value="traveler_import">
                             <input type="hidden" name="quick_plan_draft" value="<?php echo esc_attr( $quick_plan_draft_key ); ?>">
-                            <?php wp_nonce_field( 'travel_app_import' ); ?>
+                            <?php wp_nonce_field( 'traveler_import' ); ?>
                             <p class="quick-plan-confirm">
-                                <?php esc_html_e( 'Review the parsed entry fields, then choose whether to add it to an existing trip or create a new trip.', 'travel-app' ); ?>
+                                <?php esc_html_e( 'Review the parsed entry fields, then choose whether to add it to an existing trip or create a new trip.', 'traveler' ); ?>
                                 <?php
                                 printf(
                                     /* translators: %s: parser source label. */
-                                    esc_html__( ' Parsed with: %s.', 'travel-app' ),
+                                    esc_html__( ' Parsed with: %s.', 'traveler' ),
                                     esc_html( $quick_plan_parser_label )
                                 );
                                 ?>
@@ -599,7 +599,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     <?php
                                     printf(
                                         /* translators: 1: parser error code, 2: parser error message. */
-                                        esc_html__( ' AI parser error: %1$s %2$s', 'travel-app' ),
+                                        esc_html__( ' AI parser error: %1$s %2$s', 'traveler' ),
                                         esc_html( $quick_plan_parser_error_code ),
                                         esc_html( $quick_plan_parser_error_message )
                                     );
@@ -608,11 +608,11 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                             </p>
                             <div class="quick-plan-fields">
                                 <label class="field-wide">
-                                    <?php esc_html_e( 'Title', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'Title', 'traveler' ); ?>
                                     <input name="segment_title" value="<?php echo esc_attr( (string) ( $quick_plan_segment['title'] ?? '' ) ); ?>">
                                 </label>
                                 <label>
-                                    <?php esc_html_e( 'Type', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'Type', 'traveler' ); ?>
                                     <select name="segment_type">
                                         <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
                                             <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $quick_plan_segment['type'] ?? 'activity', $type ); ?>><?php echo esc_html( $segment_type_labels[ $type ] ?? ucfirst( $type ) ); ?></option>
@@ -620,35 +620,35 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     </select>
                                 </label>
                                 <label>
-                                    <?php esc_html_e( 'Location', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'Location', 'traveler' ); ?>
                                     <input name="segment_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['location'] ?? '' ) ); ?>">
                                 </label>
                                 <label>
-                                    <?php esc_html_e( 'Start Date', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'Start Date', 'traveler' ); ?>
                                     <input type="date" name="segment_date" value="<?php echo esc_attr( (string) ( $quick_plan_segment['date'] ?? '' ) ); ?>">
                                 </label>
                                 <label>
-                                    <?php esc_html_e( 'Start Time', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'Start Time', 'traveler' ); ?>
                                     <input type="time" name="segment_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['time'] ?? '' ) ); ?>">
                                 </label>
                                 <label>
-                                    <?php esc_html_e( 'End Date', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'End Date', 'traveler' ); ?>
                                     <input type="date" name="segment_end_date" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_date'] ?? '' ) ); ?>">
                                 </label>
                                 <label>
-                                    <?php esc_html_e( 'End Time', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'End Time', 'traveler' ); ?>
                                     <input type="time" name="segment_end_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_time'] ?? '' ) ); ?>">
                                 </label>
                                 <label class="field-wide">
-                                    <?php esc_html_e( 'End Location', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'End Location', 'traveler' ); ?>
                                     <input name="segment_end_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_location'] ?? '' ) ); ?>">
                                 </label>
                                 <label class="field-wide">
-                                    <?php esc_html_e( 'URL', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'URL', 'traveler' ); ?>
                                     <input type="url" name="segment_url" value="<?php echo esc_attr( (string) ( $quick_plan_segment['url'] ?? '' ) ); ?>">
                                 </label>
                                 <label class="field-wide">
-                                    <?php esc_html_e( 'Details', 'travel-app' ); ?>
+                                    <?php esc_html_e( 'Details', 'traveler' ); ?>
                                     <textarea name="segment_details"><?php echo esc_textarea( (string) ( $quick_plan_segment['details'] ?? '' ) ); ?></textarea>
                                 </label>
                             </div>
@@ -658,25 +658,25 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                         <label class="quick-plan-choice">
                                             <input type="radio" name="quick_plan_target" value="<?php echo esc_attr( (string) ( $match['id'] ?? 0 ) ); ?>" <?php checked( 0, $index ); ?>>
                                             <span>
-                                                <strong><?php echo esc_html( (string) ( $match['title'] ?? __( 'Travel plan', 'travel-app' ) ) ); ?></strong>
-                                                <?php echo esc_html( $travel_app->format_date_range_label( (string) ( $match['starts_at'] ?? '' ), (string) ( $match['ends_at'] ?? '' ) ) ); ?>
+                                                <strong><?php echo esc_html( (string) ( $match['title'] ?? __( 'Travel plan', 'traveler' ) ) ); ?></strong>
+                                                <?php echo esc_html( $traveler->format_date_range_label( (string) ( $match['starts_at'] ?? '' ), (string) ( $match['ends_at'] ?? '' ) ) ); ?>
                                             </span>
                                         </label>
                                     <?php endforeach; ?>
                                 <?php else : ?>
-                                    <p class="quick-plan-confirm"><?php esc_html_e( 'No matching existing travel plan was found for these fields.', 'travel-app' ); ?></p>
+                                    <p class="quick-plan-confirm"><?php esc_html_e( 'No matching existing travel plan was found for these fields.', 'traveler' ); ?></p>
                                 <?php endif; ?>
                                 <label class="quick-plan-choice">
                                     <input type="radio" name="quick_plan_target" value="new" <?php checked( empty( $quick_plan_matches ) ); ?>>
                                     <span>
-                                        <strong><?php esc_html_e( 'Create a new travel plan', 'travel-app' ); ?></strong>
-                                        <?php esc_html_e( 'Use this item as the first entry.', 'travel-app' ); ?>
-                                        <input type="text" name="quick_plan_trip_title" value="<?php echo esc_attr( $quick_plan_trip_title ); ?>" aria-label="<?php esc_attr_e( 'New travel plan title', 'travel-app' ); ?>">
+                                        <strong><?php esc_html_e( 'Create a new travel plan', 'traveler' ); ?></strong>
+                                        <?php esc_html_e( 'Use this item as the first entry.', 'traveler' ); ?>
+                                        <input type="text" name="quick_plan_trip_title" value="<?php echo esc_attr( $quick_plan_trip_title ); ?>" aria-label="<?php esc_attr_e( 'New travel plan title', 'traveler' ); ?>">
                                         <?php if ( count( $delegated_owner_options ) > 1 ) : ?>
-                                            <select name="travel_app_owner_user_id" aria-label="<?php esc_attr_e( 'Create travel plan for', 'travel-app' ); ?>">
+                                            <select name="traveler_owner_user_id" aria-label="<?php esc_attr_e( 'Create travel plan for', 'traveler' ); ?>">
                                                 <?php foreach ( $delegated_owner_options as $owner_option ) : ?>
                                                     <option value="<?php echo esc_attr( (string) $owner_option->ID ); ?>">
-                                                        <?php echo esc_html( get_current_user_id() === (int) $owner_option->ID ? __( 'Myself', 'travel-app' ) : $owner_option->display_name ); ?>
+                                                        <?php echo esc_html( get_current_user_id() === (int) $owner_option->ID ? __( 'Myself', 'traveler' ) : $owner_option->display_name ); ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -687,15 +687,15 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     <label class="quick-plan-choice">
                                         <input type="radio" name="quick_plan_target" value="existing">
                                         <span>
-                                            <strong><?php esc_html_e( 'Choose a current or upcoming trip', 'travel-app' ); ?></strong>
-                                            <select name="quick_plan_existing_trip" data-quick-plan-existing-trip aria-label="<?php esc_attr_e( 'Current or upcoming trip', 'travel-app' ); ?>">
+                                            <strong><?php esc_html_e( 'Choose a current or upcoming trip', 'traveler' ); ?></strong>
+                                            <select name="quick_plan_existing_trip" data-quick-plan-existing-trip aria-label="<?php esc_attr_e( 'Current or upcoming trip', 'traveler' ); ?>">
                                                 <?php foreach ( $quick_plan_selectable_trips as $trip_data ) : ?>
                                                     <option value="<?php echo esc_attr( (string) ( $trip_data['id'] ?? 0 ) ); ?>">
                                                         <?php
                                                         echo esc_html(
                                                             trim(
-                                                                (string) ( $trip_data['title'] ?? __( 'Travel plan', 'travel-app' ) ) . ' - ' .
-                                                                $travel_app->format_date_range_label( (string) ( $trip_data['starts_at'] ?? '' ), (string) ( $trip_data['ends_at'] ?? '' ) )
+                                                                (string) ( $trip_data['title'] ?? __( 'Travel plan', 'traveler' ) ) . ' - ' .
+                                                                $traveler->format_date_range_label( (string) ( $trip_data['starts_at'] ?? '' ), (string) ( $trip_data['ends_at'] ?? '' ) )
                                                             )
                                                         );
                                                         ?>
@@ -707,38 +707,38 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                 <?php endif; ?>
                             </div>
                             <div class="quick-plan-actions">
-                                <button type="submit"><?php esc_html_e( 'Add Plan', 'travel-app' ); ?></button>
+                                <button type="submit"><?php esc_html_e( 'Add Plan', 'traveler' ); ?></button>
                             </div>
                         </form>
                     <?php else : ?>
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
-                    <input type="hidden" name="action" value="travel_app_import">
-                    <?php wp_nonce_field( 'travel_app_import' ); ?>
+                    <input type="hidden" name="action" value="traveler_import">
+                    <?php wp_nonce_field( 'traveler_import' ); ?>
                     <label class="drop-zone" id="itinerary_drop_zone" for="itinerary_file">
-                        <span class="drop-title"><?php esc_html_e( 'Drop file', 'travel-app' ); ?></span>
-                        <span class="drop-file-name" id="itinerary_file_name"><?php esc_html_e( 'ICS or text file', 'travel-app' ); ?></span>
+                        <span class="drop-title"><?php esc_html_e( 'Drop file', 'traveler' ); ?></span>
+                        <span class="drop-file-name" id="itinerary_file_name"><?php esc_html_e( 'ICS or text file', 'traveler' ); ?></span>
                         <input type="file" id="itinerary_file" name="itinerary_file" accept=".ics,.txt,text/calendar,text/plain">
                     </label>
-                    <label for="itinerary_text"><?php esc_html_e( 'Enter a trip name, paste a confirmation, or type an entry', 'travel-app' ); ?></label>
-                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'travel-app' ); ?>"></textarea>
+                    <label for="itinerary_text"><?php esc_html_e( 'Enter a trip name, paste a confirmation, or type an entry', 'traveler' ); ?></label>
+                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'traveler' ); ?>"></textarea>
                     <?php if ( count( $delegated_owner_options ) > 1 ) : ?>
-                        <label for="travel_app_owner_user_id"><?php esc_html_e( 'Create for', 'travel-app' ); ?></label>
-                        <select id="travel_app_owner_user_id" name="travel_app_owner_user_id">
+                        <label for="traveler_owner_user_id"><?php esc_html_e( 'Create for', 'traveler' ); ?></label>
+                        <select id="traveler_owner_user_id" name="traveler_owner_user_id">
                             <?php foreach ( $delegated_owner_options as $owner_option ) : ?>
                                 <option value="<?php echo esc_attr( (string) $owner_option->ID ); ?>">
-                                    <?php echo esc_html( get_current_user_id() === (int) $owner_option->ID ? __( 'Myself', 'travel-app' ) : $owner_option->display_name ); ?>
+                                    <?php echo esc_html( get_current_user_id() === (int) $owner_option->ID ? __( 'Myself', 'traveler' ) : $owner_option->display_name ); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     <?php endif; ?>
-                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'Enter only a trip name to create a new trip. AI extraction can also turn plain text into an entry for review; files and confirmations still work too.', 'travel-app' ) : __( 'Enter only a trip name to create a new trip, or use quick parsing, calendar parsing, or a basic parser for itinerary text.', 'travel-app' ) ); ?></p>
-                    <button type="submit"><?php esc_html_e( 'Create or Import', 'travel-app' ); ?></button>
+                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'Enter only a trip name to create a new trip. AI extraction can also turn plain text into an entry for review; files and confirmations still work too.', 'traveler' ) : __( 'Enter only a trip name to create a new trip, or use quick parsing, calendar parsing, or a basic parser for itinerary text.', 'traveler' ) ); ?></p>
+                    <button type="submit"><?php esc_html_e( 'Create or Import', 'traveler' ); ?></button>
                 </form>
                 <?php if ( '' !== $all_trips_calendar_url && ! $is_playground ) : ?>
                     <div class="calendar-subscription" data-calendar-subscription>
-                        <h3><?php esc_html_e( 'Calendar Subscription', 'travel-app' ); ?></h3>
-                        <p class="hint"><?php esc_html_e( 'Add this URL to your calendar app to see all your trips there.', 'travel-app' ); ?></p>
-                        <button class="calendar-button" type="button" data-copy-url="<?php echo esc_attr( $all_trips_calendar_url ); ?>"><?php esc_html_e( 'Copy URL', 'travel-app' ); ?></button>
+                        <h3><?php esc_html_e( 'Calendar Subscription', 'traveler' ); ?></h3>
+                        <p class="hint"><?php esc_html_e( 'Add this URL to your calendar app to see all your trips there.', 'traveler' ); ?></p>
+                        <button class="calendar-button" type="button" data-copy-url="<?php echo esc_attr( $all_trips_calendar_url ); ?>"><?php esc_html_e( 'Copy URL', 'traveler' ); ?></button>
                         <p class="hint" data-copy-status aria-live="polite"></p>
                     </div>
                 <?php endif; ?>
@@ -779,7 +779,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             function showFileName() {
                 fileName.textContent = fileInput.files && fileInput.files.length
                     ? fileInput.files[0].name
-                    : '<?php echo esc_js( __( 'ICS or text file', 'travel-app' ) ); ?>';
+                    : '<?php echo esc_js( __( 'ICS or text file', 'traveler' ) ); ?>';
             }
 
             ['dragenter', 'dragover'].forEach(function(eventName) {
@@ -819,12 +819,12 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             }
 
             function confirmCopied() {
-                button.textContent = '<?php echo esc_js( __( 'Copied!', 'travel-app' ) ); ?>';
+                button.textContent = '<?php echo esc_js( __( 'Copied!', 'traveler' ) ); ?>';
                 if (status) {
-                    status.textContent = '<?php echo esc_js( __( 'Calendar subscription link copied.', 'travel-app' ) ); ?>';
+                    status.textContent = '<?php echo esc_js( __( 'Calendar subscription link copied.', 'traveler' ) ); ?>';
                 }
                 window.setTimeout(function() {
-                    button.textContent = '<?php echo esc_js( __( 'Copy URL', 'travel-app' ) ); ?>';
+                    button.textContent = '<?php echo esc_js( __( 'Copy URL', 'traveler' ) ); ?>';
                 }, 1800);
             }
 
@@ -836,13 +836,13 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
 
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(url).then(confirmCopied).catch(function() {
-                        window.prompt('<?php echo esc_js( __( 'Copy this link:', 'travel-app' ) ); ?>', url);
+                        window.prompt('<?php echo esc_js( __( 'Copy this link:', 'traveler' ) ); ?>', url);
                         confirmCopied();
                     });
                     return;
                 }
 
-                window.prompt('<?php echo esc_js( __( 'Copy this link:', 'travel-app' ) ); ?>', url);
+                window.prompt('<?php echo esc_js( __( 'Copy this link:', 'traveler' ) ); ?>', url);
                 confirmCopied();
             });
         }());

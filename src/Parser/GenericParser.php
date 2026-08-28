@@ -1,6 +1,6 @@
 <?php
 
-namespace TravelApp\Parser;
+namespace Traveler\Parser;
 
 class GenericParser {
     public function parse( string $text ): array {
@@ -31,7 +31,7 @@ class GenericParser {
         }
 
         if ( '' === $title ) {
-            $title = __( 'Imported Travel Plan', 'travel-app' );
+            $title = __( 'Imported Travel Plan', 'traveler' );
         }
 
         $segments = [];

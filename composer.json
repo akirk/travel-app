@@ -1,6 +1,6 @@
 {
-    "name": "travel-app/travel-app",
-    "description": "Travel App - A WordPress app powered by WpApp",
+    "name": "traveler/traveler",
+    "description": "Traveler - A WordPress app powered by WpApp",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
     "require": {
@@ -12,7 +12,7 @@
     },
     "autoload": {
         "psr-4": {
-            "TravelApp\\": "src/"
+            "Traveler\\": "src/"
         }
     },
     "scripts": {
@@ -25,6 +25,6 @@
         }
     ],
     "config": {
-        "autoloader-suffix": "travelapp"
+        "autoloader-suffix": "traveler"
     }
 }

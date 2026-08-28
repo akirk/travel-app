@@ -1,7 +1,7 @@
 (function() {
-    var config = window.travelAppPwa || {};
+    var config = window.travelerPwa || {};
     var messages = config.messages || {};
-    var dbName = 'travel-app-offline';
+    var dbName = 'traveler-offline';
     var storeName = 'mutations';
     var offlineState = {
         connection: navigator.onLine ? 'Online' : 'Offline',
@@ -35,7 +35,7 @@
     }
 
     function setWorkerVersion(value) {
-        workerVersion = value ? String(value).replace(/^travel-app-/, '') : '';
+        workerVersion = value ? String(value).replace(/^traveler-/, '') : '';
         offlineState.worker = workerVersion ? workerState + ', ' + workerVersion : workerState;
         updateOfflinePanel();
     }
@@ -289,11 +289,11 @@
 
         setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Registering');
 
-        window.addEventListener('travel-app-sync', function() {
+        window.addEventListener('traveler-sync', function() {
             flushQueue();
         });
 
-        window.addEventListener('travel-app-cache-status', function(event) {
+        window.addEventListener('traveler-cache-status', function(event) {
             var detail = event.detail || {};
             setOfflineState('cache', detail.ok ? 'Ready offline' : 'Not cached');
             if (typeof detail.cachedCount === 'number' && typeof detail.totalCount === 'number') {
@@ -302,7 +302,7 @@
             updateAttachmentAvailability(detail.cachedUrls || []);
         });
 
-        window.addEventListener('travel-app-version', function(event) {
+        window.addEventListener('traveler-version', function(event) {
             var detail = event.detail || {};
             setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Ready');
             setWorkerVersion(detail.version || '');
@@ -334,7 +334,7 @@
         }
 
         return navigator.serviceWorker.ready.then(function(registration) {
-            return registration.sync.register('travel-app-sync');
+            return registration.sync.register('traveler-sync');
         }).catch(function() {});
     }
 
@@ -404,7 +404,7 @@
     }
 
     function getTripData() {
-        var source = document.getElementById('travel-app-trip-data');
+        var source = document.getElementById('traveler-trip-data');
         if (!source || !source.textContent) {
             return null;
         }

@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use TravelApp\LodgingCoverage;
+use Traveler\LodgingCoverage;
 
 final class LodgingCoverageTest extends TestCase {
     public function test_reports_no_missing_nights_when_lodging_covers_trip(): void {

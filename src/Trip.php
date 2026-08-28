@@ -1,6 +1,6 @@
 <?php
 
-namespace TravelApp;
+namespace Traveler;
 
 class Trip {
     public int $id;
@@ -16,10 +16,10 @@ class Trip {
         $this->term = $term;
         $this->id = (int) $term->term_id;
         $this->title = (string) $term->name;
-        $this->starts_at = (string) get_term_meta( $this->id, '_travel_app_starts_at', true );
-        $this->ends_at = (string) get_term_meta( $this->id, '_travel_app_ends_at', true );
-        $this->parser = (string) get_term_meta( $this->id, '_travel_app_parser', true );
-        $this->parser_error = self::normalize_parser_error( get_term_meta( $this->id, '_travel_app_parser_error', true ) );
+        $this->starts_at = (string) get_term_meta( $this->id, '_traveler_starts_at', true );
+        $this->ends_at = (string) get_term_meta( $this->id, '_traveler_ends_at', true );
+        $this->parser = (string) get_term_meta( $this->id, '_traveler_parser', true );
+        $this->parser_error = self::normalize_parser_error( get_term_meta( $this->id, '_traveler_parser_error', true ) );
         $this->segments_user_id = $segments_user_id;
     }
 
@@ -87,7 +87,7 @@ class Trip {
 
     public static function from_term( $term, ?int $segments_user_id = null ): ?self {
         if ( is_numeric( $term ) ) {
-            $term = get_term( (int) $term, 'travel_app_trip' );
+            $term = get_term( (int) $term, 'traveler_trip' );
         }
 
         if ( ! $term || is_wp_error( $term ) ) {
@@ -105,17 +105,17 @@ class Trip {
         $meta_query = [
             'relation' => 'OR',
             [
-                'key'   => '_travel_app_user_id',
+                'key'   => '_traveler_user_id',
                 'value' => (string) $user_id,
             ],
             [
-                'key'   => '_travel_app_editor_user_ids',
+                'key'   => '_traveler_editor_user_ids',
                 'value' => (string) $user_id,
             ],
         ];
 
         $terms = get_terms( [
-            'taxonomy'   => 'travel_app_trip',
+            'taxonomy'   => 'traveler_trip',
             'hide_empty' => false,
             'meta_query' => $meta_query,
         ] );
@@ -125,8 +125,8 @@ class Trip {
         }
 
         usort( $terms, static function( \WP_Term $a, \WP_Term $b ): int {
-            $a_start = (string) get_term_meta( $a->term_id, '_travel_app_starts_at', true );
-            $b_start = (string) get_term_meta( $b->term_id, '_travel_app_starts_at', true );
+            $a_start = (string) get_term_meta( $a->term_id, '_traveler_starts_at', true );
+            $b_start = (string) get_term_meta( $b->term_id, '_traveler_starts_at', true );
             return strcmp( $b_start, $a_start );
         } );
 
@@ -168,7 +168,7 @@ class Trip {
             return null;
         }
 
-        $term = get_term( $trip_id, 'travel_app_trip' );
+        $term = get_term( $trip_id, 'traveler_trip' );
         if ( ! $term || is_wp_error( $term ) ) {
             return null;
         }
@@ -177,7 +177,7 @@ class Trip {
     }
 
     public static function get_owner_id( int $trip_id ): int {
-        return (int) get_term_meta( $trip_id, '_travel_app_user_id', true );
+        return (int) get_term_meta( $trip_id, '_traveler_user_id', true );
     }
 
     public function owner_id(): int {
@@ -230,7 +230,7 @@ class Trip {
 
     public function to_ability_array( callable $share_url_callback ): array {
         $trip = $this->to_array();
-        $trip['url'] = home_url( '/travel-app/trip/' . $this->id . '/' );
+        $trip['url'] = home_url( '/traveler/trip/' . $this->id . '/' );
         $trip['share_urls'] = [
             'fellow' => (string) $share_url_callback( $this->id, 'fellow' ),
             'public' => (string) $share_url_callback( $this->id, 'public' ),
@@ -263,17 +263,17 @@ class Trip {
         $parser_error = isset( $trip['parser_error'] ) && is_array( $trip['parser_error'] ) ? $trip['parser_error'] : [];
         $parser_error_code = (string) ( $parser_error['code'] ?? '' );
         $parser_error_message = (string) ( $parser_error['message'] ?? '' );
-        $reason = __( 'No value is saved for this field.', 'travel-app' );
+        $reason = __( 'No value is saved for this field.', 'traveler' );
 
         if ( '' !== $parser ) {
-            $reason = __( 'The parser did not find a value for this field in the imported text.', 'travel-app' );
+            $reason = __( 'The parser did not find a value for this field in the imported text.', 'traveler' );
         }
 
         if ( '' !== $parser_error_code || '' !== $parser_error_message ) {
             $reason = trim(
                 sprintf(
                     /* translators: 1: parser error code, 2: parser error message. */
-                    __( 'The parser reported %1$s %2$s, and no value was saved for this field.', 'travel-app' ),
+                    __( 'The parser reported %1$s %2$s, and no value was saved for this field.', 'traveler' ),
                     $parser_error_code,
                     $parser_error_message
                 )
@@ -281,11 +281,11 @@ class Trip {
         }
 
         $field_labels = [
-            'title'        => __( 'Title', 'travel-app' ),
-            'date'         => __( 'Start Date', 'travel-app' ),
-            'time'         => __( 'Start Time', 'travel-app' ),
-            'location'     => __( 'Location', 'travel-app' ),
-            'end_location' => __( 'End Location', 'travel-app' ),
+            'title'        => __( 'Title', 'traveler' ),
+            'date'         => __( 'Start Date', 'traveler' ),
+            'time'         => __( 'Start Time', 'traveler' ),
+            'location'     => __( 'Location', 'traveler' ),
+            'end_location' => __( 'End Location', 'traveler' ),
         ];
         $report = [];
 
@@ -301,7 +301,7 @@ class Trip {
 
             foreach ( $fields as $field ) {
                 $value = trim( (string) ( $segment[ $field ] ?? '' ) );
-                if ( 'title' === $field && __( 'Untitled item', 'travel-app' ) === $value ) {
+                if ( 'title' === $field && __( 'Untitled item', 'traveler' ) === $value ) {
                     $value = '';
                 }
 

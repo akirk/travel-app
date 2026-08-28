@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use TravelApp\Parser\QuickPlanParser;
+use Traveler\Parser\QuickPlanParser;
 
 final class QuickPlanParserTest extends TestCase {
     public function test_parses_compact_activity_with_trailing_city(): void {

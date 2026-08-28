@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use TravelApp\Parser\IcsParser;
+use Traveler\Parser\IcsParser;
 
 final class IcsParserTest extends TestCase {
     public function test_tripit_activity_uses_local_time_range_and_same_day_end_date(): void {

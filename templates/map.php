@@ -1,16 +1,16 @@
 <?php
-use TravelApp\App;
-use TravelApp\Trip;
+use Traveler\App;
+use Traveler\Trip;
 
 global $wp_app_route;
 
-$travel_app = App::get_instance();
+$traveler = App::get_instance();
 $trip_id    = isset( $wp_app_route['params']['id'] ) ? absint( $wp_app_route['params']['id'] ) : absint( get_query_var( 'id' ) );
 $trip       = Trip::get( $trip_id );
-if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
+if ( ! $trip || ! current_user_can( 'read_traveler_trip', $trip_id ) ) {
     wp_die(
-        esc_html__( 'This travel plan could not be found.', 'travel-app' ),
-        esc_html__( 'Travel plan not found', 'travel-app' ),
+        esc_html__( 'This travel plan could not be found.', 'traveler' ),
+        esc_html__( 'Travel plan not found', 'traveler' ),
         [ 'response' => 404 ]
     );
 }
@@ -34,13 +34,13 @@ foreach ( $segments as $segment ) {
                 'id'       => (int) ( $segment['id'] ?? count( $route_entries ) ),
                 'is_end'   => 'end_location' === $location_key,
                 'location' => $location,
-                'kind'     => 'end_location' === $location_key ? __( 'End location', 'travel-app' ) : __( 'Location', 'travel-app' ),
-                'title'    => (string) ( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ),
+                'kind'     => 'end_location' === $location_key ? __( 'End location', 'traveler' ) : __( 'Location', 'traveler' ),
+                'title'    => (string) ( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ),
                 'type'     => (string) ( $segment['type'] ?? '' ),
                 'date'     => (string) ( $segment['date'] ?? '' ),
                 'time'     => (string) ( $segment['time'] ?? '' ),
                 'details'  => (string) ( $segment['details'] ?? '' ),
-                'url'      => home_url( '/travel-app/trip/' . $trip_id . '/#segment-' . (int) ( $segment['id'] ?? 0 ) ),
+                'url'      => home_url( '/traveler/trip/' . $trip_id . '/#segment-' . (int) ( $segment['id'] ?? 0 ) ),
             ];
         }
     }
@@ -51,7 +51,7 @@ foreach ( $segments as $segment ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( sprintf( __( '%s Route Map', 'travel-app' ), $trip_data['title'] ) ); ?></title>
+    <title><?php echo wp_app_title( sprintf( __( '%s Route Map', 'traveler' ), $trip_data['title'] ) ); ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <?php wp_app_head(); ?>
@@ -160,32 +160,32 @@ foreach ( $segments as $segment ) {
     <main>
         <header class="map-header">
             <div class="topbar">
-                <a href="<?php echo esc_url( home_url( '/travel-app/trip/' . $trip_id . '/' ) ); ?>"><?php esc_html_e( 'Back to Travel Plan', 'travel-app' ); ?></a>
+                <a href="<?php echo esc_url( home_url( '/traveler/trip/' . $trip_id . '/' ) ); ?>"><?php esc_html_e( 'Back to Travel Plan', 'traveler' ); ?></a>
             </div>
 
             <?php if ( ! $trip_data ) : ?>
-                <h1><?php esc_html_e( 'Travel plan not found', 'travel-app' ); ?></h1>
-                <p class="meta"><?php esc_html_e( 'It may have been deleted, or it does not belong to your account.', 'travel-app' ); ?></p>
+                <h1><?php esc_html_e( 'Travel plan not found', 'traveler' ); ?></h1>
+                <p class="meta"><?php esc_html_e( 'It may have been deleted, or it does not belong to your account.', 'traveler' ); ?></p>
             <?php else : ?>
                 <h1>
                     <?php
                     printf(
                         /* translators: %s: travel plan title. */
-                        esc_html__( '%s Route Map', 'travel-app' ),
+                        esc_html__( '%s Route Map', 'traveler' ),
                         '<span' . App::mask_attr( 'title', (string) $trip_data['id'] ) . '>' . esc_html( $trip_data['title'] ) . '</span>'
                     );
                     ?>
                 </h1>
                 <p class="meta">
-                    <span><?php echo esc_html( sprintf( _n( '%d waypoint', '%d waypoints', count( $route_entries ), 'travel-app' ), count( $route_entries ) ) ); ?></span>
-                    <span><?php esc_html_e( 'Straight lines between itinerary locations', 'travel-app' ); ?></span>
+                    <span><?php echo esc_html( sprintf( _n( '%d waypoint', '%d waypoints', count( $route_entries ), 'traveler' ), count( $route_entries ) ) ); ?></span>
+                    <span><?php esc_html_e( 'Straight lines between itinerary locations', 'traveler' ); ?></span>
                 </p>
             <?php endif; ?>
         </header>
 
-        <section class="map-shell" aria-label="<?php esc_attr_e( 'Route map', 'travel-app' ); ?>">
+        <section class="map-shell" aria-label="<?php esc_attr_e( 'Route map', 'traveler' ); ?>">
             <div id="route-map"></div>
-            <div class="map-status" data-map-status><?php esc_html_e( 'Loading route map...', 'travel-app' ); ?></div>
+            <div class="map-status" data-map-status><?php esc_html_e( 'Loading route map...', 'traveler' ); ?></div>
         </section>
     </main>
 
@@ -203,7 +203,7 @@ foreach ( $segments as $segment ) {
             }
 
             if (!mapNode || typeof L === 'undefined') {
-                setStatus('<?php echo esc_js( __( 'The map library could not be loaded.', 'travel-app' ) ); ?>');
+                setStatus('<?php echo esc_js( __( 'The map library could not be loaded.', 'traveler' ) ); ?>');
                 return;
             }
 
@@ -215,7 +215,7 @@ foreach ( $segments as $segment ) {
 
             if (entries.length < 2) {
                 map.setView([0, 0], 2);
-                setStatus('<?php echo esc_js( __( 'Add at least two itinerary locations to draw a route.', 'travel-app' ) ); ?>');
+                setStatus('<?php echo esc_js( __( 'Add at least two itinerary locations to draw a route.', 'traveler' ) ); ?>');
                 return;
             }
 
@@ -301,7 +301,7 @@ foreach ( $segments as $segment ) {
 
                 if (routePoints.length < 2) {
                     map.setView([0, 0], 2);
-                    setStatus('<?php echo esc_js( __( 'Not enough locations could be found on OpenStreetMap.', 'travel-app' ) ); ?>');
+                    setStatus('<?php echo esc_js( __( 'Not enough locations could be found on OpenStreetMap.', 'traveler' ) ); ?>');
                     return;
                 }
 
@@ -317,7 +317,7 @@ foreach ( $segments as $segment ) {
                     var entryKey = String(entry.id || index);
                     var dateTime = [entry.date, entry.time].filter(Boolean).join(' ');
                     var meta = [entry.type, entry.kind, dateTime].filter(Boolean).join(' · ');
-                    var title = escapeHtml(entry.title || '<?php echo esc_js( __( 'Untitled item', 'travel-app' ) ); ?>');
+                    var title = escapeHtml(entry.title || '<?php echo esc_js( __( 'Untitled item', 'traveler' ) ); ?>');
                     var maskedTitle = '<span' + maskAttr('title', entryKey + '-item') + '>' + title + '</span>';
                     var locationKey = entryKey + (entry.is_end ? '-end-location' : '-location');
                     var popupHtml = [
@@ -354,13 +354,13 @@ foreach ( $segments as $segment ) {
                 var missing = entries.length - routePoints.length;
                 setStatus(missing > 0
                     ? missing + ' ' + (missing === 1
-                        ? '<?php echo esc_js( __( 'location could not be found and was skipped.', 'travel-app' ) ); ?>'
-                        : '<?php echo esc_js( __( 'locations could not be found and were skipped.', 'travel-app' ) ); ?>')
+                        ? '<?php echo esc_js( __( 'location could not be found and was skipped.', 'traveler' ) ); ?>'
+                        : '<?php echo esc_js( __( 'locations could not be found and were skipped.', 'traveler' ) ); ?>')
                     : ''
                 );
             }).catch(function() {
                 map.setView([0, 0], 2);
-                setStatus('<?php echo esc_js( __( 'The route map could not geocode the itinerary locations.', 'travel-app' ) ); ?>');
+                setStatus('<?php echo esc_js( __( 'The route map could not geocode the itinerary locations.', 'traveler' ) ); ?>');
             });
         })();
     </script>

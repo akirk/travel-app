@@ -1,6 +1,6 @@
 <?php
 
-namespace TravelApp\Parser;
+namespace Traveler\Parser;
 
 class IcsParser {
     public function supports( string $text ): bool {
@@ -14,7 +14,7 @@ class IcsParser {
         $overview_title = '';
 
         foreach ( $events as $event ) {
-            $summary = $event['SUMMARY'] ?? __( 'Calendar event', 'travel-app' );
+            $summary = $event['SUMMARY'] ?? __( 'Calendar event', 'traveler' );
             $description = $event['DESCRIPTION'] ?? '';
             $location = $event['LOCATION'] ?? '';
             if ( $this->is_tripit_overview_event( $event, $summary, $description, $calendar_title ) ) {
@@ -322,7 +322,7 @@ class IcsParser {
             }
         }
 
-        return __( 'Imported Calendar Itinerary', 'travel-app' );
+        return __( 'Imported Calendar Itinerary', 'traveler' );
     }
 
     private function merge_lodging_check_events( array $segments ): array {
@@ -376,7 +376,7 @@ class IcsParser {
         $title = preg_replace( '/^check-(?:in|out)\s*:\s*/i', '', $title );
         $title = trim( (string) $title );
 
-        return '' !== $title ? $title : __( 'Lodging', 'travel-app' );
+        return '' !== $title ? $title : __( 'Lodging', 'traveler' );
     }
 
     private function first_non_empty_segment_value( array $segments, string $key ): string {

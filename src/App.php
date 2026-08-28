@@ -204,7 +204,7 @@ class App extends BaseApp {
                 'url'   => 'url',
                 'files' => [
                     [
-                        'name'   => 'files',
+                        'name'   => 'files[]',
                         'accept' => [ 'text/calendar', 'text/plain', '.ics', '.txt' ],
                     ],
                 ],
@@ -1947,27 +1947,25 @@ class App extends BaseApp {
 
         // The share sheet cannot carry a nonce; nothing is saved here, the
         // text is only prefilled into the form the user still has to submit.
-        $parts = [];
+        $fields = [];
         foreach ( [ 'title', 'text', 'url' ] as $field ) {
-            $value = isset( $_POST[ $field ] ) ? trim( (string) wp_unslash( $_POST[ $field ] ) ) : '';
-            if ( '' !== $value && ! in_array( $value, $parts, true ) ) {
-                $parts[] = $value;
-            }
+            $fields[ $field ] = isset( $_POST[ $field ] ) ? (string) wp_unslash( $_POST[ $field ] ) : '';
         }
 
         $unsupported_file = false;
-        foreach ( $this->get_share_target_files() as $file ) {
-            if ( ! $this->is_share_target_text_file( $file ) ) {
+        $contents = [];
+        foreach ( ShareTarget::normalize_files( $_FILES['files'] ?? null ) as $file ) {
+            if ( ! ShareTarget::is_text_file( $file ) ) {
                 $unsupported_file = true;
                 continue;
             }
-            $contents = $this->read_uploaded_text_file( $file );
-            if ( ! is_wp_error( $contents ) && '' !== trim( $contents ) ) {
-                $parts[] = $contents;
+            $file_text = $this->read_uploaded_text_file( $file );
+            if ( ! is_wp_error( $file_text ) ) {
+                $contents[] = $file_text;
             }
         }
 
-        $text = trim( implode( "\n\n", $parts ) );
+        $text = ShareTarget::build_text( $fields, $contents );
         if ( '' === $text ) {
             wp_safe_redirect( add_query_arg( 'traveler_error', $unsupported_file ? 'share_unsupported_file' : 'empty', $index_url ) );
             exit;
@@ -1998,42 +1996,6 @@ class App extends BaseApp {
 
     private function get_share_target_transient_name( string $key ): string {
         return 'traveler_shared_' . get_current_user_id() . '_' . sanitize_key( $key );
-    }
-
-    /**
-     * Normalizes $_FILES['files'] (single or multiple) into a list of file arrays.
-     */
-    private function get_share_target_files(): array {
-        if ( empty( $_FILES['files'] ) || ! is_array( $_FILES['files'] ) ) {
-            return [];
-        }
-
-        $files = $_FILES['files'];
-        if ( ! is_array( $files['name'] ?? null ) ) {
-            return [ $files ];
-        }
-
-        $list = [];
-        foreach ( array_keys( $files['name'] ) as $index ) {
-            $list[] = [
-                'name'     => $files['name'][ $index ] ?? '',
-                'type'     => $files['type'][ $index ] ?? '',
-                'tmp_name' => $files['tmp_name'][ $index ] ?? '',
-                'error'    => $files['error'][ $index ] ?? UPLOAD_ERR_NO_FILE,
-                'size'     => $files['size'][ $index ] ?? 0,
-            ];
-        }
-
-        return $list;
-    }
-
-    private function is_share_target_text_file( array $file ): bool {
-        $name = strtolower( (string) ( $file['name'] ?? '' ) );
-        $type = strtolower( (string) ( $file['type'] ?? '' ) );
-        $extension = pathinfo( $name, PATHINFO_EXTENSION );
-
-        return in_array( $extension, [ 'ics', 'txt', 'ical', 'ifb', 'icalendar' ], true )
-            || in_array( $type, [ 'text/calendar', 'text/plain' ], true );
     }
 
     public function maybe_render_user_calendar(): void {

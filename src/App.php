@@ -76,6 +76,7 @@ class App extends BaseApp {
         add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
         add_filter( 'wp_app_pwa_manifest_traveler', [ $this, 'filter_pwa_manifest' ], 10, 2 );
         add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
+        add_action( 'template_redirect', [ $this, 'maybe_handle_share_target' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_user_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_timeline' ], 0 );
@@ -191,6 +192,24 @@ class App extends BaseApp {
         $manifest['short_name'] = __( 'Timeline', 'traveler' );
         $manifest['start_url'] = home_url( '/' . $this->get_url_path() . '/' );
         $manifest['scope'] = home_url( '/' );
+        // Lets Android/Chromium users share an email body or a calendar file
+        // straight into the import form from the OS share sheet.
+        $manifest['share_target'] = [
+            'action'  => $this->get_share_target_url(),
+            'method'  => 'POST',
+            'enctype' => 'multipart/form-data',
+            'params'  => [
+                'title' => 'title',
+                'text'  => 'text',
+                'url'   => 'url',
+                'files' => [
+                    [
+                        'name'   => 'files[]',
+                        'accept' => [ 'text/calendar', 'text/plain', '.ics', '.txt' ],
+                    ],
+                ],
+            ],
+        ];
 
         if ( $trip_id > 0 ) {
             $trip = Trip::get( $trip_id );
@@ -242,6 +261,7 @@ class App extends BaseApp {
             'delete_forbidden'         => __( 'This travel plan cannot be deleted.', 'traveler' ),
             'edit_forbidden'           => __( 'This travel plan cannot be edited.', 'traveler' ),
             'empty'                    => __( 'Paste itinerary text or upload a file to import.', 'traveler' ),
+            'share_unsupported_file'   => __( 'Only calendar (.ics) and plain text files can be shared into Traveler.', 'traveler' ),
             'empty_title'              => __( 'Travel plan title cannot be empty.', 'traveler' ),
             'invalid_trip_owner'       => __( 'You cannot create travel plans for that user.', 'traveler' ),
             'missing_itinerary_text'   => __( 'Paste itinerary text to import.', 'traveler' ),
@@ -1899,6 +1919,85 @@ class App extends BaseApp {
         exit;
     }
 
+    public function get_share_target_url(): string {
+        return add_query_arg( 'traveler_share_target', '1', home_url( '/' . $this->get_url_path() . '/' ) );
+    }
+
+    /**
+     * Receives a Web Share Target POST from the installed PWA, stashes the
+     * shared text in a short-lived transient and redirects to the import form
+     * so the user can review it before importing with the usual nonce check.
+     */
+    public function maybe_handle_share_target(): void {
+        if ( empty( $_GET['traveler_share_target'] ) ) {
+            return;
+        }
+
+        $index_url = home_url( '/' . $this->get_url_path() . '/' );
+
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_safe_redirect( wp_login_url( $index_url ) );
+            exit;
+        }
+
+        if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+            wp_safe_redirect( $index_url );
+            exit;
+        }
+
+        // The share sheet cannot carry a nonce; nothing is saved here, the
+        // text is only prefilled into the form the user still has to submit.
+        $fields = [];
+        foreach ( [ 'title', 'text', 'url' ] as $field ) {
+            $fields[ $field ] = isset( $_POST[ $field ] ) ? (string) wp_unslash( $_POST[ $field ] ) : '';
+        }
+
+        $unsupported_file = false;
+        $contents = [];
+        foreach ( ShareTarget::normalize_files( $_FILES['files'] ?? null ) as $file ) {
+            if ( ! ShareTarget::is_text_file( $file ) ) {
+                $unsupported_file = true;
+                continue;
+            }
+            $file_text = $this->read_uploaded_text_file( $file );
+            if ( ! is_wp_error( $file_text ) ) {
+                $contents[] = $file_text;
+            }
+        }
+
+        $text = ShareTarget::build_text( $fields, $contents );
+        if ( '' === $text ) {
+            wp_safe_redirect( add_query_arg( 'traveler_error', $unsupported_file ? 'share_unsupported_file' : 'empty', $index_url ) );
+            exit;
+        }
+
+        $key = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : wp_generate_password( 20, false, false );
+        set_transient( $this->get_share_target_transient_name( $key ), $text, 15 * MINUTE_IN_SECONDS );
+
+        wp_safe_redirect( add_query_arg( 'shared_draft', rawurlencode( $key ), $index_url ) );
+        exit;
+    }
+
+    /**
+     * Returns and forgets the text a share target request stored for the current user.
+     */
+    public function take_share_target_text( string $key ): string {
+        $key = sanitize_key( $key );
+        if ( '' === $key ) {
+            return '';
+        }
+
+        $name = $this->get_share_target_transient_name( $key );
+        $text = get_transient( $name );
+        delete_transient( $name );
+
+        return is_string( $text ) ? $text : '';
+    }
+
+    private function get_share_target_transient_name( string $key ): string {
+        return 'traveler_shared_' . get_current_user_id() . '_' . sanitize_key( $key );
+    }
+
     public function maybe_render_user_calendar(): void {
         $user_id = isset( $_GET['traveler_trips_calendar'] ) ? absint( $_GET['traveler_trips_calendar'] ) : 0;
         $token = isset( $_GET['traveler_token'] ) ? sanitize_text_field( wp_unslash( $_GET['traveler_token'] ) ) : '';
@@ -2823,7 +2922,15 @@ class App extends BaseApp {
             return '';
         }
 
-        $file = $_FILES['itinerary_file'];
+        return $this->read_uploaded_text_file( $_FILES['itinerary_file'] );
+    }
+
+    /**
+     * Reads one entry of $_FILES as text.
+     *
+     * @return string|\WP_Error Empty string when no file was sent.
+     */
+    private function read_uploaded_text_file( array $file ) {
         $error = isset( $file['error'] ) ? (int) $file['error'] : UPLOAD_ERR_NO_FILE;
 
         if ( UPLOAD_ERR_NO_FILE === $error ) {

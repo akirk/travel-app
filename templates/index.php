@@ -11,6 +11,8 @@ $trips      = array_map( static function( Trip $trip ): array {
 $imported   = isset( $_GET['imported'] ) ? absint( $_GET['imported'] ) : 0;
 $deleted    = isset( $_GET['deleted'] ) ? absint( $_GET['deleted'] ) : 0;
 $error      = isset( $_GET['traveler_error'] ) ? sanitize_key( wp_unslash( $_GET['traveler_error'] ) ) : '';
+$shared_draft_key = isset( $_GET['shared_draft'] ) ? sanitize_key( wp_unslash( $_GET['shared_draft'] ) ) : '';
+$shared_text = '' !== $shared_draft_key ? $traveler->take_share_target_text( $shared_draft_key ) : '';
 $quick_plan_draft_key = isset( $_GET['quick_plan_draft'] ) ? sanitize_key( wp_unslash( $_GET['quick_plan_draft'] ) ) : '';
 $quick_plan_draft = '' !== $quick_plan_draft_key ? $traveler->get_quick_plan_draft( $quick_plan_draft_key ) : [];
 $quick_plan_segment = isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] ) ? $quick_plan_draft['segment'] : [];
@@ -720,7 +722,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <input type="file" id="itinerary_file" name="itinerary_file" accept=".ics,.txt,text/calendar,text/plain">
                     </label>
                     <label for="itinerary_text"><?php esc_html_e( 'Enter a trip name, paste a confirmation, or type an entry', 'traveler' ); ?></label>
-                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'traveler' ); ?>"></textarea>
+                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'traveler' ); ?>"<?php echo '' !== $shared_text ? ' autofocus' : ''; ?>><?php echo esc_textarea( $shared_text ); ?></textarea>
                     <?php if ( count( $delegated_owner_options ) > 1 ) : ?>
                         <label for="traveler_owner_user_id"><?php esc_html_e( 'Create for', 'traveler' ); ?></label>
                         <select id="traveler_owner_user_id" name="traveler_owner_user_id">

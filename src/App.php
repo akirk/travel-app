@@ -41,7 +41,10 @@ class App extends BaseApp {
             // App identity
             'app_name'   => 'Traveler',
             // 'launcher'   => true,
-            'app_icon'   => 'dashicons-location-alt',
+            'app_icon'            => 'dashicons-location-alt',
+            'app_icon_background' => 'linear-gradient(135deg, #ee0979, #ff6a00)',
+            'app_icon_color'      => '#fff',
+            'app_icon_shadow'     => true,
             // Owned content: REST reads are gated with the app's capability and
             // OpenStation keeps these menus out of its dock.
             'post_types' => [ 'traveler_item', 'traveler_journal' ],

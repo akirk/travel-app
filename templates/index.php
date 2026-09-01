@@ -165,6 +165,17 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
         h2 { font-size: 1.05rem; margin-bottom: 12px; }
         h3 { font-size: 1rem; margin-bottom: 6px; }
         a { color: var(--wp-app-color-link); }
+        .screen-reader-text {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
         .app-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; margin-bottom: 22px; }
         .lede { max-width: 680px; color: var(--wp-app-color-muted); font-size: 1.02rem; margin-bottom: 0; }
         .status-stack { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
@@ -214,6 +225,54 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             min-height: 118px;
             resize: vertical;
         }
+        .entry-mode-control {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            border: 0;
+        }
+        .entry-mode-control > input[type="radio"] {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            clip-path: inset(50%);
+            white-space: nowrap;
+        }
+        .entry-mode-label {
+            display: grid;
+            gap: 2px;
+            min-height: 58px;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 10px 12px;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            background: var(--wp-app-color-background);
+            cursor: pointer;
+        }
+        .entry-mode-label span { color: var(--wp-app-color-muted); font-size: 0.82rem; font-weight: 400; }
+        .entry-mode-control > input[type="radio"]:checked + .entry-mode-label {
+            border-color: var(--wp-app-color-link);
+            box-shadow: inset 0 0 0 1px var(--wp-app-color-link);
+        }
+        .entry-mode-control > input[type="radio"]:focus-visible + .entry-mode-label {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
+        .entry-mode-owner,
+        .entry-mode-panel { grid-column: 1 / -1; }
+        .entry-mode-owner { margin-top: 6px; }
+        .entry-mode-panel {
+            display: none;
+            padding-top: 8px;
+        }
+        #entry_mode_create:checked ~ .entry-mode-create,
+        #entry_mode_import:checked ~ .entry-mode-import { display: block; }
+        .entry-mode-panel button { width: 100%; }
         .quick-plan-fields {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -564,7 +623,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             </div>
 
             <aside class="panel import-panel" aria-labelledby="import-trip-heading">
-                <h2 id="import-trip-heading"><?php esc_html_e( 'Import', 'traveler' ); ?></h2>
+                <h2 id="import-trip-heading"><?php esc_html_e( 'Add a trip', 'traveler' ); ?></h2>
                     <?php if ( ! empty( $quick_plan_segment ) ) : ?>
                         <?php
                         $quick_plan_trip_title = isset( $quick_plan_draft['trip_title'] )
@@ -716,25 +775,48 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="traveler_import">
                     <?php wp_nonce_field( 'traveler_import' ); ?>
-                    <label class="drop-zone" id="itinerary_drop_zone" for="itinerary_file">
-                        <span class="drop-title"><?php esc_html_e( 'Drop file', 'traveler' ); ?></span>
-                        <span class="drop-file-name" id="itinerary_file_name"><?php esc_html_e( 'ICS or text file', 'traveler' ); ?></span>
-                        <input type="file" id="itinerary_file" name="itinerary_file" accept=".ics,.txt,text/calendar,text/plain">
-                    </label>
-                    <label for="itinerary_text"><?php esc_html_e( 'Enter a trip name, paste a confirmation, or type an entry', 'traveler' ); ?></label>
-                    <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'traveler' ); ?>"<?php echo '' !== $shared_text ? ' autofocus' : ''; ?>><?php echo esc_textarea( $shared_text ); ?></textarea>
-                    <?php if ( count( $delegated_owner_options ) > 1 ) : ?>
-                        <label for="traveler_owner_user_id"><?php esc_html_e( 'Create for', 'traveler' ); ?></label>
-                        <select id="traveler_owner_user_id" name="traveler_owner_user_id">
-                            <?php foreach ( $delegated_owner_options as $owner_option ) : ?>
-                                <option value="<?php echo esc_attr( (string) $owner_option->ID ); ?>">
-                                    <?php echo esc_html( get_current_user_id() === (int) $owner_option->ID ? __( 'Myself', 'traveler' ) : $owner_option->display_name ); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    <?php endif; ?>
-                    <p class="hint"><?php echo esc_html( $has_ai ? __( 'Enter only a trip name to create a new trip. AI extraction can also turn plain text into an entry for review; files and confirmations still work too.', 'traveler' ) : __( 'Enter only a trip name to create a new trip, or use quick parsing, calendar parsing, or a basic parser for itinerary text.', 'traveler' ) ); ?></p>
-                    <button type="submit"><?php esc_html_e( 'Create or Import', 'traveler' ); ?></button>
+                    <fieldset class="entry-mode-control">
+                        <legend class="screen-reader-text"><?php esc_html_e( 'Choose how to add a trip', 'traveler' ); ?></legend>
+                        <input type="radio" id="entry_mode_create" name="traveler_entry_mode" value="create" <?php checked( '', $shared_text ); ?>>
+                        <label class="entry-mode-label" for="entry_mode_create">
+                            <?php esc_html_e( 'New trip', 'traveler' ); ?>
+                            <span><?php esc_html_e( 'Start with a name', 'traveler' ); ?></span>
+                        </label>
+                        <input type="radio" id="entry_mode_import" name="traveler_entry_mode" value="import" <?php checked( '' !== $shared_text ); ?>>
+                        <label class="entry-mode-label" for="entry_mode_import">
+                            <?php esc_html_e( 'Import confirmation', 'traveler' ); ?>
+                            <span><?php esc_html_e( 'Paste text or add a file', 'traveler' ); ?></span>
+                        </label>
+                        <?php if ( count( $delegated_owner_options ) > 1 ) : ?>
+                            <label class="entry-mode-owner" for="traveler_owner_user_id">
+                                <?php esc_html_e( 'Create for', 'traveler' ); ?>
+                                <select id="traveler_owner_user_id" name="traveler_owner_user_id">
+                                    <?php foreach ( $delegated_owner_options as $owner_option ) : ?>
+                                        <option value="<?php echo esc_attr( (string) $owner_option->ID ); ?>">
+                                            <?php echo esc_html( get_current_user_id() === (int) $owner_option->ID ? __( 'Myself', 'traveler' ) : $owner_option->display_name ); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                        <?php endif; ?>
+                        <div class="entry-mode-panel entry-mode-create">
+                            <label for="trip_name"><?php esc_html_e( 'Trip name', 'traveler' ); ?></label>
+                            <input type="text" id="trip_name" name="trip_name" placeholder="<?php esc_attr_e( 'Example: Summer in Portugal', 'traveler' ); ?>">
+                            <p class="hint"><?php esc_html_e( 'Create an empty trip now, then add dates and itinerary items.', 'traveler' ); ?></p>
+                            <button type="submit"><?php esc_html_e( 'Create trip', 'traveler' ); ?></button>
+                        </div>
+                        <div class="entry-mode-panel entry-mode-import">
+                            <label class="drop-zone" id="itinerary_drop_zone" for="itinerary_file">
+                                <span class="drop-title"><?php esc_html_e( 'Drop file', 'traveler' ); ?></span>
+                                <span class="drop-file-name" id="itinerary_file_name"><?php esc_html_e( 'ICS or text file', 'traveler' ); ?></span>
+                                <input type="file" id="itinerary_file" name="itinerary_file" accept=".ics,.txt,text/calendar,text/plain">
+                            </label>
+                            <label for="itinerary_text"><?php esc_html_e( 'Confirmation or itinerary text', 'traveler' ); ?></label>
+                            <textarea id="itinerary_text" name="itinerary_text" placeholder="<?php esc_attr_e( 'Example: Dinner in Hamburg on August 2 at 7pm...', 'traveler' ); ?>"<?php echo '' !== $shared_text ? ' autofocus' : ''; ?>><?php echo esc_textarea( $shared_text ); ?></textarea>
+                            <p class="hint"><?php echo esc_html( $has_ai ? __( 'Traveler will extract the details for you to review before saving.', 'traveler' ) : __( 'Traveler will use calendar, quick, or basic parsing and ask you to review the result.', 'traveler' ) ); ?></p>
+                            <button type="submit"><?php esc_html_e( 'Review import', 'traveler' ); ?></button>
+                        </div>
+                    </fieldset>
                 </form>
                 <?php if ( '' !== $all_trips_calendar_url && ! $is_playground ) : ?>
                     <div class="calendar-subscription" data-calendar-subscription>

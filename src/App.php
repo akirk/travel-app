@@ -1645,7 +1645,10 @@ class App extends BaseApp {
             $this->save_quick_plan_draft_submission( $draft_key, $target, $redirect, $owner_user_id );
         }
 
-        $text = isset( $_POST['itinerary_text'] ) ? (string) wp_unslash( $_POST['itinerary_text'] ) : '';
+        $entry_mode = isset( $_POST['traveler_entry_mode'] ) ? sanitize_key( wp_unslash( $_POST['traveler_entry_mode'] ) ) : 'import';
+        $text = 'create' === $entry_mode && isset( $_POST['trip_name'] )
+            ? (string) wp_unslash( $_POST['trip_name'] )
+            : ( isset( $_POST['itinerary_text'] ) ? (string) wp_unslash( $_POST['itinerary_text'] ) : '' );
         $file_text = $this->get_uploaded_itinerary_text();
         if ( is_wp_error( $file_text ) ) {
             wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $file_text->get_error_code() ), $redirect ) );

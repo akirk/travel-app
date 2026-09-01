@@ -1,5 +1,6 @@
 <?php
 use Traveler\App;
+use Traveler\Parser\AiParser;
 
 $traveler = App::get_instance();
 $allow_delegated_trip_creation = $traveler->user_allows_delegated_trip_creation( get_current_user_id() );
@@ -7,6 +8,8 @@ $delegation_capability_options = $traveler->get_delegation_capability_options();
 $delegated_trip_creation_capability = $traveler->get_delegated_trip_creation_capability( get_current_user_id() );
 $global_trip_editor_capability = $traveler->get_global_trip_editor_capability( get_current_user_id() );
 $settings_updated = isset( $_GET['settings_updated'] );
+$has_ai = AiParser::is_available();
+$has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\\AI_Assistant' );
 ?>
 <!DOCTYPE html>
 <html <?php wp_app_language_attributes(); ?>>
@@ -44,6 +47,30 @@ $settings_updated = isset( $_GET['settings_updated'] );
         .settings-form {
             display: grid;
             gap: 14px;
+        }
+        .settings-section + .settings-section {
+            margin-top: 28px;
+            padding-top: 24px;
+            border-top: 1px solid var(--wp-app-color-border);
+        }
+        .integration-list {
+            display: grid;
+            gap: 14px;
+            margin: 0;
+        }
+        .integration-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 4px 16px;
+            align-items: baseline;
+        }
+        .integration-item dt { font-weight: 700; }
+        .integration-item dd { margin: 0; font-weight: 700; }
+        .integration-item p {
+            grid-column: 1 / -1;
+            margin: 0;
+            color: var(--wp-app-color-muted);
+            font-size: 0.9rem;
         }
         .setting-option {
             display: flex;
@@ -115,7 +142,32 @@ $settings_updated = isset( $_GET['settings_updated'] );
         <?php if ( $settings_updated ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Settings saved.', 'traveler' ); ?></div>
         <?php endif; ?>
-        <section aria-labelledby="delegation-settings-heading">
+        <section class="settings-section" aria-labelledby="import-tools-heading">
+            <h2 id="import-tools-heading"><?php esc_html_e( 'Import tools', 'traveler' ); ?></h2>
+            <dl class="integration-list">
+                <div class="integration-item">
+                    <dt><?php esc_html_e( 'AI-assisted parsing', 'traveler' ); ?></dt>
+                    <dd><?php echo esc_html( $has_ai ? __( 'Available', 'traveler' ) : __( 'Not connected', 'traveler' ) ); ?></dd>
+                    <p>
+                        <?php echo esc_html( $has_ai
+                            ? __( 'Traveler can extract itinerary details from plain-text confirmations.', 'traveler' )
+                            : __( 'Calendar and basic parsing remain available for imports.', 'traveler' )
+                        ); ?>
+                    </p>
+                </div>
+                <div class="integration-item">
+                    <dt><?php esc_html_e( 'AI Assistant', 'traveler' ); ?></dt>
+                    <dd><?php echo esc_html( $has_ai_assistant ? __( 'Connected', 'traveler' ) : __( 'Not connected', 'traveler' ) ); ?></dd>
+                    <p>
+                        <?php echo esc_html( $has_ai_assistant
+                            ? __( 'AI Assistant can work with your trips through Traveler abilities.', 'traveler' )
+                            : __( 'Trip planning and editing remain available directly in Traveler.', 'traveler' )
+                        ); ?>
+                    </p>
+                </div>
+            </dl>
+        </section>
+        <section class="settings-section" aria-labelledby="delegation-settings-heading">
             <h2 id="delegation-settings-heading"><?php esc_html_e( 'Delegation', 'traveler' ); ?></h2>
             <form class="settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                 <input type="hidden" name="action" value="traveler_update_user_settings">

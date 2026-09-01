@@ -440,6 +440,11 @@ if ( count( $route_locations ) >= 2 ) {
             font-weight: 750;
             overflow-wrap: anywhere;
         }
+        .offline-help {
+            margin: 12px 0 0;
+            color: var(--wp-app-color-muted);
+            font-size: 0.88rem;
+        }
         .demo-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 18px; }
         .demo-controls label { min-width: 190px; margin: 0; }
         .ghost-button {
@@ -2005,6 +2010,7 @@ if ( count( $route_locations ) >= 2 ) {
                             <dd data-offline-queue><?php esc_html_e( 'Checking', 'traveler' ); ?></dd>
                         </div>
                     </dl>
+                    <p class="offline-help"><?php esc_html_e( 'Offline access depends on the Traveler service worker. Online editing remains available when offline access is unavailable.', 'traveler' ); ?></p>
                 </details>
             <?php endif; ?>
 

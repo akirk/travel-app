@@ -12,6 +12,8 @@
     };
     var workerState = 'Checking';
     var workerVersion = '';
+    var workerConfirmed = false;
+    var cacheStatusReceived = false;
 
     function updateOfflinePanel() {
         document.querySelectorAll('[data-offline-panel]').forEach(function(panel) {
@@ -287,7 +289,7 @@
             return;
         }
 
-        setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Registering');
+        setWorkerState(navigator.serviceWorker.controller ? 'Verifying' : 'Registering');
 
         window.addEventListener('traveler-sync', function() {
             flushQueue();
@@ -295,6 +297,7 @@
 
         window.addEventListener('traveler-cache-status', function(event) {
             var detail = event.detail || {};
+            cacheStatusReceived = true;
             setOfflineState('cache', detail.ok ? 'Ready offline' : 'Not cached');
             if (typeof detail.cachedCount === 'number' && typeof detail.totalCount === 'number') {
                 setOfflineState('files', detail.cachedCount + ' of ' + detail.totalCount + ' files');
@@ -304,27 +307,33 @@
 
         window.addEventListener('traveler-version', function(event) {
             var detail = event.detail || {};
-            setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Ready');
+            workerConfirmed = true;
+            setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Ready to activate');
             setWorkerVersion(detail.version || '');
         });
 
         navigator.serviceWorker.addEventListener('controllerchange', function() {
-            setWorkerState('Active');
+            setWorkerState('Verifying');
         });
 
         window.addEventListener('load', function() {
             window.setTimeout(function() {
                 if (!window.wpAppPwa) {
-                    setWorkerState('Unavailable');
+                    setWorkerState('Unavailable here');
                     setOfflineState('cache', 'Unavailable');
                     setOfflineState('files', 'Unavailable');
                     return;
                 }
 
-                if (navigator.serviceWorker.controller) {
-                    setWorkerState('Active');
+                if (!workerConfirmed) {
+                    setWorkerState('Unavailable here');
                 }
-            }, 1000);
+
+                if (!cacheStatusReceived) {
+                    setOfflineState('cache', 'Unavailable');
+                    setOfflineState('files', 'Unavailable');
+                }
+            }, 3000);
         });
     }
 

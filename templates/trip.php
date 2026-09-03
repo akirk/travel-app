@@ -146,29 +146,6 @@ $get_google_maps_url = static function( string $address ): string {
     );
 };
 
-$get_google_maps_route_url = static function( array $locations ): string {
-    $locations = array_values( array_filter( array_map( 'trim', $locations ) ) );
-
-    if ( count( $locations ) < 2 ) {
-        return '';
-    }
-
-    $origin = array_shift( $locations );
-    $destination = array_pop( $locations );
-    $args = [
-        'api'         => '1',
-        'origin'      => $origin,
-        'destination' => $destination,
-        'travelmode'  => 'driving',
-    ];
-
-    if ( ! empty( $locations ) ) {
-        $args['waypoints'] = implode( '|', $locations );
-    }
-
-    return add_query_arg( $args, 'https://www.google.com/maps/dir/' );
-};
-
 $is_transport_segment = static function( array $segment ): bool {
     $type = (string) ( $segment['type'] ?? '' );
     if ( in_array( $type, [ 'flight', 'train' ], true ) ) {
@@ -193,11 +170,11 @@ foreach ( $segments as $segment ) {
     }
 }
 
-$trip_route_links = [];
+// The map page is only reachable with an account, so a shared or downloaded
+// timeline does not offer it.
 $trip_direct_map_url = '';
-if ( count( $route_locations ) >= 2 ) {
-    $trip_route_links['google'] = $get_google_maps_route_url( $route_locations );
-    $trip_direct_map_url = $is_static_download ? '' : home_url( '/traveler/trip/' . (int) $trip_data['id'] . '/map/' );
+if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
+    $trip_direct_map_url = home_url( '/traveler/trip/' . (int) $trip_data['id'] . '/map/' );
 }
 ?>
 <!DOCTYPE html>
@@ -327,17 +304,6 @@ if ( count( $route_locations ) >= 2 ) {
         .trip-title-form label { margin: 0; }
         .trip-title-form input { font-size: 1.35rem; font-weight: 750; }
         .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; color: var(--wp-app-color-muted); margin-bottom: 24px; }
-        .trip-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-        .trip-actions .ghost-button {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            min-height: 38px;
-            box-sizing: border-box;
-            padding: 8px 12px;
-            border-radius: 6px;
-            text-decoration: none;
-        }
         .share-link {
             display: grid;
             gap: 10px;
@@ -756,6 +722,13 @@ if ( count( $route_locations ) >= 2 ) {
             margin-bottom: 14px;
         }
         .timeline-header h2 { margin: 0; }
+        .timeline-map-link {
+            font-size: 0.9rem;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .timeline-map-link:hover,
+        .timeline-map-link:focus { text-decoration: underline; }
         .timeline-header-actions {
             display: flex;
             flex-wrap: wrap;
@@ -1044,7 +1017,6 @@ if ( count( $route_locations ) >= 2 ) {
             gap: 12px;
             align-items: center;
         }
-        .route-zone,
         .travel-journaling-zone,
         .settings-zone,
         .sharing-zone,
@@ -1054,14 +1026,12 @@ if ( count( $route_locations ) >= 2 ) {
             padding-top: 18px;
             color: var(--wp-app-color-muted);
         }
-        .route-zone h2,
         .travel-journaling-zone h2,
         .settings-zone h2,
         .sharing-zone h2,
         .danger-zone h2 {
             color: var(--wp-app-color-text);
         }
-        .route-zone details summary,
         .travel-journaling-zone details summary,
         .settings-zone details summary,
         .sharing-zone details summary,
@@ -1070,7 +1040,6 @@ if ( count( $route_locations ) >= 2 ) {
             color: var(--wp-app-color-text);
             font-weight: 700;
         }
-        .route-zone details summary h2,
         .travel-journaling-zone details summary h2,
         .settings-zone details summary h2,
         .sharing-zone details summary h2,
@@ -1298,6 +1267,12 @@ if ( count( $route_locations ) >= 2 ) {
                 <div class="timeline-header">
                     <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'traveler' ); ?></h2>
                     <div class="timeline-header-actions">
+                        <?php if ( '' !== $trip_direct_map_url ) : ?>
+                            <a class="timeline-map-link" href="<?php echo esc_url( $trip_direct_map_url ); ?>" title="<?php esc_attr_e( 'Route map on OpenStreetMap', 'traveler' ); ?>">
+                                <span aria-hidden="true">&#x1F5FA;</span>
+                                <?php esc_html_e( 'Map', 'traveler' ); ?>
+                            </a>
+                        <?php endif; ?>
                         <?php if ( $is_trip_active ) : ?>
                             <button class="ghost-button timeline-now-button" type="button" data-timeline-now aria-controls="timeline" aria-label="<?php esc_attr_e( 'Jump to current time', 'traveler' ); ?>" title="<?php esc_attr_e( 'Jump to current time', 'traveler' ); ?>" disabled>
                                 <?php esc_html_e( 'Now', 'traveler' ); ?>
@@ -1799,28 +1774,6 @@ if ( count( $route_locations ) >= 2 ) {
                             <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
-                </section>
-            <?php endif; ?>
-
-            <?php if ( $show_private_share_details && ( ! empty( $trip_route_links ) || '' !== $trip_direct_map_url ) ) : ?>
-                <section class="route-zone" aria-labelledby="route-maps-heading">
-                    <details>
-                        <summary><h2 id="route-maps-heading"><?php esc_html_e( 'Route Maps', 'traveler' ); ?></h2></summary>
-                        <div class="trip-actions" aria-label="<?php esc_attr_e( 'Route links', 'traveler' ); ?>">
-                            <?php if ( ! empty( $trip_route_links['google'] ) ) : ?>
-                                <a class="ghost-button" href="<?php echo esc_url( (string) $trip_route_links['google'] ); ?>" target="_blank" rel="noopener noreferrer">
-                                    <span aria-hidden="true">&#x1F5FA;</span>
-                                    <?php esc_html_e( 'Google Maps', 'traveler' ); ?>
-                                </a>
-                            <?php endif; ?>
-                            <?php if ( '' !== $trip_direct_map_url ) : ?>
-                                <a class="ghost-button" href="<?php echo esc_url( $trip_direct_map_url ); ?>">
-                                    <span aria-hidden="true">&#x1F5FA;</span>
-                                    <?php esc_html_e( 'OpenStreetMap', 'traveler' ); ?>
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </details>
                 </section>
             <?php endif; ?>
 

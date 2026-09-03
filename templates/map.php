@@ -115,14 +115,15 @@ $map_strings = [
             padding: 0 0 18px;
             border-bottom: 1px solid var(--wp-app-color-border);
         }
-        .topbar { margin-bottom: 16px; }
         .meta {
             display: flex;
             flex-wrap: wrap;
+            align-items: baseline;
             gap: 8px 14px;
             margin: 0;
             color: var(--wp-app-color-muted);
         }
+        .meta .back-link { margin-left: auto; }
         .map-shell {
             position: relative;
             min-height: 620px;
@@ -293,13 +294,12 @@ $map_strings = [
 
     <main>
         <header class="map-header">
-            <div class="topbar">
-                <a href="<?php echo esc_url( home_url( '/traveler/trip/' . $trip_id . '/' ) ); ?>"><?php esc_html_e( 'Back to Travel Plan', 'traveler' ); ?></a>
-            </div>
-
             <?php if ( ! $trip_data ) : ?>
                 <h1><?php esc_html_e( 'Travel plan not found', 'traveler' ); ?></h1>
-                <p class="meta"><?php esc_html_e( 'It may have been deleted, or it does not belong to your account.', 'traveler' ); ?></p>
+                <p class="meta">
+                    <span><?php esc_html_e( 'It may have been deleted, or it does not belong to your account.', 'traveler' ); ?></span>
+                    <a class="back-link" href="<?php echo esc_url( home_url( '/traveler/trip/' . $trip_id . '/' ) ); ?>"><?php esc_html_e( 'Back to Travel Plan', 'traveler' ); ?></a>
+                </p>
             <?php else : ?>
                 <h1>
                     <?php
@@ -313,6 +313,7 @@ $map_strings = [
                 <p class="meta">
                     <span><?php echo esc_html( sprintf( _n( '%d waypoint', '%d waypoints', count( $route_entries ), 'traveler' ), count( $route_entries ) ) ); ?></span>
                     <span><?php esc_html_e( 'Straight lines between itinerary locations', 'traveler' ); ?></span>
+                    <a class="back-link" href="<?php echo esc_url( home_url( '/traveler/trip/' . $trip_id . '/' ) ); ?>"><?php esc_html_e( 'Back to Travel Plan', 'traveler' ); ?></a>
                 </p>
             <?php endif; ?>
         </header>

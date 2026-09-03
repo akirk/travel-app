@@ -65,6 +65,7 @@ class App extends BaseApp {
         add_action( 'wp_ajax_traveler_generate_share_link', [ $this, 'handle_generate_share_link' ] );
         add_action( 'wp_ajax_traveler_remove_share_link', [ $this, 'handle_remove_share_link' ] );
         add_action( 'wp_ajax_traveler_clear_share_cache', [ $this, 'handle_clear_share_cache' ] );
+        add_action( 'wp_ajax_traveler_cache_geocode', [ $this, 'handle_cache_geocode' ] );
         add_action( 'admin_post_traveler_delete', [ $this, 'handle_delete' ] );
         add_action( 'admin_post_traveler_update_segment', [ $this, 'handle_update_segment' ] );
         add_action( 'admin_post_traveler_add_segment', [ $this, 'handle_add_segment' ] );
@@ -2264,6 +2265,36 @@ class App extends BaseApp {
             'calendar_url' => '',
             'message'      => __( 'Read-only timeline share link removed.', 'traveler' ),
         ] );
+    }
+
+    /**
+     * Stores the coordinates a route map looked up on Nominatim, so the next
+     * visit - on any device - can draw the map without geocoding again.
+     */
+    public function handle_cache_geocode(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to store map coordinates.', 'traveler' ) ], 403 );
+        }
+
+        check_ajax_referer( 'traveler_geocode', 'nonce' );
+
+        $payload = isset( $_POST['locations'] ) ? json_decode( wp_unslash( $_POST['locations'] ), true ) : null;
+        if ( ! is_array( $payload ) ) {
+            wp_send_json_error( [ 'message' => __( 'No coordinates were submitted.', 'traveler' ) ], 400 );
+        }
+
+        $stored = 0;
+        foreach ( $payload as $location => $candidates ) {
+            $location = sanitize_text_field( (string) $location );
+            if ( '' === $location || ! is_array( $candidates ) ) {
+                continue;
+            }
+
+            GeocodeCache::remember( $location, $candidates );
+            ++$stored;
+        }
+
+        wp_send_json_success( [ 'stored' => $stored ] );
     }
 
     public function handle_clear_share_cache(): void {

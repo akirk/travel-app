@@ -253,6 +253,17 @@ if ( count( $route_locations ) >= 2 ) {
         h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.04; margin-bottom: 12px; letter-spacing: 0; }
         h2 { font-size: 1.15rem; margin-bottom: 14px; }
         h3 { font-size: 1rem; margin-bottom: 5px; }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+            margin: -10px 0 6px;
+            color: var(--wp-app-color-muted);
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .back-link:hover,
+        .back-link:focus-visible { color: var(--wp-app-color-link); }
         .screen-reader-text {
             position: absolute;
             width: 1px;
@@ -449,6 +460,45 @@ if ( count( $route_locations ) >= 2 ) {
             border-color: var(--wp-app-color-border);
         }
         .timeline { position: relative; display: grid; gap: 0; }
+        .day-navigation {
+            position: sticky;
+            z-index: 4;
+            top: 0;
+            display: flex;
+            gap: 8px;
+            margin: 0 -4px 20px;
+            padding: 8px 4px;
+            overflow-x: auto;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: thin;
+            background: var(--wp-app-color-surface);
+        }
+        .day-navigation a {
+            display: grid;
+            flex: 0 0 auto;
+            min-width: 64px;
+            min-height: 44px;
+            box-sizing: border-box;
+            align-content: center;
+            padding: 5px 10px;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            color: var(--wp-app-color-text);
+            line-height: 1.2;
+            text-align: center;
+            text-decoration: none;
+        }
+        .day-navigation a:hover,
+        .day-navigation a:focus-visible {
+            border-color: var(--wp-app-color-link);
+            color: var(--wp-app-color-link);
+        }
+        .day-navigation a:focus-visible {
+            outline: 2px solid var(--wp-app-color-link);
+            outline-offset: 2px;
+        }
+        .day-navigation-weekday { font-size: 0.76rem; color: var(--wp-app-color-muted); }
+        .day-navigation-date { font-size: 0.88rem; font-weight: 750; }
         .timeline-day { position: relative; padding-left: 26px; border-left: 2px solid var(--wp-app-color-border); }
         .timeline-day.empty { min-height: 96px; }
         .timeline-day.current { border-left-color: var(--wp-app-color-link); }
@@ -1179,6 +1229,11 @@ if ( count( $route_locations ) >= 2 ) {
             </section>
         <?php else : ?>
             <header>
+                <?php if ( ! $is_static_download && ! $is_shared_timeline ) : ?>
+                    <a class="back-link" href="<?php echo esc_url( home_url( '/traveler/' ) ); ?>">
+                        <span aria-hidden="true">&#8592;</span>&nbsp;<?php esc_html_e( 'All trips', 'traveler' ); ?>
+                    </a>
+                <?php endif; ?>
                 <div class="trip-title-header">
                     <h1><span<?php echo App::mask_attr( 'title', (string) $trip_data['id'] ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h1>
                     <?php if ( ! $is_readonly_timeline ) : ?>
@@ -1566,6 +1621,17 @@ if ( count( $route_locations ) >= 2 ) {
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'traveler' ); ?></p>
                 <?php else : ?>
+                    <?php if ( count( $segments_by_day ) > 1 ) : ?>
+                        <nav class="day-navigation" aria-label="<?php esc_attr_e( 'Trip days', 'traveler' ); ?>">
+                            <?php foreach ( array_keys( $segments_by_day ) as $day ) : ?>
+                                <?php $day_timestamp = strtotime( $day . ' 12:00:00' ); ?>
+                                <a href="#day-<?php echo esc_attr( $day ); ?>">
+                                    <span class="day-navigation-weekday"><?php echo esc_html( wp_date( 'D', $day_timestamp ) ); ?></span>
+                                    <span class="day-navigation-date"><?php echo esc_html( wp_date( 'M j', $day_timestamp ) ); ?></span>
+                                </a>
+                            <?php endforeach; ?>
+                        </nav>
+                    <?php endif; ?>
                     <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_readonly_timeline ? ' data-readonly-timeline="1"' : ''; ?><?php echo $is_trip_active ? ' data-current-time="1" data-current-time-value="' . esc_attr( $timeline_current_time_value ) . '" data-current-time-captured="' . esc_attr( $timeline_current_time_captured ) . '"' : ''; ?>>
                         <?php if ( $show_timeline_time_marker ) : ?>
                             <div class="time-marker"><span class="time-marker-label"></span></div>
@@ -1575,7 +1641,7 @@ if ( count( $route_locations ) >= 2 ) {
                             $journal_entry = $journal_entries_by_day[ $day ] ?? [];
                             $journal_exists = ! empty( $journal_entry );
                             ?>
-                            <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" data-date="<?php echo esc_attr( $day ); ?>">
+                            <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" id="day-<?php echo esc_attr( $day ); ?>" data-date="<?php echo esc_attr( $day ); ?>">
                                 <div class="day-heading-row">
                                     <h3 class="day-heading"><?php echo esc_html( $traveler->format_date_label( $day ) ); ?></h3>
                                     <?php if ( ! $is_readonly_timeline && $journal_enabled ) : ?>

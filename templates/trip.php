@@ -1009,6 +1009,34 @@ if ( count( $route_locations ) >= 2 ) {
             border-radius: 8px;
             background: var(--wp-app-color-surface);
         }
+        .add-item-form .form-actions {
+            gap: 10px;
+            align-items: center;
+        }
+        .add-item-optional {
+            grid-column: 1 / -1;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            background: var(--wp-app-color-background);
+        }
+        .add-item-optional summary {
+            display: grid;
+            gap: 2px;
+            padding: 11px 12px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .add-item-optional summary span {
+            color: var(--wp-app-color-muted);
+            font-size: 0.82rem;
+            font-weight: 400;
+        }
+        .add-item-optional-fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            padding: 2px 12px 12px;
+        }
         .add-item-panel {
             display: grid;
             gap: 12px;
@@ -1144,6 +1172,12 @@ if ( count( $route_locations ) >= 2 ) {
             .trip-title-header { align-items: flex-start; }
             .trip-title-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
+            .add-item-optional-fields { grid-template-columns: 1fr; }
+            .add-item-form .form-actions {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .add-item-form .form-actions button { min-height: 44px; }
             .mini-timeline { grid-template-columns: 1fr; }
             .timeline-header { flex-wrap: wrap; }
             .timeline-header-actions {
@@ -1494,18 +1528,6 @@ if ( count( $route_locations ) >= 2 ) {
                                     <?php endforeach; ?>
                                 </select>
                             </label>
-                            <label class="field-wide">
-                                <?php esc_html_e( 'URL', 'traveler' ); ?>
-                                <input type="url" name="segment_url" value="<?php echo esc_attr( (string) ( $quick_plan_segment['url'] ?? '' ) ); ?>">
-                            </label>
-                            <label>
-                                <?php esc_html_e( 'Location', 'traveler' ); ?>
-                                <input name="segment_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['location'] ?? '' ) ); ?>">
-                            </label>
-                            <label>
-                                <?php esc_html_e( 'End Location', 'traveler' ); ?>
-                                <input name="segment_end_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_location'] ?? '' ) ); ?>">
-                            </label>
                             <div class="date-time-group">
                                 <label>
                                     <?php esc_html_e( 'Start Date', 'traveler' ); ?>
@@ -1516,21 +1538,40 @@ if ( count( $route_locations ) >= 2 ) {
                                     <input type="time" name="segment_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['time'] ?? '' ) ); ?>">
                                 </label>
                             </div>
-                            <div class="date-time-group">
-                                <label>
-                                    <?php esc_html_e( 'End Date', 'traveler' ); ?>
-                                    <input type="date" name="segment_end_date" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_date'] ?? '' ) ); ?>">
-                                </label>
-                                <label>
-                                    <?php esc_html_e( 'End Time', 'traveler' ); ?>
-                                    <input type="time" name="segment_end_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_time'] ?? '' ) ); ?>">
-                                </label>
-                            </div>
-                            <label class="field-wide">
-                                <?php esc_html_e( 'Details', 'traveler' ); ?>
-                                <textarea name="segment_details"><?php echo esc_textarea( (string) ( $quick_plan_segment['details'] ?? '' ) ); ?></textarea>
-                            </label>
+                            <details class="add-item-optional" data-add-item-optional<?php echo ! empty( $quick_plan_segment ) ? ' open' : ''; ?>>
+                                <summary>
+                                    <?php esc_html_e( 'More details', 'traveler' ); ?>
+                                    <span><?php esc_html_e( 'Location, end time, link, and notes', 'traveler' ); ?></span>
+                                </summary>
+                                <div class="add-item-optional-fields">
+                                    <label class="field-wide">
+                                        <?php esc_html_e( 'URL', 'traveler' ); ?>
+                                        <input type="url" name="segment_url" value="<?php echo esc_attr( (string) ( $quick_plan_segment['url'] ?? '' ) ); ?>">
+                                    </label>
+                                    <label>
+                                        <?php esc_html_e( 'Location', 'traveler' ); ?>
+                                        <input name="segment_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['location'] ?? '' ) ); ?>">
+                                    </label>
+                                    <label>
+                                        <?php esc_html_e( 'End Location', 'traveler' ); ?>
+                                        <input name="segment_end_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_location'] ?? '' ) ); ?>">
+                                    </label>
+                                    <label>
+                                        <?php esc_html_e( 'End Date', 'traveler' ); ?>
+                                        <input type="date" name="segment_end_date" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_date'] ?? '' ) ); ?>">
+                                    </label>
+                                    <label>
+                                        <?php esc_html_e( 'End Time', 'traveler' ); ?>
+                                        <input type="time" name="segment_end_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_time'] ?? '' ) ); ?>">
+                                    </label>
+                                    <label class="field-wide">
+                                        <?php esc_html_e( 'Details', 'traveler' ); ?>
+                                        <textarea name="segment_details"><?php echo esc_textarea( (string) ( $quick_plan_segment['details'] ?? '' ) ); ?></textarea>
+                                    </label>
+                                </div>
+                            </details>
                             <div class="form-actions">
+                                <button class="ghost-button" type="button" data-add-item-cancel><?php esc_html_e( 'Cancel', 'traveler' ); ?></button>
                                 <button type="submit"><?php echo esc_html( ! empty( $quick_plan_segment ) ? __( 'Add to This Trip', 'traveler' ) : __( 'Add Item', 'traveler' ) ); ?></button>
                             </div>
                         </form>
@@ -2055,15 +2096,14 @@ if ( count( $route_locations ) >= 2 ) {
                     return;
                 }
 
-                button.addEventListener('click', function() {
+                function setAddItemPanel(isOpen, focusTitle) {
                     var titleInput = form.querySelector('input[name="segment_title"]');
-                    var isHidden = form.hasAttribute('hidden');
 
-                    if (isHidden) {
+                    if (isOpen) {
                         form.removeAttribute('hidden');
                         button.setAttribute('aria-expanded', 'true');
 
-                        if (titleInput) {
+                        if (focusTitle && titleInput) {
                             titleInput.focus();
                         }
 
@@ -2072,7 +2112,20 @@ if ( count( $route_locations ) >= 2 ) {
 
                     form.setAttribute('hidden', '');
                     button.setAttribute('aria-expanded', 'false');
+                    button.focus();
+                }
+
+                button.addEventListener('click', function() {
+                    var isHidden = form.hasAttribute('hidden');
+                    setAddItemPanel(isHidden, isHidden);
                 });
+
+                var cancelButton = form.querySelector('[data-add-item-cancel]');
+                if (cancelButton) {
+                    cancelButton.addEventListener('click', function() {
+                        setAddItemPanel(false, false);
+                    });
+                }
 
                 document.querySelectorAll('[data-lodging-prefill]').forEach(function(prefillButton) {
                     prefillButton.addEventListener('click', function() {
@@ -2101,6 +2154,7 @@ if ( count( $route_locations ) >= 2 ) {
                         var startInput = form.querySelector('input[name="segment_date"]');
                         var endInput = form.querySelector('input[name="segment_end_date"]');
                         var detailsInput = form.querySelector('textarea[name="segment_details"]');
+                        var optionalDetails = form.querySelector('[data-add-item-optional]');
                         var checkerBox = prefillButton.closest('[data-lodging-checker-box]');
                         var selectedNights = checkerBox
                             ? Array.prototype.slice.call(checkerBox.querySelectorAll('[data-lodging-night]:checked'))
@@ -2148,6 +2202,9 @@ if ( count( $route_locations ) >= 2 ) {
 
                         form.removeAttribute('hidden');
                         button.setAttribute('aria-expanded', 'true');
+                        if (optionalDetails) {
+                            optionalDetails.setAttribute('open', '');
+                        }
 
                         if (typeInput) {
                             typeInput.value = 'lodging';

@@ -57,6 +57,13 @@ foreach ( $route_entries as $route_entry ) {
 // Coordinates this site already looked up, so a revisited trip draws at once.
 $known_locations = GeocodeCache::get_many( $route_location_names );
 
+// Drawn rather than typed: the play and pause characters are missing or turn into emoji
+// depending on the font.
+$playback_icons = [
+    'play'  => '<svg class="playback-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.6 1.4 10.2 6l-7.6 4.6Z" fill="currentColor"/></svg>',
+    'pause' => '<svg class="playback-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><rect x="2.4" y="1.5" width="2.7" height="9" fill="currentColor"/><rect x="6.9" y="1.5" width="2.7" height="9" fill="currentColor"/></svg>',
+];
+
 $map_strings = [
     'library'         => __( 'The map library could not be loaded.', 'traveler' ),
     'too_few'         => __( 'Add at least two itinerary locations to draw a route.', 'traveler' ),
@@ -82,7 +89,6 @@ $map_strings = [
     /* translators: %s: number of waypoints that could not be found. */
     'summary_missing' => __( '%s not found', 'traveler' ),
     'summary_none'    => __( 'None of the itinerary locations could be placed on the map.', 'traveler' ),
-    'play'            => __( 'Play route', 'traveler' ),
     'pause'           => __( 'Pause', 'traveler' ),
     'resume'          => __( 'Play', 'traveler' ),
     'replay'          => __( 'Play again', 'traveler' ),
@@ -250,6 +256,9 @@ $map_strings = [
             margin-bottom: 10px;
         }
         .playback-controls button {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
             border: 1px solid var(--wp-app-color-border);
             border-radius: 999px;
             padding: 4px 12px;
@@ -260,6 +269,10 @@ $map_strings = [
             cursor: pointer;
         }
         .playback-controls .playback-play { font-weight: 700; }
+        .playback-icon {
+            width: 0.72em;
+            height: 0.72em;
+        }
         .playback-transport {
             display: flex;
             flex-wrap: wrap;
@@ -417,7 +430,7 @@ $map_strings = [
 
         <div class="playback" data-playback hidden>
             <div class="playback-controls">
-                <button class="playback-play" type="button" data-playback-start><?php esc_html_e( 'Play route', 'traveler' ); ?></button>
+                <button class="playback-play" type="button" data-playback-start><?php echo $playback_icons['play']; ?><?php esc_html_e( 'Playback', 'traveler' ); ?></button>
                 <span class="playback-transport" data-playback-transport hidden>
                     <button type="button" data-playback-step="-1" aria-label="<?php esc_attr_e( 'Previous waypoint', 'traveler' ); ?>" title="<?php esc_attr_e( 'Previous waypoint', 'traveler' ); ?>">&#x2190;</button>
                     <button class="playback-play" type="button" data-playback-toggle></button>
@@ -488,6 +501,7 @@ $map_strings = [
             var entries = <?php echo wp_json_encode( array_values( $route_entries ) ); ?>;
             var seeded = <?php echo wp_json_encode( (object) $known_locations ); ?>;
             var i18n = <?php echo wp_json_encode( $map_strings ); ?>;
+            var icons = <?php echo wp_json_encode( $playback_icons ); ?>;
             var demoMode = <?php echo $traveler->is_demo_mode_enabled() ? 'true' : 'false'; ?>;
             var ajax = <?php echo wp_json_encode( [
                 'url'   => admin_url( 'admin-ajax.php' ),
@@ -1115,9 +1129,11 @@ $map_strings = [
                 }
 
                 if (playbackToggle) {
-                    playbackToggle.textContent = playback.playing
+                    var label = playback.playing
                         ? i18n.pause
                         : (step >= steps.length - 1 ? i18n.replay : i18n.resume);
+
+                    playbackToggle.innerHTML = (playback.playing ? icons.pause : icons.play) + escapeHtml(label);
                 }
             }
 

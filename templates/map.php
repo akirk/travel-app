@@ -82,6 +82,21 @@ $map_strings = [
     /* translators: %s: number of waypoints that could not be found. */
     'summary_missing' => __( '%s not found', 'traveler' ),
     'summary_none'    => __( 'None of the itinerary locations could be placed on the map.', 'traveler' ),
+    'play'            => __( 'Play route', 'traveler' ),
+    'pause'           => __( 'Pause', 'traveler' ),
+    'resume'          => __( 'Play', 'traveler' ),
+    'replay'          => __( 'Play again', 'traveler' ),
+    'step_previous'   => __( 'Previous', 'traveler' ),
+    'step_current'    => __( 'This step', 'traveler' ),
+    'step_next'       => __( 'Next', 'traveler' ),
+    'route_start'     => __( 'Start of the route', 'traveler' ),
+    'route_end'       => __( 'End of the route', 'traveler' ),
+    /* translators: 1: number of the current step, 2: number of steps in the route. */
+    'position'        => __( 'Step %1$s of %2$s', 'traveler' ),
+    /* translators: %s: distance in kilometres. */
+    'leg'             => __( '%s km from the previous step', 'traveler' ),
+    /* translators: %s: distance in kilometres. */
+    'leg_item'        => __( '%s km on this leg', 'traveler' ),
 ];
 ?>
 <!DOCTYPE html>
@@ -95,6 +110,8 @@ $map_strings = [
     <?php wp_app_head(); ?>
     <style>
         :root { color-scheme: light dark; }
+        /* A display rule of ours would otherwise win over the browser's [hidden] default. */
+        [hidden] { display: none !important; }
         body {
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
@@ -183,6 +200,74 @@ $map_strings = [
             font-weight: 800;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
         }
+        .playback { margin-top: 12px; }
+        .playback-steps {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .playback-step {
+            display: block;
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            background: var(--wp-app-color-surface);
+            color: var(--wp-app-color-text);
+            font: inherit;
+            text-align: left;
+        }
+        .playback-side {
+            color: var(--wp-app-color-muted);
+            cursor: pointer;
+        }
+        .playback-side[disabled] {
+            cursor: default;
+            opacity: 0.6;
+        }
+        .playback-now { border-color: #d23f31; }
+        .playback-role {
+            margin-bottom: 2px;
+            color: var(--wp-app-color-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .playback-title { font-weight: 700; }
+        .playback-arrow { padding: 0 2px; }
+        .playback-side .playback-title { font-weight: 600; }
+        .playback-meta,
+        .playback-place,
+        .playback-leg {
+            color: var(--wp-app-color-muted);
+            font-size: 0.85rem;
+        }
+        .playback-details { margin-top: 4px; }
+        .playback-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+        .playback-controls button {
+            border: 1px solid var(--wp-app-color-border);
+            border-radius: 999px;
+            padding: 4px 12px;
+            background: var(--wp-app-color-surface);
+            color: var(--wp-app-color-text);
+            font: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .playback-controls .playback-play { font-weight: 700; }
+        .playback-transport {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+        .playback-position { color: var(--wp-app-color-muted); font-size: 0.85rem; }
+        .route-item[data-route-current] { border-color: #d23f31; }
         .route-list { margin-top: 22px; }
         .route-list-head {
             display: flex;
@@ -284,8 +369,16 @@ $map_strings = [
             clip: rect(1px, 1px, 1px, 1px);
             white-space: nowrap;
         }
+        .route-marker.is-current {
+            background: #d23f31;
+            transform: scale(1.3);
+        }
+        .route-marker.is-dim { opacity: 0.45; }
         @media (max-width: 680px) {
             .map-shell { min-height: 520px; }
+            .playback-steps { grid-template-columns: 1fr; }
+            .playback-side .playback-meta { display: none; }
+            body.is-playing .map-shell { min-height: 320px; }
         }
     </style>
 </head>
@@ -321,6 +414,24 @@ $map_strings = [
         <section class="map-shell" aria-label="<?php esc_attr_e( 'Route map', 'traveler' ); ?>">
             <div id="route-map"></div>
         </section>
+
+        <div class="playback" data-playback hidden>
+            <div class="playback-steps" data-playback-steps hidden>
+                <button class="playback-step playback-side" type="button" data-playback-card="previous" data-playback-step="-1"></button>
+                <div class="playback-step playback-now" data-playback-card="current" aria-live="polite"></div>
+                <button class="playback-step playback-side" type="button" data-playback-card="next" data-playback-step="1"></button>
+            </div>
+            <div class="playback-controls">
+                <button class="playback-play" type="button" data-playback-start><?php esc_html_e( 'Play route', 'traveler' ); ?></button>
+                <span class="playback-transport" data-playback-transport hidden>
+                    <button type="button" data-playback-step="-1" aria-label="<?php esc_attr_e( 'Previous waypoint', 'traveler' ); ?>" title="<?php esc_attr_e( 'Previous waypoint', 'traveler' ); ?>">&#x2190;</button>
+                    <button class="playback-play" type="button" data-playback-toggle></button>
+                    <button type="button" data-playback-step="1" aria-label="<?php esc_attr_e( 'Next waypoint', 'traveler' ); ?>" title="<?php esc_attr_e( 'Next waypoint', 'traveler' ); ?>">&#x2192;</button>
+                    <span class="playback-position" data-playback-position></span>
+                    <button type="button" data-playback-stop><?php esc_html_e( 'Exit', 'traveler' ); ?></button>
+                </span>
+            </div>
+        </div>
 
         <p class="map-status" data-map-status><?php esc_html_e( 'Loading route map...', 'traveler' ); ?></p>
 
@@ -428,16 +539,19 @@ $map_strings = [
                 return;
             }
 
+            // Itinerary text arrives HTML-escaped, so an entity that is already there is left
+            // alone - esc_html() does not double encode either.
             function escapeHtml(value) {
-                return String(value || '').replace(/[&<>"']/g, function(character) {
-                    return {
-                        '&': '&amp;',
-                        '<': '&lt;',
-                        '>': '&gt;',
-                        '"': '&quot;',
-                        "'": '&#039;'
-                    }[character];
-                });
+                return String(value || '')
+                    .replace(/&(?![a-zA-Z][a-zA-Z0-9]{0,30};|#[0-9]{1,7};|#x[0-9a-fA-F]{1,6};)/g, '&amp;')
+                    .replace(/[<>"']/g, function(character) {
+                        return {
+                            '<': '&lt;',
+                            '>': '&gt;',
+                            '"': '&quot;',
+                            "'": '&#039;'
+                        }[character];
+                    });
             }
 
             function maskAttr(type, key) {
@@ -593,6 +707,16 @@ $map_strings = [
             var rows = {};
             var userMoved = false;
             var lookingUp = false;
+            // Playback walks the route waypoint by waypoint, keeping the one before and the one
+            // after in view, so a trip can be followed the way it was travelled.
+            var playback = { active: false, playing: false, index: null, timer: null };
+            var playbackBar = document.querySelector('[data-playback]');
+            var playbackSteps = document.querySelector('[data-playback-steps]');
+            var playbackTransport = document.querySelector('[data-playback-transport]');
+            var playbackStart = document.querySelector('[data-playback-start]');
+            var playbackToggle = document.querySelector('[data-playback-toggle]');
+            var playbackPositionNode = document.querySelector('[data-playback-position]');
+            var STEP_MS = 4000;
 
             Array.prototype.forEach.call(document.querySelectorAll('[data-route-item]'), function(row) {
                 rows[row.getAttribute('data-route-item')] = row;
@@ -699,16 +823,7 @@ $map_strings = [
             function renderRoute() {
                 chooseCandidates();
 
-                var routePoints = [];
-
-                entries.forEach(function(entry, index) {
-                    var point = hidden[index] ? null : chosen[entry.location];
-
-                    if (point) {
-                        routePoints.push({ entry: entry, index: index, lat: point.lat, lon: point.lon });
-                    }
-                });
-
+                var routePoints = placedPoints();
                 var coordinates = routePoints.map(function(point) {
                     return [point.lat, point.lon];
                 });
@@ -716,38 +831,353 @@ $map_strings = [
                 layer.clearLayers();
                 markers = {};
 
+                var steps = buildSteps(routePoints);
+                var step = playbackStep(steps);
+                var span = stepSpan(steps, step);
+
                 if (coordinates.length > 1) {
                     L.polyline(coordinates, {
                         color: '#0b6bcb',
                         weight: 4,
-                        opacity: 0.84
+                        opacity: span ? 0.25 : 0.84
                     }).addTo(layer);
                 }
 
+                if (span) {
+                    var leg = coordinates.slice(span.from, span.to + 1);
+
+                    if (leg.length > 1) {
+                        L.polyline(leg, {
+                            color: '#d23f31',
+                            weight: 5,
+                            opacity: 0.95
+                        }).addTo(layer);
+                    }
+                }
+
                 routePoints.forEach(function(point, position) {
+                    var current = span && position >= span.first && position <= span.last;
+                    var state = '';
+
+                    if (span) {
+                        state = current
+                            ? ' is-current'
+                            : (position >= span.from && position <= span.to ? ' is-adjacent' : ' is-dim');
+                    }
+
                     var icon = L.divIcon({
                         className: '',
-                        html: '<span class="route-marker">' + String(position + 1) + '</span>',
+                        html: '<span class="route-marker' + state + '">' + String(position + 1) + '</span>',
                         iconSize: [26, 26],
                         iconAnchor: [13, 13]
                     });
 
                     // Keys mirror the itinerary markup so a place keeps the same replacement in both views.
-                    markers[point.index] = L.marker([point.lat, point.lon], { icon: icon })
+                    markers[point.index] = L.marker([point.lat, point.lon], {
+                        icon: icon,
+                        zIndexOffset: current ? 1000 : 0
+                    })
                         .bindPopup(popupHtml(point.entry, point.index))
                         .addTo(layer);
                 });
 
-                if (coordinates.length && !userMoved) {
+                if (span) {
+                    var window_ = coordinates.slice(span.from, span.to + 1);
+
+                    if (window_.length > 1) {
+                        map.fitBounds(L.latLngBounds(window_), { padding: [40, 40], maxZoom: 13 });
+                    } else {
+                        map.setView(window_[0], Math.max(map.getZoom(), 11));
+                    }
+                } else if (coordinates.length && !userMoved) {
                     map.fitBounds(L.latLngBounds(coordinates), {
                         padding: [28, 28],
                         maxZoom: coordinates.length > 1 ? 19 : 11
                     });
                 }
 
-                updateRows(routePoints);
+                updateRows(routePoints, steps[step]);
+                updatePlayback(steps, step);
 
                 return routePoints;
+            }
+
+            // An itinerary item that goes somewhere contributes two waypoints, its start and its
+            // end. Playback treats those as one step, so a leg reads "Vienna to Verona" once
+            // instead of twice, while both places keep their own marker.
+            function buildSteps(routePoints) {
+                var steps = [];
+
+                routePoints.forEach(function(point, position) {
+                    point.position = position;
+
+                    var open = steps[steps.length - 1];
+                    var continues = open
+                        && point.entry.id
+                        && open.entry.id === point.entry.id
+                        && point.entry.is_end
+                        && 1 === open.points.length
+                        && !open.points[0].entry.is_end;
+
+                    if (continues) {
+                        open.points.push(point);
+                        return;
+                    }
+
+                    steps.push({ entry: point.entry, points: [ point ] });
+                });
+
+                return steps;
+            }
+
+            // Playback remembers where it is by the waypoint's place in the itinerary, so hiding a
+            // waypoint or a better match arriving mid-play moves it along rather than losing it.
+            function playbackStep(steps) {
+                if (!playback.active || !steps.length) {
+                    return -1;
+                }
+
+                var step = -1;
+
+                steps.forEach(function(candidate, position) {
+                    if (step < 0 && candidate.points[candidate.points.length - 1].index >= playback.index) {
+                        step = position;
+                    }
+                });
+
+                if (step < 0) {
+                    step = steps.length - 1;
+                }
+
+                playback.index = steps[step].points[0].index;
+
+                return step;
+            }
+
+            // The stretch of the route a step owns, plus the waypoint on either side of it: what
+            // the map shows while that step is playing.
+            function stepSpan(steps, step) {
+                if (step < 0 || !steps[step]) {
+                    return null;
+                }
+
+                var points = steps[step].points;
+                var first = points[0].position;
+                var last = points[points.length - 1].position;
+                var total = steps.reduce(function(count, one) {
+                    return count + one.points.length;
+                }, 0);
+
+                return {
+                    first: first,
+                    last: last,
+                    from: Math.max(0, first - 1),
+                    to: Math.min(total - 1, last + 1)
+                };
+            }
+
+            function placeList(step) {
+                return step.points.map(function(point) {
+                    var entry = point.entry;
+                    var key = String(entry.id || point.index);
+
+                    return '<span' + maskAttr('place', key + (entry.is_end ? '-end-location' : '-location')) + '>'
+                        + escapeHtml(entry.location || '') + '</span>';
+                }).join(' <span class="playback-arrow" aria-hidden="true">&#x2192;</span> ');
+            }
+
+            function stepCard(node, step, role, previous) {
+                if (!node) {
+                    return;
+                }
+
+                if (!step) {
+                    node.innerHTML = '<div class="playback-role">' + escapeHtml(role) + '</div>';
+
+                    if ('BUTTON' === node.tagName) {
+                        node.disabled = true;
+                    }
+
+                    return;
+                }
+
+                var entry = step.entry;
+                var points = step.points;
+                var key = String(entry.id || points[0].index);
+                var dateTime = [entry.date, entry.time].filter(Boolean).join(' ');
+                // The kind only says something when a step is an arrival on its own.
+                var kind = 1 === points.length && entry.is_end ? entry.kind : '';
+                var meta = [entry.type, kind, dateTime].filter(Boolean).join(' · ');
+                var title = '<span' + maskAttr('title', key + '-item') + '>' + escapeHtml(entry.title || i18n.untitled) + '</span>';
+                var isCurrent = 'BUTTON' !== node.tagName;
+                var distance = 0;
+                var legLabel = '';
+
+                if (isCurrent && points.length > 1) {
+                    distance = Math.round(distanceKm(points[0], points[points.length - 1]));
+                    legLabel = i18n.leg_item;
+                } else if (isCurrent && previous) {
+                    distance = Math.round(distanceKm(points[0], previous.points[previous.points.length - 1]));
+                    legLabel = i18n.leg;
+                }
+
+                node.innerHTML = [
+                    '<div class="playback-role">' + escapeHtml(role) + '</div>',
+                    '<div class="playback-title">' + (isCurrent && entry.url ? '<a href="' + encodeURI(entry.url) + '">' + title + '</a>' : title) + '</div>',
+                    meta ? '<div class="playback-meta">' + escapeHtml(meta) + '</div>' : '',
+                    '<div class="playback-place">' + placeList(step) + '</div>',
+                    isCurrent && entry.details ? '<div class="playback-details"' + maskAttr('text', key + '-details') + '>' + escapeHtml(entry.details) + '</div>' : '',
+                    distance ? '<div class="playback-leg">' + escapeHtml(format(legLabel, [ distance ])) + '</div>' : ''
+                ].join('');
+
+                if ('BUTTON' === node.tagName) {
+                    node.disabled = false;
+                }
+
+                if (window.maskPrivateData && typeof window.maskPrivateData.process === 'function') {
+                    window.maskPrivateData.process(node);
+                }
+            }
+
+            function updatePlayback(steps, step) {
+                if (!playbackBar) {
+                    return;
+                }
+
+                playbackBar.hidden = steps.length < 2;
+
+                if (playbackSteps) {
+                    playbackSteps.hidden = step < 0;
+                }
+
+                if (playbackTransport) {
+                    playbackTransport.hidden = step < 0;
+                }
+
+                if (playbackStart) {
+                    playbackStart.hidden = step >= 0;
+                }
+
+                if (step < 0) {
+                    return;
+                }
+
+                stepCard(
+                    document.querySelector('[data-playback-card="previous"]'),
+                    steps[step - 1],
+                    steps[step - 1] ? i18n.step_previous : i18n.route_start
+                );
+                stepCard(
+                    document.querySelector('[data-playback-card="current"]'),
+                    steps[step],
+                    i18n.step_current,
+                    steps[step - 1]
+                );
+                stepCard(
+                    document.querySelector('[data-playback-card="next"]'),
+                    steps[step + 1],
+                    steps[step + 1] ? i18n.step_next : i18n.route_end
+                );
+
+                if (playbackPositionNode) {
+                    playbackPositionNode.textContent = format(i18n.position, [ step + 1, steps.length ]);
+                }
+
+                if (playbackToggle) {
+                    playbackToggle.textContent = playback.playing
+                        ? i18n.pause
+                        : (step >= steps.length - 1 ? i18n.replay : i18n.resume);
+                }
+            }
+
+            function placedPoints() {
+                var points = [];
+
+                entries.forEach(function(entry, index) {
+                    var point = hidden[index] ? null : chosen[entry.location];
+
+                    if (point) {
+                        points.push({ entry: entry, index: index, lat: point.lat, lon: point.lon });
+                    }
+                });
+
+                return points;
+            }
+
+            function currentSteps() {
+                return buildSteps(placedPoints());
+            }
+
+            function stopPlaying() {
+                playback.playing = false;
+
+                if (playback.timer) {
+                    window.clearInterval(playback.timer);
+                    playback.timer = null;
+                }
+            }
+
+            function startPlaying() {
+                stopPlaying();
+                playback.playing = true;
+                playback.timer = window.setInterval(function() {
+                    goToStep(1, true);
+                }, STEP_MS);
+            }
+
+            // Moves by whole steps; auto-advance stops at the end rather than looping.
+            function goToStep(offset, automatic) {
+                var steps = currentSteps();
+                var step = playbackStep(steps);
+
+                if (step < 0) {
+                    return;
+                }
+
+                var target = step + offset;
+
+                if (target < 0 || target >= steps.length) {
+                    if (automatic) {
+                        stopPlaying();
+                        renderRoute();
+                    }
+
+                    return;
+                }
+
+                playback.index = steps[target].points[0].index;
+
+                if (playback.playing && !automatic) {
+                    startPlaying();
+                }
+
+                renderRoute();
+            }
+
+            function enterPlayback(index) {
+                var steps = currentSteps();
+
+                if (steps.length < 2) {
+                    return;
+                }
+
+                playback.active = true;
+                playback.index = undefined === index ? steps[0].points[0].index : index;
+                document.body.classList.add('is-playing');
+                map.invalidateSize();
+                startPlaying();
+                renderRoute();
+                document.querySelector('.map-shell').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            function exitPlayback() {
+                stopPlaying();
+                playback.active = false;
+                playback.index = null;
+                userMoved = false;
+                document.body.classList.remove('is-playing');
+                map.invalidateSize();
+                renderRoute();
             }
 
             function statusText(index, entry) {
@@ -784,12 +1214,19 @@ $map_strings = [
                 }
             }
 
-            function updateRows(routePoints) {
+            function updateRows(routePoints, step) {
                 var numbers = {};
+                var current = {};
 
                 routePoints.forEach(function(point, position) {
                     numbers[point.index] = position + 1;
                 });
+
+                if (step) {
+                    step.points.forEach(function(point) {
+                        current[point.index] = true;
+                    });
+                }
 
                 entries.forEach(function(entry, index) {
                     var row = rows[String(index)];
@@ -818,6 +1255,12 @@ $map_strings = [
                         row.setAttribute('data-route-hidden', '');
                     } else {
                         row.removeAttribute('data-route-hidden');
+                    }
+
+                    if (current[index]) {
+                        row.setAttribute('data-route-current', '');
+                    } else {
+                        row.removeAttribute('data-route-current');
                     }
 
                     if (placed) {
@@ -1093,10 +1536,66 @@ $map_strings = [
             });
 
             document.addEventListener('click', function(event) {
-                var focus = event.target.closest ? event.target.closest('[data-route-focus]') : null;
+                var target = event.target.closest ? event.target : null;
+
+                if (!target) {
+                    return;
+                }
+
+                if (target.closest('[data-playback-start]')) {
+                    enterPlayback();
+                    return;
+                }
+
+                if (target.closest('[data-playback-stop]')) {
+                    exitPlayback();
+                    return;
+                }
+
+                if (target.closest('[data-playback-toggle]')) {
+                    if (playback.playing) {
+                        stopPlaying();
+                    } else {
+                        var steps = currentSteps();
+
+                        // Starting again from the end plays the route from the top.
+                        if (playbackStep(steps) >= steps.length - 1) {
+                            playback.index = steps.length ? steps[0].points[0].index : null;
+                        }
+
+                        startPlaying();
+                    }
+
+                    renderRoute();
+                    return;
+                }
+
+                var stepper = target.closest('[data-playback-step]');
+
+                if (stepper) {
+                    goToStep(parseInt(stepper.getAttribute('data-playback-step'), 10) || 0);
+                    return;
+                }
+
+                var focus = target.closest('[data-route-focus]');
 
                 if (focus) {
-                    var marker = markers[focus.getAttribute('data-route-focus')];
+                    var index = parseInt(focus.getAttribute('data-route-focus'), 10);
+
+                    // While a route is playing, the list is a way to jump around it.
+                    if (playback.active) {
+                        playback.index = index;
+
+                        if (playback.playing) {
+                            startPlaying();
+                        }
+
+                        renderRoute();
+                        document.querySelector('.map-shell').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        return;
+                    }
+
+                    var marker = markers[String(index)];
 
                     if (marker) {
                         userMoved = true;
@@ -1144,6 +1643,30 @@ $map_strings = [
                     renderRoute();
                     lookUp(collectPending());
                 }
+            });
+
+            document.addEventListener('keydown', function(event) {
+                if (!playback.active || event.metaKey || event.ctrlKey || event.altKey) {
+                    return;
+                }
+
+                var tag = event.target && event.target.tagName ? event.target.tagName : '';
+
+                if ('INPUT' === tag || 'SELECT' === tag || 'TEXTAREA' === tag) {
+                    return;
+                }
+
+                if ('ArrowRight' === event.key) {
+                    goToStep(1);
+                } else if ('ArrowLeft' === event.key) {
+                    goToStep(-1);
+                } else if ('Escape' === event.key) {
+                    exitPlayback();
+                } else {
+                    return;
+                }
+
+                event.preventDefault();
             });
 
             // Coordinates this site looked up before are on the page already.

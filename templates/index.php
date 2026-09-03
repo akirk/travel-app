@@ -18,7 +18,6 @@ $quick_plan_draft = '' !== $quick_plan_draft_key ? $traveler->get_quick_plan_dra
 $quick_plan_segment = isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] ) ? $quick_plan_draft['segment'] : [];
 $quick_plan_matches = isset( $quick_plan_draft['matches'] ) && is_array( $quick_plan_draft['matches'] ) ? $quick_plan_draft['matches'] : [];
 $has_ai     = AiParser::is_available();
-$has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\AI_Assistant' );
 $delegated_owner_options = $traveler->get_delegated_trip_owner_options();
 $demo_mode_enabled = $traveler->is_demo_mode_enabled();
 $is_playground = $traveler->is_playground();
@@ -165,23 +164,8 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
         h2 { font-size: 1.05rem; margin-bottom: 12px; }
         h3 { font-size: 1rem; margin-bottom: 6px; }
         a { color: var(--wp-app-color-link); }
-        .app-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; margin-bottom: 22px; }
+        .app-header { margin-bottom: 22px; }
         .lede { max-width: 680px; color: var(--wp-app-color-muted); font-size: 1.02rem; margin-bottom: 0; }
-        .status-stack { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-        .status {
-            display: inline-flex;
-            align-items: center;
-            min-height: 30px;
-            padding: 4px 10px;
-            border: 1px solid var(--wp-app-color-border);
-            border-radius: 999px;
-            background: var(--wp-app-color-surface);
-            color: var(--wp-app-color-muted);
-            font-size: 0.82rem;
-            white-space: nowrap;
-        }
-        .status.available { color: #0f6b42; border-color: rgba(15, 107, 66, 0.32); background: rgba(15, 107, 66, 0.08); }
-        .status.unavailable { color: #8a4b08; border-color: rgba(138, 75, 8, 0.28); background: rgba(138, 75, 8, 0.08); }
         .notice {
             margin-bottom: 18px;
             border-radius: 6px;
@@ -279,6 +263,11 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
         .drop-zone input { position: absolute; opacity: 0; pointer-events: none; }
         .drop-title { font-weight: 700; }
         .drop-file-name, .hint { color: var(--wp-app-color-muted); font-size: 0.88rem; overflow-wrap: anywhere; }
+        .capability-note {
+            margin: 10px 0;
+            color: var(--wp-app-color-muted);
+            font-size: 0.88rem;
+        }
         .demo-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 14px 0; }
         .demo-controls label { min-width: 190px; margin: 0; }
         button {
@@ -397,8 +386,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
             padding: 18px;
         }
         @media (max-width: 880px) {
-            .app-header, .dashboard, .mini-timeline, .quick-plan-fields { grid-template-columns: 1fr; }
-            .status-stack { justify-content: flex-start; }
+            .dashboard, .mini-timeline, .quick-plan-fields { grid-template-columns: 1fr; }
             .dashboard-import-confirm .trip-sections { order: 2; }
             .dashboard-import-confirm .import-panel { order: 1; }
             button { width: 100%; }
@@ -410,18 +398,8 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
 
     <main>
         <header class="app-header">
-            <div>
-                <h1><?php esc_html_e( 'Traveler', 'traveler' ); ?></h1>
-                <p class="lede"><?php esc_html_e( 'A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.', 'traveler' ); ?></p>
-            </div>
-            <div class="status-stack" aria-label="<?php esc_attr_e( 'Integration status', 'traveler' ); ?>">
-                <span class="status <?php echo $has_ai ? 'available' : 'unavailable'; ?>">
-                    <?php echo esc_html( $has_ai ? __( 'WordPress AI parser available', 'traveler' ) : __( 'Fallback parser active', 'traveler' ) ); ?>
-                </span>
-                <span class="status <?php echo $has_ai_assistant ? 'available' : 'unavailable'; ?>">
-                    <?php echo esc_html( $has_ai_assistant ? __( 'AI Assistant connected', 'traveler' ) : __( 'AI Assistant not detected', 'traveler' ) ); ?>
-                </span>
-            </div>
+            <h1><?php esc_html_e( 'Traveler', 'traveler' ); ?></h1>
+            <p class="lede"><?php esc_html_e( 'A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.', 'traveler' ); ?></p>
         </header>
 
         <?php if ( $imported ) : ?>
@@ -734,6 +712,9 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         </select>
                     <?php endif; ?>
                     <p class="hint"><?php echo esc_html( $has_ai ? __( 'Enter only a trip name to create a new trip. AI extraction can also turn plain text into an entry for review; files and confirmations still work too.', 'traveler' ) : __( 'Enter only a trip name to create a new trip, or use quick parsing, calendar parsing, or a basic parser for itinerary text.', 'traveler' ) ); ?></p>
+                    <?php if ( ! $has_ai ) : ?>
+                        <p class="capability-note"><?php esc_html_e( 'Traveler will use calendar and basic parsing for this import.', 'traveler' ); ?></p>
+                    <?php endif; ?>
                     <button type="submit"><?php esc_html_e( 'Create or Import', 'traveler' ); ?></button>
                 </form>
                 <?php if ( '' !== $all_trips_calendar_url && ! $is_playground ) : ?>

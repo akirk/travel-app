@@ -205,7 +205,6 @@ $map_strings = [
             display: grid;
             grid-template-columns: 1fr 1.5fr 1fr;
             gap: 10px;
-            margin-bottom: 10px;
         }
         .playback-step {
             display: block;
@@ -248,6 +247,7 @@ $map_strings = [
             flex-wrap: wrap;
             align-items: center;
             gap: 8px;
+            margin-bottom: 10px;
         }
         .playback-controls button {
             border: 1px solid var(--wp-app-color-border);
@@ -416,11 +416,6 @@ $map_strings = [
         </section>
 
         <div class="playback" data-playback hidden>
-            <div class="playback-steps" data-playback-steps hidden>
-                <button class="playback-step playback-side" type="button" data-playback-card="previous" data-playback-step="-1"></button>
-                <div class="playback-step playback-now" data-playback-card="current" aria-live="polite"></div>
-                <button class="playback-step playback-side" type="button" data-playback-card="next" data-playback-step="1"></button>
-            </div>
             <div class="playback-controls">
                 <button class="playback-play" type="button" data-playback-start><?php esc_html_e( 'Play route', 'traveler' ); ?></button>
                 <span class="playback-transport" data-playback-transport hidden>
@@ -431,6 +426,11 @@ $map_strings = [
                     <button type="button" data-playback-fit hidden title="<?php esc_attr_e( 'Fit each step to the map again', 'traveler' ); ?>"><?php esc_html_e( 'Fit step', 'traveler' ); ?></button>
                     <button type="button" data-playback-stop><?php esc_html_e( 'Exit', 'traveler' ); ?></button>
                 </span>
+            </div>
+            <div class="playback-steps" data-playback-steps hidden>
+                <button class="playback-step playback-side" type="button" data-playback-card="previous" data-playback-step="-1"></button>
+                <div class="playback-step playback-now" data-playback-card="current" aria-live="polite"></div>
+                <button class="playback-step playback-side" type="button" data-playback-card="next" data-playback-step="1"></button>
             </div>
         </div>
 

@@ -53,6 +53,7 @@ class App extends BaseApp {
             'pwa'        => $this->get_pwa_config(),
         ] );
 
+        add_action( 'init', [ $this, 'enqueue_assets' ] );
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_traveler_import', [ $this, 'handle_import' ] );
@@ -78,7 +79,6 @@ class App extends BaseApp {
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'register_ai_assistant_welcome_tips' ], 10, 2 );
         add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
         add_filter( 'wp_app_pwa_manifest_traveler', [ $this, 'filter_pwa_manifest' ], 10, 2 );
-        add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
         add_action( 'template_redirect', [ $this, 'maybe_handle_share_target' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_user_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_calendar' ], 0 );
@@ -147,23 +147,24 @@ class App extends BaseApp {
         $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
         $offline_script_path = dirname( __DIR__ ) . '/assets/js/offline-sync.js';
 
-        wp_enqueue_script(
+        // Naming the scope means these register on Traveler's own hook, so
+        // this does not need to run during a render. It runs on init because
+        // the messages below are translated.
+        $scope = $this->get_url_path();
+
+        wp_app_enqueue_script(
             'traveler-timeline-time',
             plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/traveler.php' ),
             [],
             file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
-            true
+            true,
+            $scope
         );
 
-        wp_enqueue_script(
-            'traveler-offline-sync',
-            plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
-            [],
-            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
-            true
-        );
-        wp_add_inline_script(
-            'traveler-offline-sync',
+        // Registered before offline-sync.js so the messages are defined by the
+        // time it runs, which is what wp_add_inline_script( 'before' ) did.
+        wp_app_add_inline_script(
+            'traveler-offline-sync-data',
             'window.travelerPwa=' . wp_json_encode( [
                 'messages' => [
                     'offlineQueued' => __( 'Saved offline. Changes will sync when you are back online.', 'traveler' ),
@@ -172,7 +173,17 @@ class App extends BaseApp {
                     'syncFailed'    => __( 'Some offline changes could not sync yet.', 'traveler' ),
                 ],
             ] ) . ';',
-            'before'
+            true,
+            $scope
+        );
+
+        wp_app_enqueue_script(
+            'traveler-offline-sync',
+            plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
+            [],
+            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
+            true,
+            $scope
         );
     }
 

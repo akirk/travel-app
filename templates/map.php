@@ -428,6 +428,7 @@ $map_strings = [
                     <button class="playback-play" type="button" data-playback-toggle></button>
                     <button type="button" data-playback-step="1" aria-label="<?php esc_attr_e( 'Next waypoint', 'traveler' ); ?>" title="<?php esc_attr_e( 'Next waypoint', 'traveler' ); ?>">&#x2192;</button>
                     <span class="playback-position" data-playback-position></span>
+                    <button type="button" data-playback-fit hidden title="<?php esc_attr_e( 'Fit each step to the map again', 'traveler' ); ?>"><?php esc_html_e( 'Fit step', 'traveler' ); ?></button>
                     <button type="button" data-playback-stop><?php esc_html_e( 'Exit', 'traveler' ); ?></button>
                 </span>
             </div>
@@ -709,13 +710,22 @@ $map_strings = [
             var lookingUp = false;
             // Playback walks the route waypoint by waypoint, keeping the one before and the one
             // after in view, so a trip can be followed the way it was travelled.
-            var playback = { active: false, playing: false, index: null, timer: null };
+            var playback = { active: false, playing: false, index: null, timer: null, zoom: null };
+            // Moving the map ourselves also fires Leaflet's zoom events, so they are ignored for a
+            // moment afterwards: what arrives outside that window is the viewer's own doing.
+            var autoMoveUntil = 0;
+
+            function autoMove(move) {
+                autoMoveUntil = Date.now() + 800;
+                move();
+            }
             var playbackBar = document.querySelector('[data-playback]');
             var playbackSteps = document.querySelector('[data-playback-steps]');
             var playbackTransport = document.querySelector('[data-playback-transport]');
             var playbackStart = document.querySelector('[data-playback-start]');
             var playbackToggle = document.querySelector('[data-playback-toggle]');
             var playbackPositionNode = document.querySelector('[data-playback-position]');
+            var playbackFit = document.querySelector('[data-playback-fit]');
             var STEP_MS = 4000;
 
             Array.prototype.forEach.call(document.querySelectorAll('[data-route-item]'), function(row) {
@@ -724,6 +734,12 @@ $map_strings = [
 
             map.on('dragstart', function() {
                 userMoved = true;
+            });
+
+            map.on('zoomend', function() {
+                if (playback.active && Date.now() > autoMoveUntil) {
+                    playback.zoom = map.getZoom();
+                }
             });
 
             map.on('popupopen', function(event) {
@@ -882,17 +898,28 @@ $map_strings = [
                 });
 
                 if (span) {
-                    var window_ = coordinates.slice(span.from, span.to + 1);
+                    var bounds = L.latLngBounds(coordinates.slice(span.from, span.to + 1));
+                    // Zoom the step needs: everything the step covers, at city level at the closest.
+                    var fitZoom = bounds.getNorthEast().equals(bounds.getSouthWest())
+                        ? Math.max(map.getZoom(), 11)
+                        : map.getBoundsZoom(bounds, false, L.point(40, 40));
 
-                    if (window_.length > 1) {
-                        map.fitBounds(L.latLngBounds(window_), { padding: [40, 40], maxZoom: 13 });
-                    } else {
-                        map.setView(window_[0], Math.max(map.getZoom(), 11));
-                    }
+                    fitZoom = Math.min(fitZoom, 13);
+
+                    // A zoom set during playback is kept as a ceiling rather than a fixed level:
+                    // the map does not creep back in on the next step, but a long leg that would
+                    // not fit still widens out for it.
+                    var zoom = null === playback.zoom ? fitZoom : Math.min(playback.zoom, fitZoom);
+
+                    autoMove(function() {
+                        map.setView(bounds.getCenter(), zoom);
+                    });
                 } else if (coordinates.length && !userMoved) {
-                    map.fitBounds(L.latLngBounds(coordinates), {
-                        padding: [28, 28],
-                        maxZoom: coordinates.length > 1 ? 19 : 11
+                    autoMove(function() {
+                        map.fitBounds(L.latLngBounds(coordinates), {
+                            padding: [28, 28],
+                            maxZoom: coordinates.length > 1 ? 19 : 11
+                        });
                     });
                 }
 
@@ -1083,6 +1110,10 @@ $map_strings = [
                     playbackPositionNode.textContent = format(i18n.position, [ step + 1, steps.length ]);
                 }
 
+                if (playbackFit) {
+                    playbackFit.hidden = null === playback.zoom;
+                }
+
                 if (playbackToggle) {
                     playbackToggle.textContent = playback.playing
                         ? i18n.pause
@@ -1163,8 +1194,11 @@ $map_strings = [
 
                 playback.active = true;
                 playback.index = undefined === index ? steps[0].points[0].index : index;
+                playback.zoom = null;
                 document.body.classList.add('is-playing');
-                map.invalidateSize();
+                autoMove(function() {
+                    map.invalidateSize();
+                });
                 startPlaying();
                 renderRoute();
                 document.querySelector('.map-shell').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1174,9 +1208,12 @@ $map_strings = [
                 stopPlaying();
                 playback.active = false;
                 playback.index = null;
+                playback.zoom = null;
                 userMoved = false;
                 document.body.classList.remove('is-playing');
-                map.invalidateSize();
+                autoMove(function() {
+                    map.invalidateSize();
+                });
                 renderRoute();
             }
 
@@ -1552,6 +1589,12 @@ $map_strings = [
                     return;
                 }
 
+                if (target.closest('[data-playback-fit]')) {
+                    playback.zoom = null;
+                    renderRoute();
+                    return;
+                }
+
                 if (target.closest('[data-playback-toggle]')) {
                     if (playback.playing) {
                         stopPlaying();
@@ -1599,7 +1642,9 @@ $map_strings = [
 
                     if (marker) {
                         userMoved = true;
-                        map.setView(marker.getLatLng(), Math.max(map.getZoom(), 11));
+                        autoMove(function() {
+                            map.setView(marker.getLatLng(), Math.max(map.getZoom(), 11));
+                        });
                         marker.openPopup();
                         document.querySelector('.map-shell').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }

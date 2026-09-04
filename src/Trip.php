@@ -189,7 +189,7 @@ class Trip {
     }
 
     public static function is_active_data( array $trip_data, ?string $today = null ): bool {
-        $today = $today ?: ( function_exists( 'current_time' ) ? current_time( 'Y-m-d' ) : date( 'Y-m-d' ) );
+        $today = $today ?: ( function_exists( 'current_time' ) ? current_time( 'Y-m-d' ) : gmdate( 'Y-m-d' ) );
         $starts = (string) ( $trip_data['starts_at'] ?? '' );
         $ends = (string) ( $trip_data['ends_at'] ?? '' );
 

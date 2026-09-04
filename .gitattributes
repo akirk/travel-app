@@ -1,0 +1,44 @@
+# Git/CI
+.git* export-ignore
+.github export-ignore
+
+# WordPress.org assets (deployed to the SVN assets/ directory, not shipped)
+.wordpress-org export-ignore
+
+# IDE/Editor/agents
+.vscode export-ignore
+.claude export-ignore
+.agents export-ignore
+.codex export-ignore
+AGENTS.md export-ignore
+CLAUDE.md export-ignore
+
+# Testing/linting
+phpunit.xml export-ignore
+phpunit.xml.dist export-ignore
+phpcs.xml export-ignore
+phpcs.xml.dist export-ignore
+tests export-ignore
+
+# Build/Dev
+composer.lock export-ignore
+blueprint.json export-ignore
+blueprint-openstation.json export-ignore
+demo.json export-ignore
+
+# Dev vendors
+vendor/bin export-ignore
+vendor/phpunit export-ignore
+vendor/sebastian export-ignore
+vendor/phar-io export-ignore
+vendor/theseer export-ignore
+vendor/myclabs export-ignore
+vendor/doctrine export-ignore
+vendor/nikic export-ignore
+vendor/**/test export-ignore
+vendor/**/tests export-ignore
+vendor/**/Test export-ignore
+vendor/**/Tests export-ignore
+
+# Misc
+.DS_Store export-ignore

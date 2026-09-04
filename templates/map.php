@@ -1,4 +1,8 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 use Traveler\App;
 use Traveler\GeocodeCache;
 use Traveler\Trip;
@@ -104,15 +108,25 @@ $map_strings = [
     /* translators: %s: distance in kilometres. */
     'leg_item'        => __( '%s km on this leg', 'traveler' ),
 ];
+
+// Leaflet ships with the plugin: wordpress.org does not allow loading assets
+// from a CDN. Printed in the head so the inline map script below can use L.
+$leaflet_base_url = plugins_url( 'assets/vendor/leaflet/', dirname( __DIR__ ) . '/traveler.php' );
+wp_app_enqueue_style( 'traveler-leaflet', $leaflet_base_url . 'leaflet.css', [], '1.9.4', 'traveler' );
+wp_app_enqueue_script( 'traveler-leaflet', $leaflet_base_url . 'leaflet.js', [], '1.9.4', false, 'traveler' );
 ?>
 <!DOCTYPE html>
 <html <?php wp_app_language_attributes(); ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( sprintf( __( '%s Route Map', 'traveler' ), $trip_data['title'] ) ); ?></title>
+    <title>
+    <?php
+    /* translators: %s: travel plan title. */
+    wp_app_the_title( sprintf( __( '%s Route Map', 'traveler' ), $trip_data['title'] ) ); 
+    ?>
+    </title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <?php wp_app_head(); ?>
     <style>
         :root { color-scheme: light dark; }
@@ -412,12 +426,22 @@ $map_strings = [
                     printf(
                         /* translators: %s: travel plan title. */
                         esc_html__( '%s Route Map', 'traveler' ),
-                        '<span' . App::mask_attr( 'title', (string) $trip_data['id'] ) . '>' . esc_html( $trip_data['title'] ) . '</span>'
+                        '<span' . esc_attr( App::mask_attr( 'title', (string) $trip_data['id'] ) ) . '>' . esc_html( $trip_data['title'] ) . '</span>'
                     );
                     ?>
                 </h1>
                 <p class="meta">
-                    <span><?php echo esc_html( sprintf( _n( '%d waypoint', '%d waypoints', count( $route_entries ), 'traveler' ), count( $route_entries ) ) ); ?></span>
+                    <span>
+                        <?php
+                        echo esc_html(
+                            sprintf(
+                                /* translators: %d: number of waypoints on the route. */
+                                _n( '%d waypoint', '%d waypoints', count( $route_entries ), 'traveler' ),
+                                count( $route_entries )
+                            )
+                        );
+                        ?>
+                    </span>
                     <span><?php esc_html_e( 'Straight lines between itinerary locations', 'traveler' ); ?></span>
                     <a class="back-link" href="<?php echo esc_url( home_url( '/traveler/trip/' . $trip_id . '/' ) ); ?>"><?php esc_html_e( 'Back to Travel Plan', 'traveler' ); ?></a>
                 </p>
@@ -430,7 +454,7 @@ $map_strings = [
 
         <div class="playback" data-playback hidden>
             <div class="playback-controls">
-                <button class="playback-play" type="button" data-playback-start><?php echo $playback_icons['play']; ?><?php esc_html_e( 'Playback', 'traveler' ); ?></button>
+                <button class="playback-play" type="button" data-playback-start><?php echo $playback_icons['play']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A hard-coded SVG literal defined at the top of this file. ?><?php esc_html_e( 'Playback', 'traveler' ); ?></button>
                 <span class="playback-transport" data-playback-transport hidden>
                     <button type="button" data-playback-step="-1" aria-label="<?php esc_attr_e( 'Previous waypoint', 'traveler' ); ?>" title="<?php esc_attr_e( 'Previous waypoint', 'traveler' ); ?>">&#x2190;</button>
                     <button class="playback-play" type="button" data-playback-toggle></button>
@@ -476,13 +500,13 @@ $map_strings = [
                             <span class="route-item-number" data-route-number aria-hidden="true">-</span>
                         </label>
                         <div class="route-item-body">
-                            <button type="button" class="route-item-focus" data-route-focus="<?php echo esc_attr( (string) $route_index ); ?>"><span<?php echo App::mask_attr( 'title', $route_key . '-item' ); ?>><?php echo esc_html( $route_entry['title'] ); ?></span></button>
+                            <button type="button" class="route-item-focus" data-route-focus="<?php echo esc_attr( (string) $route_index ); ?>"><span<?php echo esc_attr( App::mask_attr( 'title', $route_key . '-item' ) ); ?>><?php echo esc_html( $route_entry['title'] ); ?></span></button>
                             <?php if ( $route_meta ) : ?>
                                 <div class="route-item-meta"><?php echo esc_html( implode( ' · ', $route_meta ) ); ?></div>
                             <?php endif; ?>
-                            <div class="route-item-meta"<?php echo App::mask_attr( 'place', $route_key . ( $route_entry['is_end'] ? '-end-location' : '-location' ) ); ?>><?php echo esc_html( $route_entry['location'] ); ?></div>
+                            <div class="route-item-meta"<?php echo esc_attr( App::mask_attr( 'place', $route_key . ( $route_entry['is_end'] ? '-end-location' : '-location' ) ) ); ?>><?php echo esc_html( $route_entry['location'] ); ?></div>
                             <div class="route-item-status" data-route-status></div>
-                            <div class="route-item-status" data-route-match<?php echo App::mask_attr( 'place' ); ?>></div>
+                            <div class="route-item-status" data-route-match<?php echo esc_attr( App::mask_attr( 'place' ) ); ?>></div>
                             <label class="route-item-pick" hidden>
                                 <span class="screen-reader-text"><?php esc_html_e( 'Matched place', 'traveler' ); ?></span>
                                 <select data-route-pick="<?php echo esc_attr( (string) $route_index ); ?>"></select>
@@ -495,7 +519,6 @@ $map_strings = [
         <?php endif; ?>
     </main>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         (function() {
             var entries = <?php echo wp_json_encode( array_values( $route_entries ) ); ?>;

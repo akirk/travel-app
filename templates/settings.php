@@ -1,4 +1,8 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 use Traveler\App;
 
 $traveler = App::get_instance();
@@ -13,7 +17,7 @@ $settings_updated = isset( $_GET['settings_updated'] );
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( __( 'Traveler Settings', 'traveler' ) ); ?></title>
+    <title><?php wp_app_the_title( __( 'Traveler Settings', 'traveler' ) ); ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <?php wp_app_head(); ?>
     <style>

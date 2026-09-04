@@ -1755,7 +1755,7 @@ class App extends BaseApp {
             get_current_user_id(),
             '_traveler_delegated_trip_creation_capability',
             $this->normalize_delegation_capability(
-                isset( $_POST['delegated_trip_creation_capability'] ) ? (string) wp_unslash( $_POST['delegated_trip_creation_capability'] ) : 'edit_others_posts',
+                isset( $_POST['delegated_trip_creation_capability'] ) ? sanitize_key( wp_unslash( $_POST['delegated_trip_creation_capability'] ) ) : 'edit_others_posts',
                 'edit_others_posts'
             )
         );
@@ -1763,7 +1763,7 @@ class App extends BaseApp {
             get_current_user_id(),
             '_traveler_global_trip_editor_capability',
             $this->normalize_delegation_capability(
-                isset( $_POST['global_trip_editor_capability'] ) ? (string) wp_unslash( $_POST['global_trip_editor_capability'] ) : 'none',
+                isset( $_POST['global_trip_editor_capability'] ) ? sanitize_key( wp_unslash( $_POST['global_trip_editor_capability'] ) ) : 'none',
                 'none'
             )
         );
@@ -1930,6 +1930,7 @@ class App extends BaseApp {
         header( 'Content-Disposition: inline; filename="' . $filename . '.ics"' );
         header( 'Content-Length: ' . strlen( $ics ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete iCalendar document; every field in it went through escape_ics_text().
         echo $ics;
         exit;
     }
@@ -1955,7 +1956,8 @@ class App extends BaseApp {
             exit;
         }
 
-        if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+        $request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : '';
+        if ( 'POST' !== strtoupper( $request_method ) ) {
             wp_safe_redirect( $index_url );
             exit;
         }
@@ -2049,6 +2051,7 @@ class App extends BaseApp {
         header( 'Content-Disposition: inline; filename="travel-plans.ics"' );
         header( 'Content-Length: ' . strlen( $ics ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete iCalendar document; every field in it went through escape_ics_text().
         echo $ics;
         exit;
     }
@@ -2216,6 +2219,7 @@ class App extends BaseApp {
         header( 'Content-Disposition: attachment; filename="' . $filename . '.html"' );
         header( 'Content-Length: ' . strlen( $html ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete HTML document rendered by the trip template, which escapes at each point of output.
         echo $html;
         exit;
     }
@@ -2278,6 +2282,7 @@ class App extends BaseApp {
 
         check_ajax_referer( 'traveler_geocode', 'nonce' );
 
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- A JSON document; the keys are sanitized below and the values by GeocodeCache::sanitize_candidates().
         $payload = isset( $_POST['locations'] ) ? json_decode( wp_unslash( $_POST['locations'] ), true ) : null;
         if ( ! is_array( $payload ) ) {
             wp_send_json_error( [ 'message' => __( 'No coordinates were submitted.', 'traveler' ) ], 400 );
@@ -3446,7 +3451,10 @@ class App extends BaseApp {
             $format = 'F j, Y';
         }
 
-        $localized_default_format = _x( 'F j, Y', 'date format' );
+        // The stored option is core's untranslated default here, so reuse core's own
+        // translation of it rather than shipping a second copy of the same string.
+        // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch -- Deliberately reusing core's 'date format' string.
+        $localized_default_format = _x( 'F j, Y', 'date format', 'default' );
         if ( 'F j, Y' === $format && 'F j, Y' !== $localized_default_format ) {
             $format = $localized_default_format;
         }
@@ -3522,11 +3530,19 @@ class App extends BaseApp {
 
         $date_diff = (int) $start_date->diff( $end_date )->format( '%a' );
         if ( 'lodging' === ( $segment['type'] ?? '' ) ) {
-            return sprintf( _n( '1 night', '%d nights', $date_diff, 'traveler' ), $date_diff );
+            return sprintf(
+                /* translators: %d: number of nights. */
+                _n( '%d night', '%d nights', $date_diff, 'traveler' ),
+                $date_diff
+            );
         }
 
         $days = $date_diff + 1;
-        return sprintf( _n( '1 day', '%d days', $days, 'traveler' ), $days );
+        return sprintf(
+            /* translators: %d: number of days. */
+            _n( '%d day', '%d days', $days, 'traveler' ),
+            $days
+        );
     }
 
     public function get_segment_date_range_label( array $segment, bool $include_duration = true ): string {
@@ -3579,12 +3595,28 @@ class App extends BaseApp {
 
         if ( $start_date > $today_date ) {
             $days = (int) $today_date->diff( $start_date )->format( '%a' );
-            return sprintf( _n( 'Starts tomorrow', 'Starts in %d days', $days, 'traveler' ), $days );
+            if ( 1 === $days ) {
+                return __( 'Starts tomorrow', 'traveler' );
+            }
+
+            return sprintf(
+                /* translators: %d: number of days until the travel plan starts. */
+                _n( 'Starts in %d day', 'Starts in %d days', $days, 'traveler' ),
+                $days
+            );
         }
 
         if ( $end_date && $end_date < $today_date ) {
             $days = (int) $end_date->diff( $today_date )->format( '%a' );
-            return sprintf( _n( 'Ended yesterday', 'Ended %d days ago', $days, 'traveler' ), $days );
+            if ( 1 === $days ) {
+                return __( 'Ended yesterday', 'traveler' );
+            }
+
+            return sprintf(
+                /* translators: %d: number of days since the travel plan ended. */
+                _n( 'Ended %d day ago', 'Ended %d days ago', $days, 'traveler' ),
+                $days
+            );
         }
 
         return __( 'Active now', 'traveler' );
@@ -3605,7 +3637,11 @@ class App extends BaseApp {
         }
 
         $days = (int) $start_date->diff( $end_date )->format( '%a' ) + 1;
-        return sprintf( _n( '1 day', '%d days', $days, 'traveler' ), $days );
+        return sprintf(
+            /* translators: %d: number of days. */
+            _n( '%d day', '%d days', $days, 'traveler' ),
+            $days
+        );
     }
 
     public function parse_itinerary_text( string $text ): array {
@@ -3917,8 +3953,12 @@ class App extends BaseApp {
         $wpdb->query( "UPDATE {$wpdb->term_taxonomy} SET taxonomy = 'traveler_trip' WHERE taxonomy = 'travel_app_trip'" );
 
         foreach ( [ $wpdb->postmeta, $wpdb->termmeta, $wpdb->usermeta ] as $table ) {
+            // The table names come from $wpdb, never from a request, and there is
+            // nothing else to interpolate, so there is no placeholder to use here.
+            // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( '_traveler_', SUBSTRING( meta_key, 13 ) ) WHERE meta_key LIKE '\\_travel\\_app\\_%'" );
             $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( 'traveler_', SUBSTRING( meta_key, 12 ) ) WHERE meta_key LIKE 'travel\\_app\\_%'" );
+            // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
         }
 
         $cap_map = [

@@ -202,7 +202,11 @@ class UrlPreviewService {
         $debug['response_code'] = (string) $response_code;
         if ( $response_code < 200 || $response_code >= 300 ) {
             $debug['status'] = 'http_error';
-            $debug['message'] = sprintf( __( 'Unexpected HTTP status %d.', 'traveler' ), $response_code );
+            $debug['message'] = sprintf(
+                /* translators: %d: HTTP status code returned by the URL. */
+                __( 'Unexpected HTTP status %d.', 'traveler' ),
+                $response_code
+            );
             return [];
         }
 

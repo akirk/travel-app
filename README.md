@@ -1,7 +1,7 @@
 # Traveler
 
 - Contributors: akirk
-- Tags: travel, itinerary, trip-planner, travel-journal, maps
+- Tags: travel, itinerary, trip-planner, travel-journal, wp-app
 - Requires at least: 6.0
 - Requires PHP: 7.4
 - Tested up to: 7.1

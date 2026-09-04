@@ -104,6 +104,12 @@ $map_strings = [
     /* translators: %s: distance in kilometres. */
     'leg_item'        => __( '%s km on this leg', 'traveler' ),
 ];
+
+// Leaflet ships with the plugin: wordpress.org does not allow loading assets
+// from a CDN. Printed in the head so the inline map script below can use L.
+$leaflet_base_url = plugins_url( 'assets/vendor/leaflet/', dirname( __DIR__ ) . '/traveler.php' );
+wp_app_enqueue_style( 'traveler-leaflet', $leaflet_base_url . 'leaflet.css', [], '1.9.4', 'traveler' );
+wp_app_enqueue_script( 'traveler-leaflet', $leaflet_base_url . 'leaflet.js', [], '1.9.4', false, 'traveler' );
 ?>
 <!DOCTYPE html>
 <html <?php wp_app_language_attributes(); ?>>
@@ -112,7 +118,6 @@ $map_strings = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo wp_app_title( sprintf( __( '%s Route Map', 'traveler' ), $trip_data['title'] ) ); ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <?php wp_app_head(); ?>
     <style>
         :root { color-scheme: light dark; }
@@ -495,7 +500,6 @@ $map_strings = [
         <?php endif; ?>
     </main>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         (function() {
             var entries = <?php echo wp_json_encode( array_values( $route_entries ) ); ?>;

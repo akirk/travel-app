@@ -55,6 +55,7 @@ class GeocodeCache {
             $importance = is_finite( $importance ) ? max( 0.0, min( 1.0, $importance ) ) : 0.0;
 
             $label = isset( $candidate['label'] ) ? (string) $candidate['label'] : '';
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags -- Only reached when WordPress is not loaded, so wp_strip_all_tags() does not exist.
             $label = function_exists( 'sanitize_text_field' ) ? sanitize_text_field( $label ) : trim( strip_tags( $label ) );
 
             $clean[] = [

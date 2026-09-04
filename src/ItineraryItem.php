@@ -216,6 +216,15 @@ class ItineraryItem {
         ];
     }
 
+    /**
+     * Maps the segment fields of an admin-post request onto a segment array.
+     *
+     * The nonce is verified by the App handler that calls this - the sniff
+     * cannot see across the call - and every field is unslashed and sanitized
+     * below.
+     *
+     * phpcs:disable WordPress.Security.NonceVerification.Missing
+     */
     public static function from_request(): array {
         return [
             'type'         => isset( $_POST['segment_type'] ) ? sanitize_key( wp_unslash( $_POST['segment_type'] ) ) : 'other',
@@ -239,6 +248,7 @@ class ItineraryItem {
             'image'       => isset( $_POST['segment_url_preview_image'] ) ? esc_url_raw( wp_unslash( $_POST['segment_url_preview_image'] ) ) : '',
         ];
     }
+    // phpcs:enable WordPress.Security.NonceVerification.Missing
 
     public static function get_user_item( int $trip_id, int $item_id ): ?self {
         if ( ! current_user_can( 'read_traveler_trip', $trip_id ) || $item_id <= 0 ) {

@@ -1556,11 +1556,21 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                     <strong class="timeline-day-rail-title"><?php esc_html_e( 'Trip timeline', 'traveler' ); ?></strong>
                     <p class="timeline-day-rail-summary">
                         <?php
+                        $timeline_day_count_label = sprintf(
+                            /* translators: %d: number of itinerary days. */
+                            _n( '%d day', '%d days', count( $segments_by_day ), 'traveler' ),
+                            count( $segments_by_day )
+                        );
+                        $timeline_item_count_label = sprintf(
+                            /* translators: %d: number of itinerary items. */
+                            _n( '%d item', '%d items', count( $segments ), 'traveler' ),
+                            count( $segments )
+                        );
                         printf(
                             /* translators: 1: formatted itinerary day count, 2: formatted trip item count. */
                             esc_html__( '%1$s · %2$s', 'traveler' ),
-                            esc_html( sprintf( _n( '%d day', '%d days', count( $segments_by_day ), 'traveler' ), count( $segments_by_day ) ) ),
-                            esc_html( sprintf( _n( '%d item', '%d items', count( $segments ), 'traveler' ), count( $segments ) ) )
+                            esc_html( $timeline_day_count_label ),
+                            esc_html( $timeline_item_count_label )
                         );
                         ?>
                     </p>
@@ -1882,7 +1892,15 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                         <div class="day-heading-meta">
                                             <h3 class="day-heading" id="<?php echo esc_attr( $day_heading_id ); ?>"><?php echo esc_html( $traveler->format_date_label( $day ) ); ?></h3>
                                             <span class="day-item-count">
-                                                <?php echo esc_html( sprintf( _n( '%d timeline item', '%d timeline items', count( $day_segments ), 'traveler' ), count( $day_segments ) ) ); ?>
+                                                <?php
+                                                echo esc_html(
+                                                    sprintf(
+                                                        /* translators: %d: number of items scheduled for the day. */
+                                                        _n( '%d timeline item', '%d timeline items', count( $day_segments ), 'traveler' ),
+                                                        count( $day_segments )
+                                                    )
+                                                );
+                                                ?>
                                             </span>
                                         </div>
                                     </div>

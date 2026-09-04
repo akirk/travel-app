@@ -53,6 +53,7 @@ class App extends BaseApp {
             'pwa'        => $this->get_pwa_config(),
         ] );
 
+        add_action( 'init', [ $this, 'enqueue_assets' ] );
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_traveler_import', [ $this, 'handle_import' ] );
@@ -64,6 +65,7 @@ class App extends BaseApp {
         add_action( 'wp_ajax_traveler_generate_share_link', [ $this, 'handle_generate_share_link' ] );
         add_action( 'wp_ajax_traveler_remove_share_link', [ $this, 'handle_remove_share_link' ] );
         add_action( 'wp_ajax_traveler_clear_share_cache', [ $this, 'handle_clear_share_cache' ] );
+        add_action( 'wp_ajax_traveler_cache_geocode', [ $this, 'handle_cache_geocode' ] );
         add_action( 'admin_post_traveler_delete', [ $this, 'handle_delete' ] );
         add_action( 'admin_post_traveler_update_segment', [ $this, 'handle_update_segment' ] );
         add_action( 'admin_post_traveler_add_segment', [ $this, 'handle_add_segment' ] );
@@ -78,7 +80,6 @@ class App extends BaseApp {
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'register_ai_assistant_welcome_tips' ], 10, 2 );
         add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
         add_filter( 'wp_app_pwa_manifest_traveler', [ $this, 'filter_pwa_manifest' ], 10, 2 );
-        add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
         add_action( 'template_redirect', [ $this, 'maybe_handle_share_target' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_user_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_calendar' ], 0 );
@@ -147,23 +148,24 @@ class App extends BaseApp {
         $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
         $offline_script_path = dirname( __DIR__ ) . '/assets/js/offline-sync.js';
 
-        wp_enqueue_script(
+        // Naming the scope means these register on Traveler's own hook, so
+        // this does not need to run during a render. It runs on init because
+        // the messages below are translated.
+        $scope = $this->get_url_path();
+
+        wp_app_enqueue_script(
             'traveler-timeline-time',
             plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/traveler.php' ),
             [],
             file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
-            true
+            true,
+            $scope
         );
 
-        wp_enqueue_script(
-            'traveler-offline-sync',
-            plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
-            [],
-            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
-            true
-        );
-        wp_add_inline_script(
-            'traveler-offline-sync',
+        // Registered before offline-sync.js so the messages are defined by the
+        // time it runs, which is what wp_add_inline_script( 'before' ) did.
+        wp_app_add_inline_script(
+            'traveler-offline-sync-data',
             'window.travelerPwa=' . wp_json_encode( [
                 'messages' => [
                     'offlineQueued' => __( 'Saved offline. Changes will sync when you are back online.', 'traveler' ),
@@ -172,7 +174,17 @@ class App extends BaseApp {
                     'syncFailed'    => __( 'Some offline changes could not sync yet.', 'traveler' ),
                 ],
             ] ) . ';',
-            'before'
+            true,
+            $scope
+        );
+
+        wp_app_enqueue_script(
+            'traveler-offline-sync',
+            plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
+            [],
+            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
+            true,
+            $scope
         );
     }
 
@@ -1743,7 +1755,7 @@ class App extends BaseApp {
             get_current_user_id(),
             '_traveler_delegated_trip_creation_capability',
             $this->normalize_delegation_capability(
-                isset( $_POST['delegated_trip_creation_capability'] ) ? (string) wp_unslash( $_POST['delegated_trip_creation_capability'] ) : 'edit_others_posts',
+                isset( $_POST['delegated_trip_creation_capability'] ) ? sanitize_key( wp_unslash( $_POST['delegated_trip_creation_capability'] ) ) : 'edit_others_posts',
                 'edit_others_posts'
             )
         );
@@ -1751,7 +1763,7 @@ class App extends BaseApp {
             get_current_user_id(),
             '_traveler_global_trip_editor_capability',
             $this->normalize_delegation_capability(
-                isset( $_POST['global_trip_editor_capability'] ) ? (string) wp_unslash( $_POST['global_trip_editor_capability'] ) : 'none',
+                isset( $_POST['global_trip_editor_capability'] ) ? sanitize_key( wp_unslash( $_POST['global_trip_editor_capability'] ) ) : 'none',
                 'none'
             )
         );
@@ -1918,6 +1930,7 @@ class App extends BaseApp {
         header( 'Content-Disposition: inline; filename="' . $filename . '.ics"' );
         header( 'Content-Length: ' . strlen( $ics ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete iCalendar document; every field in it went through escape_ics_text().
         echo $ics;
         exit;
     }
@@ -1943,7 +1956,8 @@ class App extends BaseApp {
             exit;
         }
 
-        if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+        $request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : '';
+        if ( 'POST' !== strtoupper( $request_method ) ) {
             wp_safe_redirect( $index_url );
             exit;
         }
@@ -2037,6 +2051,7 @@ class App extends BaseApp {
         header( 'Content-Disposition: inline; filename="travel-plans.ics"' );
         header( 'Content-Length: ' . strlen( $ics ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete iCalendar document; every field in it went through escape_ics_text().
         echo $ics;
         exit;
     }
@@ -2204,6 +2219,7 @@ class App extends BaseApp {
         header( 'Content-Disposition: attachment; filename="' . $filename . '.html"' );
         header( 'Content-Length: ' . strlen( $html ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete HTML document rendered by the trip template, which escapes at each point of output.
         echo $html;
         exit;
     }
@@ -2253,6 +2269,37 @@ class App extends BaseApp {
             'calendar_url' => '',
             'message'      => __( 'Read-only timeline share link removed.', 'traveler' ),
         ] );
+    }
+
+    /**
+     * Stores the coordinates a route map looked up on Nominatim, so the next
+     * visit - on any device - can draw the map without geocoding again.
+     */
+    public function handle_cache_geocode(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to store map coordinates.', 'traveler' ) ], 403 );
+        }
+
+        check_ajax_referer( 'traveler_geocode', 'nonce' );
+
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- A JSON document; the keys are sanitized below and the values by GeocodeCache::sanitize_candidates().
+        $payload = isset( $_POST['locations'] ) ? json_decode( wp_unslash( $_POST['locations'] ), true ) : null;
+        if ( ! is_array( $payload ) ) {
+            wp_send_json_error( [ 'message' => __( 'No coordinates were submitted.', 'traveler' ) ], 400 );
+        }
+
+        $stored = 0;
+        foreach ( $payload as $location => $candidates ) {
+            $location = sanitize_text_field( (string) $location );
+            if ( '' === $location || ! is_array( $candidates ) ) {
+                continue;
+            }
+
+            GeocodeCache::remember( $location, $candidates );
+            ++$stored;
+        }
+
+        wp_send_json_success( [ 'stored' => $stored ] );
     }
 
     public function handle_clear_share_cache(): void {
@@ -3404,7 +3451,10 @@ class App extends BaseApp {
             $format = 'F j, Y';
         }
 
-        $localized_default_format = _x( 'F j, Y', 'date format' );
+        // The stored option is core's untranslated default here, so reuse core's own
+        // translation of it rather than shipping a second copy of the same string.
+        // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch -- Deliberately reusing core's 'date format' string.
+        $localized_default_format = _x( 'F j, Y', 'date format', 'default' );
         if ( 'F j, Y' === $format && 'F j, Y' !== $localized_default_format ) {
             $format = $localized_default_format;
         }
@@ -3480,11 +3530,19 @@ class App extends BaseApp {
 
         $date_diff = (int) $start_date->diff( $end_date )->format( '%a' );
         if ( 'lodging' === ( $segment['type'] ?? '' ) ) {
-            return sprintf( _n( '1 night', '%d nights', $date_diff, 'traveler' ), $date_diff );
+            return sprintf(
+                /* translators: %d: number of nights. */
+                _n( '%d night', '%d nights', $date_diff, 'traveler' ),
+                $date_diff
+            );
         }
 
         $days = $date_diff + 1;
-        return sprintf( _n( '1 day', '%d days', $days, 'traveler' ), $days );
+        return sprintf(
+            /* translators: %d: number of days. */
+            _n( '%d day', '%d days', $days, 'traveler' ),
+            $days
+        );
     }
 
     public function get_segment_date_range_label( array $segment, bool $include_duration = true ): string {
@@ -3537,12 +3595,28 @@ class App extends BaseApp {
 
         if ( $start_date > $today_date ) {
             $days = (int) $today_date->diff( $start_date )->format( '%a' );
-            return sprintf( _n( 'Starts tomorrow', 'Starts in %d days', $days, 'traveler' ), $days );
+            if ( 1 === $days ) {
+                return __( 'Starts tomorrow', 'traveler' );
+            }
+
+            return sprintf(
+                /* translators: %d: number of days until the travel plan starts. */
+                _n( 'Starts in %d day', 'Starts in %d days', $days, 'traveler' ),
+                $days
+            );
         }
 
         if ( $end_date && $end_date < $today_date ) {
             $days = (int) $end_date->diff( $today_date )->format( '%a' );
-            return sprintf( _n( 'Ended yesterday', 'Ended %d days ago', $days, 'traveler' ), $days );
+            if ( 1 === $days ) {
+                return __( 'Ended yesterday', 'traveler' );
+            }
+
+            return sprintf(
+                /* translators: %d: number of days since the travel plan ended. */
+                _n( 'Ended %d day ago', 'Ended %d days ago', $days, 'traveler' ),
+                $days
+            );
         }
 
         return __( 'Active now', 'traveler' );
@@ -3563,7 +3637,11 @@ class App extends BaseApp {
         }
 
         $days = (int) $start_date->diff( $end_date )->format( '%a' ) + 1;
-        return sprintf( _n( '1 day', '%d days', $days, 'traveler' ), $days );
+        return sprintf(
+            /* translators: %d: number of days. */
+            _n( '%d day', '%d days', $days, 'traveler' ),
+            $days
+        );
     }
 
     public function parse_itinerary_text( string $text ): array {
@@ -3875,8 +3953,12 @@ class App extends BaseApp {
         $wpdb->query( "UPDATE {$wpdb->term_taxonomy} SET taxonomy = 'traveler_trip' WHERE taxonomy = 'travel_app_trip'" );
 
         foreach ( [ $wpdb->postmeta, $wpdb->termmeta, $wpdb->usermeta ] as $table ) {
+            // The table names come from $wpdb, never from a request, and there is
+            // nothing else to interpolate, so there is no placeholder to use here.
+            // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( '_traveler_', SUBSTRING( meta_key, 13 ) ) WHERE meta_key LIKE '\\_travel\\_app\\_%'" );
             $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( 'traveler_', SUBSTRING( meta_key, 12 ) ) WHERE meta_key LIKE 'travel\\_app\\_%'" );
+            // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
         }
 
         $cap_map = [

@@ -1,4 +1,8 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 use Traveler\App;
 use Traveler\LodgingCoverage;
 use Traveler\Parser\AiParser;
@@ -182,7 +186,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( $trip_data ? $trip_data['title'] : __( 'Travel Plan', 'traveler' ) ); ?></title>
+    <title><?php echo wp_app_title( $trip_data ? $trip_data['title'] : __( 'Travel Plan', 'traveler' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_app_title() returns esc_html()-escaped output. ?></title>
     <?php if ( ! $is_static_download ) : ?>
         <link rel="manifest" href="<?php echo esc_url( $traveler->get_manifest_url( (int) $trip_data['id'], $share_token ) ); ?>">
         <meta name="theme-color" content="#0b6bcb">
@@ -1149,7 +1153,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
         <?php else : ?>
             <header>
                 <div class="trip-title-header">
-                    <h1><span<?php echo App::mask_attr( 'title', (string) $trip_data['id'] ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h1>
+                    <h1><span<?php echo esc_attr( App::mask_attr( 'title', (string) $trip_data['id'] ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h1>
                     <?php if ( ! $is_readonly_timeline ) : ?>
                         <button class="trip-title-edit-button" type="button" data-trip-title-edit aria-controls="trip-title-form" aria-expanded="false" title="<?php esc_attr_e( 'Edit travel plan title', 'traveler' ); ?>">
                             <span aria-hidden="true">✎</span>
@@ -1171,12 +1175,22 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                 <?php endif; ?>
                 <div class="meta">
                     <?php if ( '' !== $traveller_label ) : ?>
-                        <span<?php echo App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ); ?>><?php echo esc_html( $traveller_label ); ?></span>
+                        <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $traveller_label ); ?></span>
                     <?php endif; ?>
                     <?php foreach ( $traveler->get_trip_summary_parts( $trip_data, null, ! $is_static_download ) as $summary_part ) : ?>
                         <span><?php echo esc_html( $summary_part ); ?></span>
                     <?php endforeach; ?>
-                    <span><?php echo esc_html( sprintf( _n( '%d item', '%d items', count( $segments ), 'traveler' ), count( $segments ) ) ); ?></span>
+                    <span>
+                        <?php
+                        echo esc_html(
+                            sprintf(
+                                /* translators: %d: number of itinerary items. */
+                                _n( '%d item', '%d items', count( $segments ), 'traveler' ),
+                                count( $segments )
+                            )
+                        );
+                        ?>
+                    </span>
                     <?php if ( ! $is_readonly_timeline ) : ?>
                         <?php if ( ! empty( $lodging_required_nights ) && empty( $lodging_missing_ranges ) ) : ?>
                             <button class="lodging-checker covered" type="button" data-lodging-checker-toggle aria-controls="lodging-checker-box" aria-expanded="false">
@@ -1239,10 +1253,12 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                             $step_title = (string) ( $step['title'] ?? '' );
                             if ( 'checkout' === $step_timeline_kind ) {
                                 $step_title = '' !== $step_title
+                                    /* translators: %s: name of the lodging being checked out of. */
                                     ? sprintf( __( 'Check out: %s', 'traveler' ), $step_title )
                                     : __( 'Check out', 'traveler' );
                             } elseif ( 'return' === $step_timeline_kind ) {
                                 $step_title = '' !== $step_title
+                                    /* translators: %s: name of the rental car being returned. */
                                     ? sprintf( __( 'Return car: %s', 'traveler' ), $step_title )
                                     : __( 'Return car', 'traveler' );
                             }
@@ -1252,11 +1268,11 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                         <?php foreach ( [ 'current' => __( 'Now', 'traveler' ), 'next' => __( 'Next', 'traveler' ) ] as $key => $label ) : ?>
                             <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-slot-label="<?php echo esc_attr( $label ); ?>" data-ended-label="<?php esc_attr_e( 'Last', 'traveler' ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'traveler' ); ?>">
                                 <div class="mini-label" data-preview-label><?php echo esc_html( $label ); ?></div>
-                                <div class="mini-title" data-preview-title<?php echo App::mask_attr( 'title' ); ?>><?php esc_html_e( 'No item', 'traveler' ); ?></div>
+                                <div class="mini-title" data-preview-title<?php echo esc_attr( App::mask_attr( 'title' ) ); ?>><?php esc_html_e( 'No item', 'traveler' ); ?></div>
                                 <div class="mini-countdown" data-preview-countdown></div>
-                                <div class="mini-location" data-preview-meta<?php echo App::mask_attr( 'text' ); ?>></div>
-                                <div class="mini-location" data-preview-location<?php echo App::mask_attr( 'place' ); ?>></div>
-                                <div class="mini-location" data-preview-end<?php echo App::mask_attr( 'text' ); ?>></div>
+                                <div class="mini-location" data-preview-meta<?php echo esc_attr( App::mask_attr( 'text' ) ); ?>></div>
+                                <div class="mini-location" data-preview-location<?php echo esc_attr( App::mask_attr( 'place' ) ); ?>></div>
+                                <div class="mini-location" data-preview-end<?php echo esc_attr( App::mask_attr( 'text' ) ); ?>></div>
                             </a>
                         <?php endforeach; ?>
                     </div>
@@ -1371,12 +1387,12 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                     </span>
                                 </span>
                                 <span class="lodging-checker-brief">
-                                    <span<?php echo App::mask_attr( 'title', (string) ( $covered_lodging_night['item_id'] ?? 0 ) . '-item' ); ?>><?php echo esc_html( $covered_item_label ); ?></span>
+                                    <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $covered_lodging_night['item_id'] ?? 0 ) . '-item' ) ); ?>><?php echo esc_html( $covered_item_label ); ?></span>
                                     <?php if ( isset( $segment_type_labels[ $covered_item_type ] ) ) : ?>
                                         · <?php echo esc_html( $segment_type_labels[ $covered_item_type ] ); ?>
                                     <?php endif; ?>
                                 </span>
-                                <span class="lodging-checker-brief"<?php echo App::mask_attr( 'place', (string) ( $covered_lodging_night['item_id'] ?? 0 ) . '-location' ); ?>><?php echo esc_html( (string) ( $covered_lodging_night['location'] ?? '' ) ); ?></span>
+                                <span class="lodging-checker-brief"<?php echo esc_attr( App::mask_attr( 'place', (string) ( $covered_lodging_night['item_id'] ?? 0 ) . '-location' ) ); ?>><?php echo esc_html( (string) ( $covered_lodging_night['location'] ?? '' ) ); ?></span>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -1613,13 +1629,13 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                             <div>
                                                 <div class="timeline-title-row title">
                                                     <?php if ( $is_readonly_timeline ) : ?>
-                                                        <span<?php echo App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
+                                                        <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
                                                     <?php elseif ( ! $is_end_timeline_entry ) : ?>
                                                         <button class="timeline-title-button" type="button" data-inline-edit-toggle aria-controls="<?php echo esc_attr( 'edit-segment-' . $index ); ?>">
-                                                            <span<?php echo App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
+                                                            <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
                                                         </button>
                                                     <?php else : ?>
-                                                        <span<?php echo App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
+                                                        <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
                                                     <?php endif; ?>
                                                     <?php if ( $show_url_preview && ! $has_url_preview && ! empty( $segment['url'] ) ) : ?>
                                                         <a class="timeline-url-link" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer" title="<?php esc_attr_e( 'Open item URL', 'traveler' ); ?>">
@@ -1636,7 +1652,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                     <div class="detail">
                                                         <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
                                                             <span aria-hidden="true">&#x1F4CD;</span>
-                                                            <span<?php echo App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-location' ); ?>><?php echo esc_html( $location ); ?></span>
+                                                            <span<?php echo esc_attr( App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-location' ) ); ?>><?php echo esc_html( $location ); ?></span>
                                                         </a>
                                                     </div>
                                                 <?php endif; ?>
@@ -1646,12 +1662,12 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                         <?php esc_html_e( 'To:', 'traveler' ); ?>
                                                         <a href="<?php echo esc_url( $get_google_maps_url( $end_location ) ); ?>" target="_blank" rel="noopener noreferrer">
                                                             <span aria-hidden="true">&#x1F4CD;</span>
-                                                            <span<?php echo App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-end-location' ); ?>><?php echo esc_html( $end_location ); ?></span>
+                                                            <span<?php echo esc_attr( App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-end-location' ) ); ?>><?php echo esc_html( $end_location ); ?></span>
                                                         </a>
                                                     </div>
                                                 <?php endif; ?>
                                                 <?php if ( $show_private_share_details && ! empty( $segment['details'] ) ) : ?>
-                                                    <div class="detail timeline-note"<?php echo App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-details' ); ?>><?php echo esc_html( $segment['details'] ); ?></div>
+                                                    <div class="detail timeline-note"<?php echo esc_attr( App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-details' ) ); ?>><?php echo esc_html( $segment['details'] ); ?></div>
                                                 <?php endif; ?>
                                                 <?php if ( ! empty( $attachments ) ) : ?>
                                                     <div class="attachment-links" aria-label="<?php esc_attr_e( 'Attachments', 'traveler' ); ?>">
@@ -1662,9 +1678,17 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                             }
                                                             $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'traveler' ) ) );
                                                             ?>
-                                                            <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'traveler' ), $attachment_label ) ); ?>" data-offline-cache-url>
+                                                            <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php
+                                                            echo esc_attr(
+                                                                sprintf(
+                                                                    /* translators: %s: attachment file name. */
+                                                                    __( 'Download %s', 'traveler' ),
+                                                                    $attachment_label
+                                                                )
+                                                            );
+                                                            ?>" data-offline-cache-url>
                                                                 <span aria-hidden="true">↓</span>
-                                                                <span<?php echo App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-attachment-' . (string) ( $attachment['id'] ?? md5( $attachment_label ) ) ); ?>><?php echo esc_html( $attachment_label ); ?></span>
+                                                                <span<?php echo esc_attr( App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-attachment-' . (string) ( $attachment['id'] ?? md5( $attachment_label ) ) ) ); ?>><?php echo esc_html( $attachment_label ); ?></span>
                                                             </a>
                                                         <?php endforeach; ?>
                                                     </div>
@@ -1673,17 +1697,17 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                     <?php $has_url_preview_image = ! empty( $url_preview['image'] ); ?>
                                                     <a class="url-preview<?php echo $has_url_preview_image ? '' : ' no-image'; ?>" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer">
                                                         <?php if ( $has_url_preview_image ) : ?>
-                                                            <img class="url-preview-image"<?php echo App::mask_attr( 'image', (string) ( $segment['id'] ?? $index ) . '-preview' ); ?> src="<?php echo esc_url( (string) $url_preview['image'] ); ?>" alt="" loading="lazy">
+                                                            <img class="url-preview-image"<?php echo esc_attr( App::mask_attr( 'image', (string) ( $segment['id'] ?? $index ) . '-preview' ) ); ?> src="<?php echo esc_url( (string) $url_preview['image'] ); ?>" alt="" loading="lazy">
                                                         <?php endif; ?>
                                                         <div class="url-preview-text">
                                                             <?php if ( ! empty( $url_preview['site_name'] ) ) : ?>
                                                                 <div class="url-preview-meta"><?php echo esc_html( (string) $url_preview['site_name'] ); ?></div>
                                                             <?php endif; ?>
                                                             <?php if ( ! empty( $url_preview['title'] ) ) : ?>
-                                                                <div class="url-preview-title"<?php echo App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-preview' ); ?>><?php echo esc_html( (string) $url_preview['title'] ); ?></div>
+                                                                <div class="url-preview-title"<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-preview' ) ); ?>><?php echo esc_html( (string) $url_preview['title'] ); ?></div>
                                                             <?php endif; ?>
                                                             <?php if ( ! empty( $url_preview['description'] ) ) : ?>
-                                                                <div class="url-preview-description"<?php echo App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-preview-description' ); ?>><?php echo esc_html( (string) $url_preview['description'] ); ?></div>
+                                                                <div class="url-preview-description"<?php echo esc_attr( App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-preview-description' ) ); ?>><?php echo esc_html( (string) $url_preview['description'] ); ?></div>
                                                             <?php endif; ?>
                                                         </div>
                                                     </a>
@@ -1716,10 +1740,10 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                         <span>
                                             <span class="type"><?php echo esc_html( $segment_type_labels[ $segment['type'] ?? 'other' ] ?? ucfirst( $segment['type'] ?: __( 'other', 'traveler' ) ) ); ?></span><br>
                                             <?php if ( $is_readonly_timeline ) : ?>
-                                                <span class="title"<?php echo App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
+                                                <span class="title"<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
                                             <?php else : ?>
                                                 <button class="timeline-title-button title" type="button" data-inline-edit-toggle aria-controls="<?php echo esc_attr( 'edit-segment-' . $index ); ?>">
-                                                    <span<?php echo App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
+                                                    <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
                                                 </button>
                                             <?php endif; ?>
                                             <?php if ( ! empty( $segment['end_date'] ) ) : ?>
@@ -1730,7 +1754,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                 <br><span class="detail">
                                                     <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
                                                         <span aria-hidden="true">&#x1F4CD;</span>
-                                                        <span<?php echo App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-location' ); ?>><?php echo esc_html( $location ); ?></span>
+                                                        <span<?php echo esc_attr( App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-location' ) ); ?>><?php echo esc_html( $location ); ?></span>
                                                     </a>
                                                 </span>
                                             <?php endif; ?>
@@ -1740,7 +1764,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                     <?php esc_html_e( 'To:', 'traveler' ); ?>
                                                     <a href="<?php echo esc_url( $get_google_maps_url( $end_location ) ); ?>" target="_blank" rel="noopener noreferrer">
                                                         <span aria-hidden="true">&#x1F4CD;</span>
-                                                        <span<?php echo App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-end-location' ); ?>><?php echo esc_html( $end_location ); ?></span>
+                                                        <span<?php echo esc_attr( App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-end-location' ) ); ?>><?php echo esc_html( $end_location ); ?></span>
                                                     </a>
                                                 </span>
                                             <?php endif; ?>
@@ -1753,9 +1777,17 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                         }
                                                         $attachment_label = (string) ( ( $attachment['title'] ?? '' ) ?: ( $attachment['filename'] ?? __( 'Attachment', 'traveler' ) ) );
                                                         ?>
-                                                        <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr( sprintf( __( 'Download %s', 'traveler' ), $attachment_label ) ); ?>" data-offline-cache-url>
+                                                        <a class="attachment-download" href="<?php echo esc_url( (string) $attachment['url'] ); ?>" download target="_blank" rel="noopener noreferrer" title="<?php
+                                                            echo esc_attr(
+                                                                sprintf(
+                                                                    /* translators: %s: attachment file name. */
+                                                                    __( 'Download %s', 'traveler' ),
+                                                                    $attachment_label
+                                                                )
+                                                            );
+                                                            ?>" data-offline-cache-url>
                                                             <span aria-hidden="true">↓</span>
-                                                            <span<?php echo App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-attachment-' . (string) ( $attachment['id'] ?? md5( $attachment_label ) ) ); ?>><?php echo esc_html( $attachment_label ); ?></span>
+                                                            <span<?php echo esc_attr( App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-attachment-' . (string) ( $attachment['id'] ?? md5( $attachment_label ) ) ) ); ?>><?php echo esc_html( $attachment_label ); ?></span>
                                                         </a>
                                                     <?php endforeach; ?>
                                                 </div>
@@ -1858,8 +1890,8 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                         <label class="setting-option">
                                             <input type="checkbox" name="trip_editor_ids[]" value="<?php echo esc_attr( (string) $editor_candidate->ID ); ?>" <?php checked( in_array( (int) $editor_candidate->ID, $trip_editor_ids, true ) ); ?>>
                                             <span>
-                                                <strong<?php echo App::mask_attr( 'person', (string) $editor_candidate->ID ); ?>><?php echo esc_html( $editor_candidate->display_name ); ?></strong>
-                                                <span<?php echo App::mask_attr( 'email', (string) $editor_candidate->ID ); ?>><?php echo esc_html( $editor_candidate->user_email ); ?></span>
+                                                <strong<?php echo esc_attr( App::mask_attr( 'person', (string) $editor_candidate->ID ) ); ?>><?php echo esc_html( $editor_candidate->display_name ); ?></strong>
+                                                <span<?php echo esc_attr( App::mask_attr( 'email', (string) $editor_candidate->ID ) ); ?>><?php echo esc_html( $editor_candidate->user_email ); ?></span>
                                             </span>
                                         </label>
                                     <?php endforeach; ?>

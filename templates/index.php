@@ -1,4 +1,8 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 use Traveler\App;
 use Traveler\LodgingCoverage;
 use Traveler\Parser\AiParser;
@@ -147,7 +151,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( __( 'Traveler', 'traveler' ) ); ?></title>
+    <title><?php echo wp_app_title( __( 'Traveler', 'traveler' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_app_title() returns esc_html()-escaped output. ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <?php wp_app_head(); ?>
     <style>
@@ -458,11 +462,11 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <?php $current_trip = $featured_trip; ?>
                         <?php $current_trip_timeline_segments = LodgingCoverage::timeline_segments( $current_trip['segments'] ?? [] ); ?>
                         <article class="current-card">
-                            <h3><a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><span<?php echo App::mask_attr( 'title', (string) ( $current_trip['id'] ?? '' ) ); ?>><?php echo esc_html( $current_trip['title'] ); ?></span></a></h3>
+                            <h3><a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $current_trip['id'] ?? '' ) ) ); ?>><?php echo esc_html( $current_trip['title'] ); ?></span></a></h3>
                             <div class="trip-meta">
                                 <?php $current_trip_owner_label = $traveler->get_trip_traveller_label( $current_trip ); ?>
                                 <?php if ( '' !== $current_trip_owner_label ) : ?>
-                                    <span<?php echo App::mask_attr( 'person', (string) ( $current_trip['owner_id'] ?? '' ) ); ?>><?php echo esc_html( $current_trip_owner_label ); ?></span>
+                                    <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $current_trip['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $current_trip_owner_label ); ?></span>
                                 <?php endif; ?>
                                 <?php foreach ( $traveler->get_trip_summary_parts( $current_trip, $today ) as $summary_part ) : ?>
                                     <span><?php echo esc_html( $summary_part ); ?></span>
@@ -489,10 +493,12 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                     $step_title = (string) ( $step['title'] ?? '' );
                                     if ( 'checkout' === $step_timeline_kind ) {
                                         $step_title = '' !== $step_title
+                                            /* translators: %s: name of the lodging being checked out of. */
                                             ? sprintf( __( 'Check out: %s', 'traveler' ), $step_title )
                                             : __( 'Check out', 'traveler' );
                                     } elseif ( 'return' === $step_timeline_kind ) {
                                         $step_title = '' !== $step_title
+                                            /* translators: %s: name of the rental car being returned. */
                                             ? sprintf( __( 'Return car: %s', 'traveler' ), $step_title )
                                             : __( 'Return car', 'traveler' );
                                     }
@@ -502,11 +508,11 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                                 <?php foreach ( [ 'current' => __( 'Current', 'traveler' ), 'next' => __( 'Next', 'traveler' ) ] as $key => $label ) : ?>
                                     <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'traveler' ); ?>">
                                         <div class="mini-label"><?php echo esc_html( $label ); ?></div>
-                                        <div class="mini-title" data-preview-title<?php echo App::mask_attr( 'title' ); ?>><?php esc_html_e( 'No item', 'traveler' ); ?></div>
+                                        <div class="mini-title" data-preview-title<?php echo esc_attr( App::mask_attr( 'title' ) ); ?>><?php esc_html_e( 'No item', 'traveler' ); ?></div>
                                         <div class="mini-countdown" data-preview-countdown></div>
-                                        <div class="mini-location" data-preview-meta<?php echo App::mask_attr( 'text' ); ?>></div>
-                                        <div class="mini-location" data-preview-location<?php echo App::mask_attr( 'place' ); ?>></div>
-                                        <div class="mini-location" data-preview-end<?php echo App::mask_attr( 'text' ); ?>></div>
+                                        <div class="mini-location" data-preview-meta<?php echo esc_attr( App::mask_attr( 'text' ) ); ?>></div>
+                                        <div class="mini-location" data-preview-location<?php echo esc_attr( App::mask_attr( 'place' ) ); ?>></div>
+                                        <div class="mini-location" data-preview-end<?php echo esc_attr( App::mask_attr( 'text' ) ); ?>></div>
                                     </a>
                                 <?php endforeach; ?>
                             </div>
@@ -522,11 +528,11 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <div class="trip-list">
                             <?php foreach ( $upcoming_trips as $trip_data ) : ?>
                                 <a class="trip-card <?php echo (int) $trip_data['id'] === $imported ? 'highlight' : ''; ?>" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
-                                    <h3><span<?php echo App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
+                                    <h3><span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
                                     <div class="trip-meta">
                                         <?php $trip_owner_label = $traveler->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
-                                            <span<?php echo App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
+                                            <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
                                         <?php foreach ( $traveler->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
                                             <span><?php echo esc_html( $summary_part ); ?></span>
@@ -546,11 +552,11 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
                         <div class="trip-list">
                             <?php foreach ( $year_trips as $trip_data ) : ?>
                                 <a class="trip-card" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
-                                    <h3><span<?php echo App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
+                                    <h3><span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
                                     <div class="trip-meta">
                                         <?php $trip_owner_label = $traveler->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
-                                            <span<?php echo App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
+                                            <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
                                         <?php foreach ( $traveler->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
                                             <span><?php echo esc_html( $summary_part ); ?></span>

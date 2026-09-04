@@ -11,12 +11,12 @@
 
 Turn booking confirmations into day-by-day travel itineraries you can follow, map, share and journal, all kept privately on your own site.
 
+## Description
+
 [Try Traveler in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/traveler/main/blueprint.json)
 · [Try it with demo data](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/traveler/main/demo.json)
 
 [Try it in OpenStation](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/traveler/main/blueprint-openstation.json) — the same app opened in desktop mode with the [OpenStation](https://github.com/WordPress/openstation) plugin.
-
-## Description
 
 Traveler is a private travel organizer that lives on your own WordPress. Paste or
 upload booking confirmations, calendar exports and itinerary notes, and Traveler

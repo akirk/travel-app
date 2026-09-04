@@ -144,14 +144,24 @@
             return;
         }
 
-        var currentItem = null;
-        var nextItem = null;
-
         target.querySelectorAll('.timeline-day').forEach(function(day) {
             var date = day.getAttribute('data-date') || '';
             day.classList.toggle('past', dateValue && date && date !== 'unscheduled' && date < dateValue);
             day.classList.toggle('current', dateValue && date === dateValue);
         });
+
+        var panel = target.closest('.timeline-panel');
+        if (panel) {
+            panel.querySelectorAll('[data-timeline-day-link]').forEach(function(link) {
+                var isCurrent = dateValue && link.getAttribute('data-timeline-day-link') === dateValue;
+                link.classList.toggle('is-current', isCurrent);
+                if (isCurrent) {
+                    link.setAttribute('aria-current', 'date');
+                } else {
+                    link.removeAttribute('aria-current');
+                }
+            });
+        }
 
         target.querySelectorAll('.timeline-item').forEach(function(item) {
             var itemRange = getItemTimeRange(item);
@@ -159,21 +169,44 @@
             if (!currentTime || !itemRange) {
                 return;
             }
-            if (itemRange.start <= currentTime) {
-                currentItem = item;
+
+            if (itemRange.start <= currentTime && currentTime < itemRange.end) {
+                item.classList.add('current');
+            } else if (itemRange.end <= currentTime) {
                 item.classList.add('past');
-            } else if (!nextItem) {
-                nextItem = item;
             }
         });
 
-        if (currentItem) {
-            currentItem.classList.add('current');
-        } else if (nextItem) {
-            nextItem.classList.add('current');
-        }
-
+        updateTimelineStateLabels(target);
         updateTimelineJumpControls(target, positionMarker(target, value, currentTime));
+    }
+
+    function updateTimelineStateLabels(target) {
+        var currentLabel = target.getAttribute('data-state-current') || 'Current';
+        var pastLabel = target.getAttribute('data-state-past') || 'Passed';
+        var plannedLabel = target.getAttribute('data-state-planned') || 'Planned';
+        var generatedLabel = target.getAttribute('data-state-generated') || 'Generated';
+
+        target.querySelectorAll('.timeline-item').forEach(function(item) {
+            var state = item.querySelector('[data-timeline-state]');
+            var isGenerated = item.getAttribute('data-generated') === '1';
+
+            if (!state) {
+                return;
+            }
+
+            if (item.classList.contains('current')) {
+                state.textContent = currentLabel;
+            } else if (item.classList.contains('past')) {
+                state.textContent = pastLabel;
+            } else if (isGenerated) {
+                state.textContent = generatedLabel;
+            } else {
+                state.textContent = plannedLabel;
+            }
+
+            state.classList.toggle('generated', isGenerated && !item.classList.contains('current') && !item.classList.contains('past'));
+        });
     }
 
     function updatePreviewTarget(target, value, currentTime) {
@@ -402,13 +435,25 @@
         }
 
         if (hasExplicitItemTime(item)) {
-            var time = parseDateTime(item.getAttribute('data-datetime') || '');
-            return time ? { start: time, end: time } : null;
+            var itemDate = getItemDate(item);
+            var start = parseDateTime(item.getAttribute('data-datetime') || '');
+            var endDate = item.getAttribute('data-end-date') || itemDate;
+            var endTime = String(item.getAttribute('data-end-time') || '').trim();
+            var end = 0;
+
+            if (endDate && endTime.match(/^\d{1,2}:\d{2}$/)) {
+                end = parseDateTime(endDate + 'T' + endTime);
+            } else if (item.getAttribute('data-end-date')) {
+                end = parseDateTime(endDate + 'T23:59:59');
+            }
+
+            return start ? { start: start, end: end > start ? end : start } : null;
         }
 
         var date = getItemDate(item);
         var start = date ? parseDateTime(date + 'T00:00') : 0;
-        var end = date ? parseDateTime(date + 'T23:59:59') : 0;
+        var endDate = item.getAttribute('data-end-date') || date;
+        var end = endDate ? parseDateTime(endDate + 'T23:59:59') : 0;
 
         return start && end ? { start: start, end: end } : null;
     }
@@ -440,21 +485,109 @@
         return Math.max(72, Math.min(160, viewportOffset));
     }
 
+    function getScrollBehavior() {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    }
+
+    function setTimelineDayExpanded(day, expanded) {
+        var content = day ? day.querySelector('.timeline-day-content') : null;
+        var button = day ? day.querySelector('[data-timeline-day-toggle]') : null;
+        var label = button ? button.querySelector('[data-timeline-day-toggle-label]') : null;
+
+        if (!content || !button) {
+            return;
+        }
+
+        content.hidden = !expanded;
+        button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        if (label) {
+            label.textContent = expanded
+                ? (button.getAttribute('data-collapse-label') || 'Collapse')
+                : (button.getAttribute('data-expand-label') || 'Expand');
+        }
+    }
+
     function scrollToTimelineNow(target) {
         var marker = target.querySelector('.time-marker');
         var currentItem = target.querySelector('.timeline-item.current');
+        var currentDay = currentItem ? currentItem.closest('.timeline-day') : target.querySelector('.timeline-day.current');
+        var currentDayContent = currentDay ? currentDay.querySelector('.timeline-day-content') : null;
+        var currentDayWasCollapsed = !!(currentDayContent && currentDayContent.hidden);
+
+        if (currentDay) {
+            setTimelineDayExpanded(currentDay, true);
+        }
+
+        if (currentDayWasCollapsed && currentItem) {
+            currentItem.scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
+            return;
+        }
+        if (currentDayWasCollapsed && currentDay) {
+            currentDay.scrollIntoView({ behavior: getScrollBehavior(), block: 'start' });
+            return;
+        }
 
         if (marker && marker.style.display !== 'none') {
             window.scrollTo({
                 top: Math.max(0, marker.getBoundingClientRect().top + window.pageYOffset - getScrollOffset()),
-                behavior: 'smooth'
+                behavior: getScrollBehavior()
             });
             return;
         }
 
         if (currentItem) {
-            currentItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            currentItem.scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
         }
+    }
+
+    function initTimelineDayControls() {
+        document.querySelectorAll('[data-timeline-day-toggle]').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var day = button.closest('.timeline-day');
+                setTimelineDayExpanded(day, button.getAttribute('aria-expanded') !== 'true');
+            });
+        });
+    }
+
+    function initTimelineDayNavigation() {
+        document.querySelectorAll('.timeline-panel').forEach(function(panel) {
+            var links = Array.prototype.slice.call(panel.querySelectorAll('[data-timeline-day-link]'));
+            var days = Array.prototype.slice.call(panel.querySelectorAll('.timeline-day'));
+
+            function setActiveLink(date) {
+                links.forEach(function(link) {
+                    link.classList.toggle('is-active', link.getAttribute('data-timeline-day-link') === date);
+                });
+            }
+
+            links.forEach(function(link) {
+                link.addEventListener('click', function() {
+                    var day = document.getElementById((link.getAttribute('href') || '').replace(/^#/, ''));
+                    if (day) {
+                        setTimelineDayExpanded(day, true);
+                        setActiveLink(day.getAttribute('data-date') || '');
+                    }
+                });
+            });
+
+            if ('IntersectionObserver' in window && days.length) {
+                var observer = new IntersectionObserver(function(entries) {
+                    var visible = entries.filter(function(entry) {
+                        return entry.isIntersecting;
+                    }).sort(function(a, b) {
+                        return a.boundingClientRect.top - b.boundingClientRect.top;
+                    });
+
+                    if (visible[0]) {
+                        setActiveLink(visible[0].target.getAttribute('data-date') || '');
+                    }
+                }, { rootMargin: '-12% 0px -70% 0px', threshold: 0 });
+
+                days.forEach(function(day) {
+                    observer.observe(day);
+                });
+            }
+        });
     }
 
     function initTimelineJumpControls() {
@@ -696,6 +829,8 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         initTimelineJumpControls();
+        initTimelineDayControls();
+        initTimelineDayNavigation();
         document.querySelectorAll('[data-demo-controls]').forEach(initControl);
         updateStandaloneTimelines();
         updateStandalonePreviews();

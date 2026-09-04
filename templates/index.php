@@ -151,7 +151,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( __( 'Traveler', 'traveler' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_app_title() returns esc_html()-escaped output. ?></title>
+    <title><?php wp_app_the_title( __( 'Traveler', 'traveler' ) ); ?></title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <?php wp_app_head(); ?>
     <style>

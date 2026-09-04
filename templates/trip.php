@@ -186,7 +186,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo wp_app_title( $trip_data ? $trip_data['title'] : __( 'Travel Plan', 'traveler' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_app_title() returns esc_html()-escaped output. ?></title>
+    <title><?php wp_app_the_title( $trip_data ? $trip_data['title'] : __( 'Travel Plan', 'traveler' ) ); ?></title>
     <?php if ( ! $is_static_download ) : ?>
         <link rel="manifest" href="<?php echo esc_url( $traveler->get_manifest_url( (int) $trip_data['id'], $share_token ) ); ?>">
         <meta name="theme-color" content="#0b6bcb">

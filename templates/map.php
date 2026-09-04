@@ -123,7 +123,7 @@ wp_app_enqueue_script( 'traveler-leaflet', $leaflet_base_url . 'leaflet.js', [],
     <title>
     <?php
     /* translators: %s: travel plan title. */
-    echo wp_app_title( sprintf( __( '%s Route Map', 'traveler' ), $trip_data['title'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_app_title() returns esc_html()-escaped output.
+    wp_app_the_title( sprintf( __( '%s Route Map', 'traveler' ), $trip_data['title'] ) ); 
     ?>
     </title>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>

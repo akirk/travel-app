@@ -1,12 +1,19 @@
 <?php
 /**
  * Plugin Name: Traveler
- * Description: A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.
+ * Plugin URI: https://github.com/akirk/traveler
+ * Description: Turn booking confirmations into day-by-day travel itineraries you can follow, map, share and journal, all kept privately on your own site.
  * Version: 1.0.0
- * Author: Alex Kirk
- * Text Domain: traveler
+ * Requires at least: 6.0
  * Tested up to: 7.1
  * Requires PHP: 7.4
+ * Author: Alex Kirk
+ * Author URI: https://alex.kirk.at/
+ * License: GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: traveler
+ *
+ * @package Traveler
  */
 
 namespace Traveler;

@@ -166,6 +166,7 @@ visits do not query it again.
 ## Screenshots
 
 1. A trip's day-by-day timeline, with the current and upcoming itinerary items highlighted.
+2. The trip list on a phone: the trips coming up with their dates and lengths, and the finished ones by year below.
 
 ## Changelog
 

@@ -477,6 +477,11 @@
             }
 
             button.disabled = !enabled;
+            var clock = button.querySelector('[data-timeline-clock]');
+            var markerLabel = target.querySelector('.time-marker-label');
+            if (clock) {
+                clock.textContent = enabled && markerLabel ? markerLabel.textContent : '';
+            }
         });
     }
 
@@ -518,8 +523,9 @@
             setTimelineDayExpanded(currentDay, true);
         }
 
-        if (currentDayWasCollapsed && currentItem) {
-            currentItem.scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
+        if (currentItem) {
+            var currentWrap = currentItem.closest('.timeline-item-wrap') || currentItem;
+            currentWrap.scrollIntoView({ behavior: getScrollBehavior(), block: 'start' });
             return;
         }
         if (currentDayWasCollapsed && currentDay) {
@@ -534,10 +540,6 @@
             });
             return;
         }
-
-        if (currentItem) {
-            currentItem.scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
-        }
     }
 
     function initTimelineDayControls() {
@@ -550,6 +552,14 @@
     }
 
     function initTimelineDayNavigation() {
+        document.querySelectorAll('[data-preview-slot]').forEach(function(link) {
+            link.addEventListener('click', function() {
+                var item = document.getElementById((link.getAttribute('href') || '').replace(/^#/, ''));
+                if (item) {
+                    setTimelineDayExpanded(item.closest('.timeline-day'), true);
+                }
+            });
+        });
         document.querySelectorAll('.timeline-panel').forEach(function(panel) {
             var links = Array.prototype.slice.call(panel.querySelectorAll('[data-timeline-day-link]'));
             var days = Array.prototype.slice.call(panel.querySelectorAll('.timeline-day'));
@@ -644,7 +654,7 @@
                 return;
             }
 
-            itemRect = item.getBoundingClientRect();
+            itemRect = (item.hidden ? item.closest('.timeline-item-wrap') || item : item).getBoundingClientRect();
             itemValue = parseDateTime(date + 'T' + itemTime);
             if (itemValue) {
                 anchors.push({
@@ -834,6 +844,19 @@
         document.querySelectorAll('[data-demo-controls]').forEach(initControl);
         updateStandaloneTimelines();
         updateStandalonePreviews();
+        // Keep the time signal aligned when editors, disclosures, or breakpoints change the rows.
+        function refreshTimelineLayout() {
+            document.querySelectorAll('[data-demo-controls]').forEach(updateControl);
+            updateStandaloneTimelines();
+        }
+        if ('ResizeObserver' in window) {
+            var layoutObserver = new ResizeObserver(refreshTimelineLayout);
+            document.querySelectorAll('.timeline').forEach(function(target) {
+                layoutObserver.observe(target);
+            });
+        } else {
+            window.addEventListener('resize', refreshTimelineLayout);
+        }
         window.setInterval(function() {
             document.querySelectorAll('[data-demo-controls]').forEach(updateControl);
             updateStandaloneTimelines();

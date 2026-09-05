@@ -528,10 +528,10 @@
                     view.hidden = true;
                 }
                 panel.hidden = false;
-                panel.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest' });
+                panel.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
                 var titleInput = form.elements.segment_title;
                 if (titleInput) {
-                    titleInput.focus();
+                    titleInput.focus({ preventScroll: true });
                     titleInput.select();
                 }
             });
@@ -557,7 +557,7 @@
                 view.hidden = false;
                 view.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest' });
                 if (editToggle) {
-                    editToggle.focus();
+                    editToggle.focus({ preventScroll: true });
                 }
             }
         });

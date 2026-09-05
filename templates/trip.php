@@ -78,6 +78,29 @@ $segment_type_labels = [
     'activity' => __( 'Activity', 'traveler' ),
     'other'    => __( 'Other', 'traveler' ),
 ];
+// Decorative icons share one stroke system; the adjacent text supplies their meaning.
+$render_timeline_icon = static function( string $name ): void {
+    $paths = [
+        'flight'   => 'M22 2 9 15M22 2l-8 20-5-7-7-5 20-8Z',
+        'lodging'  => 'M3 18V7m18 11V7M3 14h18M5 14V9h14v5M7 9V6h10v3M3 18v3m18-3v3',
+        'train'    => 'M7 3h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM5 11h14M9 3v8m6-8v8M8 15h1m6 0h1M8 18l-3 4m11-4 3 4M7 21h10',
+        'car'      => 'm5 9 2-5h10l2 5M4 9h16l1 3v6H3v-6l1-3ZM6 13h2m8 0h2M5 18v3m14-3v3',
+        'activity' => 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm4 5-2 6-6 2 2-6 6-2Z',
+        'other'    => 'M6 3h9l4 4v14H5V3h1Zm9 0v5h4M8 12h8m-8 4h5',
+        'checkout'=> 'M10 3H4v18h6m4-14 5 5-5 5m-6-5h11',
+        'return'  => 'M8 4 3 9l5 5M3 9h11a6 6 0 0 1 0 12h-3',
+        'pin'     => 'M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0ZM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',
+        'arrow'   => 'M4 12h16m-6-6 6 6-6 6',
+        'external'=> 'M14 3h7v7m0-7L10 14M10 3H3v18h18v-7',
+        'chevron' => 'm6 9 6 6 6-6',
+        'clock'   => 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4v5l3 2',
+        'edit'    => 'm14 5 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15v6Z',
+        'map'     => 'm3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Zm6-2v16m6-14v16',
+    ];
+    ?>
+    <svg class="timeline-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="<?php echo esc_attr( $paths[ $name ] ?? $paths['other'] ); ?>" /></svg>
+    <?php
+};
 $lodging_coverage = LodgingCoverage::analyze( $trip_data, $segments );
 $timeline_segments = LodgingCoverage::timeline_segments( $segments );
 if ( $is_readonly_timeline ) {
@@ -228,7 +251,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             background: var(--wp-app-color-background);
             color: var(--wp-app-color-text);
         }
-        main { max-width: 980px; margin: 0 auto; padding: 32px 18px 56px; }
+        main { max-width: 1180px; margin: 0 auto; padding: 32px 18px 56px; }
         a { color: var(--wp-app-color-link); }
         h1, h2, h3, p { margin-top: 0; }
         h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.04; margin-bottom: 12px; letter-spacing: 0; }
@@ -418,65 +441,176 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             border: 1px solid var(--wp-app-color-border);
             border-color: var(--wp-app-color-border);
         }
+        .timeline-panel,
+        .now-next-panel {
+            --ledger-ink: #101820;
+            --ledger-paper: #f7f8f5;
+            --ledger-muted: #52606b;
+            --ledger-line: #ccd2d5;
+            --ledger-signal: #e4532f;
+            --ledger-current: #eaf0eb;
+        }
+        .timeline-panel {
+            --timeline-scroll-offset: 54px;
+            display: grid;
+            grid-template-columns: 210px minmax(0, 1fr);
+            padding: 0;
+            border-radius: 0;
+            background: var(--ledger-paper);
+            color: var(--ledger-ink);
+        }
+        .timeline-day-rail {
+            position: sticky;
+            top: 18px;
+            align-self: start;
+            min-height: calc(100vh - 36px);
+            box-sizing: border-box;
+            padding: 26px 18px;
+            background: var(--ledger-ink);
+            color: var(--ledger-paper);
+        }
+        .timeline-day-rail-title {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 1.35rem;
+            font-weight: 800;
+            line-height: 1.05;
+            letter-spacing: -0.025em;
+        }
+        .timeline-day-rail-summary {
+            margin: 0 0 24px;
+            color: var(--ledger-line);
+            font-size: 0.78rem;
+        }
+        .timeline-day-links {
+            display: grid;
+            gap: 3px;
+        }
+        .timeline-day-link {
+            display: grid;
+            grid-template-columns: 32px minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+            min-height: 48px;
+            box-sizing: border-box;
+            padding: 7px 8px;
+            border-radius: 6px;
+            color: inherit;
+            text-decoration: none;
+        }
+        .timeline-day-link:hover,
+        .timeline-day-link:focus,
+        .timeline-day-link:focus-visible,
+        .timeline-day-link.is-active {
+            background: rgba(247, 248, 245, 0.12);
+            color: inherit;
+            text-decoration: none;
+        }
+        .timeline-day-link.is-current,
+        .timeline-day-link[aria-current="date"] {
+            background: var(--ledger-signal);
+            color: #101820;
+        }
+        .timeline-day-link:focus-visible {
+            outline: 2px solid var(--ledger-paper);
+            outline-offset: 2px;
+        }
+        .timeline-day-link strong {
+            font-size: 1.15rem;
+            font-variant-numeric: tabular-nums;
+        }
+        .timeline-day-link span,
+        .timeline-day-link small {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .timeline-day-link span { font-size: 0.77rem; }
+        .timeline-day-link small { font-size: 0.7rem; opacity: 0.72; }
+        .timeline-day-link.is-current small,
+        .timeline-day-link[aria-current="date"] small { opacity: 1; }
+        .timeline-ledger-content {
+            min-width: 0;
+            padding: 26px 30px 44px;
+        }
         .timeline { position: relative; display: grid; gap: 0; }
-        .timeline-day { position: relative; padding-left: 26px; border-left: 2px solid var(--wp-app-color-border); }
-        .timeline-day.empty { min-height: 96px; }
-        .timeline-day.current { border-left-color: var(--wp-app-color-link); }
-        .timeline-day.past { opacity: 0.62; }
-        .timeline[data-readonly-timeline] .timeline-day.past { opacity: 1; }
+        .timeline-day {
+            position: relative;
+            margin-bottom: 44px;
+            scroll-margin-top: 22px;
+        }
+        .timeline-day:last-child { margin-bottom: 0; }
+        .timeline-day-content[hidden] { display: none; }
+        .timeline-day-empty {
+            margin: 0;
+            padding: 26px 4px;
+            border-bottom: 1px dashed var(--ledger-line);
+            color: var(--ledger-muted);
+            font-size: 0.82rem;
+        }
         .time-marker {
             display: none;
             position: absolute;
             z-index: 3;
-            left: 0;
-            width: 0;
+            left: -20px;
+            width: 14px;
             height: 0;
-            color: var(--wp-app-color-link);
+            border-top: 1px solid var(--ledger-signal);
+            color: var(--ledger-signal);
             pointer-events: none;
         }
         .time-marker::before {
             content: "";
             position: absolute;
-            left: -5px;
-            top: -5px;
-            width: 10px;
-            height: 10px;
+            left: 0;
+            top: -4px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: var(--wp-app-color-link);
-            box-shadow: 0 0 0 3px var(--wp-app-color-background);
+            background: var(--ledger-signal);
         }
-        .time-marker span {
-            position: absolute;
-            left: -8px;
-            top: -13px;
-            transform: translateX(-100%);
-            padding: 2px 6px;
-            border-radius: 999px;
-            background: var(--wp-app-color-link);
-            color: #fff;
-            font-size: 0.76rem;
-            font-weight: 750;
-            line-height: 1.2;
-            white-space: nowrap;
-        }
+        .timeline-now-time { font-variant-numeric: tabular-nums; font-size: 0.75rem; font-weight: 500; }
         .day-heading {
-            position: relative;
-            margin: 0 0 10px;
-            padding-top: 2px;
-            color: var(--wp-app-color-muted);
-            font-size: 0.92rem;
-            font-weight: 750;
+            margin: 0;
+            color: var(--ledger-muted);
+            font-size: 0.88rem;
+            font-weight: 700;
         }
         .day-heading-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 16px;
+            align-items: end;
+            justify-content: space-between;
+            padding-bottom: 11px;
+            border-bottom: 3px solid var(--ledger-ink);
+        }
+        .day-heading-copy {
+            display: grid;
+            grid-template-columns: 76px minmax(0, 1fr);
+            gap: 14px;
+            align-items: end;
+        }
+        .day-number {
+            font-size: 2.65rem;
+            font-weight: 850;
+            line-height: 0.8;
+            letter-spacing: -0.035em;
+            font-variant-numeric: tabular-nums;
+        }
+        .day-heading-meta { min-width: 0; }
+        .day-item-count {
+            display: block;
+            margin-top: 2px;
+            color: var(--ledger-muted);
+            font-size: 0.75rem;
+        }
+        .day-heading-controls {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
-        .day-heading-row .day-heading {
-            margin-bottom: 0;
+            justify-content: flex-end;
         }
         .day-journal-form {
             margin: 0;
@@ -490,41 +624,93 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
         .day-journal-button {
             min-height: 30px;
             padding: 4px 9px;
-            border-color: var(--wp-app-color-border);
-            background: var(--wp-app-color-surface);
-            color: var(--wp-app-color-link);
+            border-color: var(--ledger-line);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--ledger-ink);
             font-size: 0.82rem;
             font-weight: 700;
         }
-        .day-heading::before {
-            content: "";
-            position: absolute;
-            left: -34px;
-            top: 8px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--wp-app-color-background);
-            border: 2px solid var(--wp-app-color-border);
+        .day-collapse-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 44px;
+            padding: 4px 6px;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            color: var(--ledger-ink);
+            font-size: 0.76rem;
+            font-weight: 750;
+            text-decoration: none;
+            text-underline-offset: 3px;
         }
-        .timeline-day.current .day-heading::before { border-color: var(--wp-app-color-link); background: var(--wp-app-color-link); }
+        .day-collapse-button .timeline-icon { width: 16px; height: 16px; }
+        .day-collapse-button[aria-expanded="false"] .timeline-icon { transform: rotate(-90deg); }
+        .day-collapse-button:hover { background: #e6e9e4; color: var(--ledger-ink); }
+        .day-collapse-button:focus-visible {
+            outline: 2px solid var(--ledger-signal);
+            outline-offset: 2px;
+        }
         .timeline-item-wrap {
-            margin-bottom: 10px;
+            margin: 0;
         }
+        .timeline-item-wrap, .timeline-item, .timeline-edit-panel { scroll-margin-top: var(--timeline-scroll-offset, 54px); }
+        .timeline-item[hidden] { display: none; }
         .timeline-item {
             display: grid;
-            grid-template-columns: 74px minmax(0, 1fr);
-            gap: 12px;
-            padding: 12px;
-            border: 1px solid var(--wp-app-color-border);
-            border-radius: 8px;
-            background: var(--wp-app-color-background);
+            grid-template-columns: 64px 36px minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: center;
+            min-height: 76px;
+            box-sizing: border-box;
+            padding: 18px 10px;
+            border: 0;
+            border-bottom: 1px solid var(--ledger-line);
+            border-radius: 0;
+            background: transparent;
             color: inherit;
         }
+        .timeline-item.past { color: var(--ledger-muted); }
         .timeline-item.current {
-            outline: 2px solid var(--wp-app-color-link);
-            outline-offset: 1px;
+            background: var(--ledger-current);
+            color: var(--ledger-ink);
+            outline: 0;
         }
+        .timeline-item.current .timeline-symbol { background: var(--ledger-signal); color: var(--ledger-ink); }
+        .timeline-item.past .timeline-symbol { background: #e5e9e4; color: var(--ledger-muted); }
+        .timeline-icon { flex: 0 0 auto; vertical-align: middle; }
+        .timeline-symbol {
+            display: inline-grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--ledger-ink);
+            color: var(--ledger-paper);
+        }
+        .timeline-symbol .timeline-icon { width: 21px; height: 21px; }
+        .timeline-event { min-width: 0; }
+        .timeline-event-type { display: block; color: var(--ledger-muted); font-size: 0.75rem; margin: 2px 0 6px; }
+        .timeline-state {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-sizing: border-box;
+            padding: 4px 0;
+            color: var(--ledger-muted);
+            font-size: 0.75rem;
+            font-weight: 650;
+            white-space: nowrap;
+        }
+        .timeline-state::before { content: ""; width: 6px; height: 6px; border: 1px solid currentColor; border-radius: 50%; }
+        .timeline-item.current .timeline-state {
+            color: #942b14;
+        }
+        .timeline-item.current .timeline-state::before { background: currentColor; }
+        .timeline-item.past .timeline-state::before { width: 7px; height: 4px; border: 0; border-bottom: 1.5px solid; border-left: 1.5px solid; border-radius: 0; transform: rotate(-45deg); }
+        .timeline-state.generated::before { border-radius: 1px; }
         .timeline-title-row {
             display: flex;
             align-items: center;
@@ -547,6 +733,10 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             text-align: left;
             cursor: pointer;
         }
+        .timeline-panel { --wp-app-color-link: #8f2d18; --wp-app-color-text: var(--ledger-ink); --wp-app-color-muted: var(--ledger-muted); --wp-app-color-border: var(--ledger-line); --wp-app-color-surface: #fff; color-scheme: light; }
+        .timeline-panel ::selection { background: #f8c3af; color: var(--ledger-ink); }
+        .timeline-panel :focus-visible { outline: 2px solid #942b14; outline-offset: 3px; }
+        .timeline-title-button .timeline-icon { width: 13px; height: 13px; margin-left: 6px; color: var(--ledger-muted); }
         .timeline-title-link:hover,
         .timeline-title-link:focus,
         .timeline-title-link:focus-visible,
@@ -566,8 +756,8 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             align-items: center;
             justify-content: center;
             flex: 0 0 auto;
-            width: 24px;
-            height: 24px;
+            width: 44px;
+            height: 44px;
             border-radius: 6px;
             color: var(--wp-app-color-link);
             font-weight: 750;
@@ -583,13 +773,19 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             outline: 2px solid var(--wp-app-color-link);
             outline-offset: 2px;
         }
-        .time { color: var(--wp-app-color-muted); font-weight: 750; }
+        .time {
+            color: var(--ledger-muted);
+            font-size: 0.82rem;
+            font-weight: 750;
+            font-variant-numeric: tabular-nums;
+        }
+        .timeline-end-time { display: block; margin-top: 3px; font-size: 0.72rem; font-weight: 500; }
         .type { color: var(--wp-app-color-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0; }
         .timeline-meta {
             min-width: 0;
         }
         .title { font-weight: 750; overflow-wrap: anywhere; }
-        .detail { color: var(--wp-app-color-muted); overflow-wrap: anywhere; }
+        .detail { color: var(--ledger-muted); overflow-wrap: anywhere; }
         .detail a {
             display: inline-flex;
             align-items: center;
@@ -614,7 +810,12 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
         }
         .timeline-item .timeline-note {
             font-size: 0.8rem;
+            margin-top: 6px;
+            white-space: pre-line;
         }
+        .timeline-route { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+        .timeline-route .timeline-icon { width: 14px; height: 14px; }
+        .timeline-route a { min-height: 28px; }
         .attachment-links {
             display: flex;
             flex-wrap: wrap;
@@ -723,14 +924,23 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            margin-bottom: 14px;
+            margin-bottom: 24px;
         }
-        .timeline-header h2 { margin: 0; }
+        .timeline-header h2 {
+            margin: 0;
+            font-size: 1.35rem;
+            letter-spacing: -0.02em;
+        }
         .timeline-map-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 44px;
             font-size: 0.9rem;
             text-decoration: none;
             white-space: nowrap;
         }
+        .timeline-header-actions .timeline-icon { width: 16px; height: 16px; }
         .timeline-map-link:hover,
         .timeline-map-link:focus { text-decoration: underline; }
         .timeline-header-actions {
@@ -742,22 +952,33 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             margin-left: auto;
         }
         .now-next-panel {
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            overflow: hidden;
             margin-bottom: 18px;
-        }
-        .now-next-panel h2 {
-            margin-bottom: 12px;
         }
         .mini-timeline {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
         }
         .mini-step {
-            display: block;
-            border-left: 3px solid var(--wp-app-color-border);
-            padding-left: 12px;
+            display: grid;
+            align-content: center;
+            min-height: 118px;
+            box-sizing: border-box;
+            padding: 20px 24px;
+            border: 0;
             color: inherit;
             text-decoration: none;
+        }
+        .mini-step.current {
+            background: var(--ledger-ink);
+            color: var(--ledger-paper);
+        }
+        .mini-step.next {
+            background: var(--ledger-signal);
+            color: #101820;
         }
         .mini-step:hover,
         .mini-step:focus,
@@ -767,43 +988,74 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
         .mini-step:focus-visible * {
             text-decoration: none;
         }
-        .mini-step:hover { border-left-color: var(--wp-app-color-link); }
+        .mini-step:hover .mini-title { text-decoration: underline; text-underline-offset: 3px; }
         .mini-step:focus-visible {
-            outline: 2px solid var(--wp-app-color-link);
-            outline-offset: 3px;
+            position: relative;
+            z-index: 1;
+            outline: 3px solid #fff;
+            outline-offset: -6px;
         }
-        .mini-step.current { border-left-color: var(--wp-app-color-link); }
-        .mini-label { color: var(--wp-app-color-muted); font-size: 0.78rem; text-transform: uppercase; }
-        .mini-title { font-weight: 750; overflow-wrap: anywhere; }
-        .mini-location {
-            color: var(--wp-app-color-muted);
+        .mini-label {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: var(--ledger-signal);
+            font-size: 0.7rem;
+            font-weight: 850;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .mini-label .timeline-icon { width: 16px; height: 16px; }
+        .mini-step.next .mini-label { color: #101820; }
+        .mini-step.next .mini-location,
+        .mini-step.next .mini-countdown {
+            color: #101820;
+            opacity: 1;
+        }
+        .mini-title {
+            margin-top: 5px;
+            font-size: 1.05rem;
+            font-weight: 800;
             overflow-wrap: anywhere;
-            font-size: 0.88rem;
+        }
+        .mini-location {
+            color: inherit;
+            opacity: 0.72;
+            overflow-wrap: anywhere;
+            font-size: 0.8rem;
             line-height: 1.42;
         }
         .mini-countdown {
-            color: var(--wp-app-color-muted);
+            color: inherit;
+            opacity: 0.72;
             font-size: 0.82rem;
             font-weight: 650;
             margin-top: 2px;
         }
+        .mini-location:empty, .mini-countdown:empty { display: none; }
+        .mini-details { display: flex; flex-wrap: wrap; column-gap: 6px; }
+        .mini-timeline:has(.mini-step[hidden]) { grid-template-columns: minmax(0, 1fr); }
         .mini-step[hidden] { display: none; }
         .timeline-now-button:disabled {
             cursor: not-allowed;
             opacity: 0.48;
         }
         .timeline-edit-panel {
-            border: 1px solid var(--wp-app-color-border);
-            border-radius: 8px;
-            background: var(--wp-app-color-surface);
-            margin-bottom: 10px;
+            border: 1px solid var(--ledger-line);
+            border-top: 0;
+            border-radius: 0;
+            background: #fff;
+            margin: 0;
         }
         .timeline-edit-panel[hidden] {
             display: none;
         }
         .timeline-edit-panel .edit-form {
-            padding: 14px 12px 12px;
+            padding: 22px;
         }
+        .timeline-edit-panel input,
+        .timeline-edit-panel select,
+        .timeline-edit-panel textarea { color: var(--ledger-ink); background: #fff; border-color: #89949b; caret-color: #942b14; }
         .timeline-edit-panel .delete-segment-form {
             display: none;
         }
@@ -936,11 +1188,19 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            height: 32px;
-            min-height: 32px;
-            padding: 5px 9px;
+            min-height: 44px;
+            gap: 6px;
+            padding: 8px 12px;
             font-size: 0.88rem;
             line-height: 1.2;
+        }
+        .timeline-panel .add-item-button {
+            background: var(--ledger-ink);
+            color: var(--ledger-paper);
+        }
+        .timeline-panel .timeline-now-button {
+            border-color: var(--ledger-line);
+            color: var(--ledger-ink);
         }
         details.timeline-details,
         details.item {
@@ -1097,41 +1357,97 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             border-color: rgba(159, 31, 31, 0.36);
         }
         .empty { color: var(--wp-app-color-muted); }
-        @media (max-width: 680px) {
+        @media (max-width: 820px) {
             .timeline-panel {
-                background: transparent;
-                border: 0;
-                padding: 0;
+                --timeline-scroll-offset: 100px;
+                grid-template-columns: minmax(0, 1fr);
             }
-            .timeline-item {
-                background: var(--wp-app-color-surface);
+            .timeline-day-rail {
+                position: sticky;
+                z-index: 5;
+                top: 0;
+                min-height: 0;
+                padding: 10px 12px;
+                border-bottom: 1px solid rgba(247, 248, 245, 0.28);
             }
-            .timeline-item, .summary-grid, .edit-form, .share-option { grid-template-columns: 1fr; }
-            .timeline-meta {
+            .timeline-day-rail-title,
+            .timeline-day-rail-summary { display: none; }
+            .timeline-day-links {
                 display: flex;
-                align-items: baseline;
-                gap: 8px;
+                gap: 5px;
+                overflow-x: auto;
+                padding: 2px;
+                scrollbar-width: thin;
+                scrollbar-color: #76818a var(--ledger-ink);
             }
+            .timeline-day-link {
+                flex: 0 0 auto;
+                grid-template-columns: 28px auto;
+                min-height: 44px;
+                padding: 5px 9px;
+            }
+            .timeline-day-link small { display: none; }
+            .timeline-ledger-content { padding: 22px 20px 38px; }
+            .timeline-day { scroll-margin-top: 88px; }
+            #wpadminbar ~ main .timeline-day-rail { top: 32px; }
+            #wpadminbar ~ main .timeline-day { scroll-margin-top: 120px; }
+            #wpadminbar ~ main .timeline-panel { --timeline-scroll-offset: 132px; }
+        }
+        @media (max-width: 680px) {
+            main { padding-inline: 12px; }
+            .timeline-panel { border: 0; }
+            .timeline-item {
+                grid-template-columns: 36px minmax(0, 1fr);
+                gap: 3px 12px;
+                align-items: start;
+                padding: 18px 4px;
+            }
+            .timeline-meta { grid-column: 2; grid-row: 1; }
+            .timeline-end-time { display: inline; margin-left: 6px; }
+            .timeline-symbol { grid-column: 1; grid-row: 1 / span 2; }
+            .timeline-event { grid-column: 2; grid-row: 2; }
+            .timeline-title-button { min-height: 44px; }
+            .timeline-route { gap: 0 6px; }
+            .timeline-route a { min-height: 44px; }
+            .timeline-state {
+                grid-column: 2;
+                justify-self: start;
+                margin-top: 4px;
+            }
+            .timeline-ledger-content { padding: 18px 14px 28px; }
+            .summary-grid, .edit-form, .share-option { grid-template-columns: 1fr; }
             .url-preview { grid-template-columns: 1fr; }
             .url-preview-image { width: 100%; }
             .trip-title-header { align-items: flex-start; }
             .trip-title-form { grid-template-columns: 1fr; }
             .date-time-group { grid-template-columns: 1fr; }
             .mini-timeline { grid-template-columns: 1fr; }
+            .mini-step { grid-template-columns: 62px minmax(0, 1fr); column-gap: 8px; min-height: 0; padding: 16px; }
+            .mini-step > :not(.mini-label) { grid-column: 2; }
+            .mini-label { grid-row: 1 / span 5; align-self: start; padding-top: 3px; }
+            .mini-title { margin-top: 0; font-size: 0.95rem; }
+            .mini-location, .mini-countdown { font-size: 0.76rem; }
             .timeline-header { flex-wrap: wrap; }
             .timeline-header-actions {
                 margin-left: 0;
                 justify-content: flex-start;
             }
-            .time-marker span {
-                left: 14px;
-                transform: none;
-            }
+            .time-marker { left: -12px; width: 6px; }
+            .time-marker::before { left: -4px; width: 6px; height: 6px; top: -3px; }
+            .day-heading-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+            .day-heading-copy { grid-template-columns: 54px minmax(0, 1fr); gap: 10px; }
+            .day-number { font-size: 2.15rem; }
+            .day-heading-controls { justify-content: flex-end; }
             .lodging-checker-night,
             .lodging-checker-night-covered { grid-template-columns: 1fr; }
             .lodging-checker-actions button { width: 100%; }
             .demo-controls label { min-width: 100%; }
             .offline-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 782px) {
+            #wpadminbar ~ main .timeline-day-rail { top: 46px; }
+            #wpadminbar ~ main .timeline-day { scroll-margin-top: 134px; }
+            #wpadminbar ~ main .timeline-panel { --timeline-scroll-offset: 146px; }
         }
     </style>
 </head>
@@ -1267,12 +1583,14 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                         <?php endforeach; ?>
                         <?php foreach ( [ 'current' => __( 'Now', 'traveler' ), 'next' => __( 'Next', 'traveler' ) ] as $key => $label ) : ?>
                             <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-slot-label="<?php echo esc_attr( $label ); ?>" data-ended-label="<?php esc_attr_e( 'Last', 'traveler' ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'traveler' ); ?>">
-                                <div class="mini-label" data-preview-label><?php echo esc_html( $label ); ?></div>
+                                <div class="mini-label"><?php $render_timeline_icon( 'current' === $key ? 'clock' : 'arrow' ); ?><span data-preview-label><?php echo esc_html( $label ); ?></span></div>
                                 <div class="mini-title" data-preview-title<?php echo esc_attr( App::mask_attr( 'title' ) ); ?>><?php esc_html_e( 'No item', 'traveler' ); ?></div>
                                 <div class="mini-countdown" data-preview-countdown></div>
+                                <div class="mini-details">
                                 <div class="mini-location" data-preview-meta<?php echo esc_attr( App::mask_attr( 'text' ) ); ?>></div>
                                 <div class="mini-location" data-preview-location<?php echo esc_attr( App::mask_attr( 'place' ) ); ?>></div>
                                 <div class="mini-location" data-preview-end<?php echo esc_attr( App::mask_attr( 'text' ) ); ?>></div>
+                                </div>
                             </a>
                         <?php endforeach; ?>
                     </div>
@@ -1280,18 +1598,63 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
             <?php endif; ?>
 
             <section class="panel timeline-panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
+                <aside class="timeline-day-rail" aria-label="<?php esc_attr_e( 'Timeline days', 'traveler' ); ?>">
+                    <strong class="timeline-day-rail-title"><?php esc_html_e( 'Trip timeline', 'traveler' ); ?></strong>
+                    <p class="timeline-day-rail-summary">
+                        <?php
+                        $timeline_day_count_label = sprintf(
+                            /* translators: %d: number of itinerary days. */
+                            _n( '%d day', '%d days', count( $segments_by_day ), 'traveler' ),
+                            count( $segments_by_day )
+                        );
+                        $timeline_item_count_label = sprintf(
+                            /* translators: %d: number of itinerary items. */
+                            _n( '%d item', '%d items', count( $segments ), 'traveler' ),
+                            count( $segments )
+                        );
+                        printf(
+                            /* translators: 1: formatted itinerary day count, 2: formatted trip item count. */
+                            esc_html__( '%1$s · %2$s', 'traveler' ),
+                            esc_html( $timeline_day_count_label ),
+                            esc_html( $timeline_item_count_label )
+                        );
+                        ?>
+                    </p>
+                    <?php if ( ! empty( $segments_by_day ) ) : ?>
+                        <nav class="timeline-day-links" aria-label="<?php esc_attr_e( 'Jump to day', 'traveler' ); ?>">
+                            <?php foreach ( array_keys( $segments_by_day ) as $day_index => $day_link_date ) : ?>
+                                <?php $day_link_timestamp = strtotime( $day_link_date . ' 12:00:00' ); ?>
+                                <a
+                                    class="timeline-day-link<?php echo 0 === $day_index ? ' is-active' : ''; ?><?php echo $day_link_date === $today ? ' is-current' : ''; ?>"
+                                    href="#timeline-day-<?php echo esc_attr( $day_link_date ); ?>"
+                                    data-timeline-day-link="<?php echo esc_attr( $day_link_date ); ?>"
+                                    <?php echo $day_link_date === $today ? 'aria-current="date"' : ''; ?>
+                                >
+                                    <strong><?php echo esc_html( $day_link_timestamp ? date_i18n( 'd', $day_link_timestamp ) : $day_link_date ); ?></strong>
+                                    <span><?php echo esc_html( $day_link_timestamp ? date_i18n( 'D', $day_link_timestamp ) : '' ); ?></span>
+                                    <small><?php echo esc_html( $day_link_timestamp ? date_i18n( 'M', $day_link_timestamp ) : '' ); ?></small>
+                                </a>
+                            <?php endforeach; ?>
+                        </nav>
+                    <?php endif; ?>
+                </aside>
+                <div class="timeline-ledger-content">
                 <div class="timeline-header">
-                    <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'traveler' ); ?></h2>
+                    <div class="timeline-header-copy">
+                        <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'traveler' ); ?></h2>
+                    </div>
                     <div class="timeline-header-actions">
                         <?php if ( '' !== $trip_direct_map_url ) : ?>
                             <a class="timeline-map-link" href="<?php echo esc_url( $trip_direct_map_url ); ?>" title="<?php esc_attr_e( 'Route map on OpenStreetMap', 'traveler' ); ?>">
-                                <span aria-hidden="true">&#x1F5FA;</span>
+                                <?php $render_timeline_icon( 'map' ); ?>
                                 <?php esc_html_e( 'Map', 'traveler' ); ?>
                             </a>
                         <?php endif; ?>
                         <?php if ( $is_trip_active ) : ?>
                             <button class="ghost-button timeline-now-button" type="button" data-timeline-now aria-controls="timeline" aria-label="<?php esc_attr_e( 'Jump to current time', 'traveler' ); ?>" title="<?php esc_attr_e( 'Jump to current time', 'traveler' ); ?>" disabled>
+                                <?php $render_timeline_icon( 'clock' ); ?>
                                 <?php esc_html_e( 'Now', 'traveler' ); ?>
+                                <span class="timeline-now-time" data-timeline-clock aria-hidden="true"></span>
                             </button>
                         <?php endif; ?>
                         <?php if ( ! $is_readonly_timeline ) : ?>
@@ -1557,20 +1920,40 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'traveler' ); ?></p>
                 <?php else : ?>
-                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_readonly_timeline ? ' data-readonly-timeline="1"' : ''; ?><?php echo $is_trip_active ? ' data-current-time="1" data-current-time-value="' . esc_attr( $timeline_current_time_value ) . '" data-current-time-captured="' . esc_attr( $timeline_current_time_captured ) . '"' : ''; ?>>
+                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>" data-state-current="<?php esc_attr_e( 'Current', 'traveler' ); ?>" data-state-past="<?php esc_attr_e( 'Passed', 'traveler' ); ?>" data-state-planned="<?php esc_attr_e( 'Planned', 'traveler' ); ?>" data-state-generated="<?php esc_attr_e( 'Generated', 'traveler' ); ?>"<?php echo $is_readonly_timeline ? ' data-readonly-timeline="1"' : ''; ?><?php echo $is_trip_active ? ' data-current-time="1" data-current-time-value="' . esc_attr( $timeline_current_time_value ) . '" data-current-time-captured="' . esc_attr( $timeline_current_time_captured ) . '"' : ''; ?>>
                         <?php if ( $show_timeline_time_marker ) : ?>
-                            <div class="time-marker"><span class="time-marker-label"></span></div>
+                            <div class="time-marker" aria-hidden="true"><span class="time-marker-label" hidden></span></div>
                         <?php endif; ?>
                         <?php foreach ( $segments_by_day as $day => $day_segments ) : ?>
                             <?php
                             $journal_entry = $journal_entries_by_day[ $day ] ?? [];
                             $journal_exists = ! empty( $journal_entry );
+                            $day_timestamp = strtotime( $day . ' 12:00:00' );
+                            $day_heading_id = 'timeline-day-heading-' . $day;
+                            $day_content_id = 'timeline-day-content-' . $day;
                             ?>
-                            <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" data-date="<?php echo esc_attr( $day ); ?>">
+                            <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" id="timeline-day-<?php echo esc_attr( $day ); ?>" data-date="<?php echo esc_attr( $day ); ?>" aria-labelledby="<?php echo esc_attr( $day_heading_id ); ?>">
                                 <div class="day-heading-row">
-                                    <h3 class="day-heading"><?php echo esc_html( $traveler->format_date_label( $day ) ); ?></h3>
-                                    <?php if ( ! $is_readonly_timeline && $journal_enabled ) : ?>
-                                        <div class="day-journal-actions">
+                                    <div class="day-heading-copy">
+                                        <span class="day-number" aria-hidden="true"><?php echo esc_html( $day_timestamp ? date_i18n( 'd', $day_timestamp ) : $day ); ?></span>
+                                        <div class="day-heading-meta">
+                                            <h3 class="day-heading" id="<?php echo esc_attr( $day_heading_id ); ?>"><?php echo esc_html( $traveler->format_date_label( $day ) ); ?></h3>
+                                            <span class="day-item-count">
+                                                <?php
+                                                echo esc_html(
+                                                    sprintf(
+                                                        /* translators: %d: number of items scheduled for the day. */
+                                                        _n( '%d timeline item', '%d timeline items', count( $day_segments ), 'traveler' ),
+                                                        count( $day_segments )
+                                                    )
+                                                );
+                                                ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="day-heading-controls">
+                                        <?php if ( ! $is_readonly_timeline && $journal_enabled ) : ?>
+                                            <div class="day-journal-actions">
                                             <form class="day-journal-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                                                 <input type="hidden" name="action" value="traveler_open_journal_entry">
                                                 <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
@@ -1591,9 +1974,18 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                     </button>
                                                 </form>
                                             <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <button class="day-collapse-button" type="button" data-timeline-day-toggle aria-controls="<?php echo esc_attr( $day_content_id ); ?>" aria-expanded="true" data-expand-label="<?php esc_attr_e( 'Expand', 'traveler' ); ?>" data-collapse-label="<?php esc_attr_e( 'Collapse', 'traveler' ); ?>">
+                                            <span data-timeline-day-toggle-label><?php esc_html_e( 'Collapse', 'traveler' ); ?></span>
+                                            <?php $render_timeline_icon( 'chevron' ); ?>
+                                        </button>
+                                    </div>
                                 </div>
+                                <div class="timeline-day-content" id="<?php echo esc_attr( $day_content_id ); ?>">
+                                <?php if ( empty( $day_segments ) ) : ?>
+                                    <p class="timeline-day-empty"><?php esc_html_e( 'Nothing scheduled. Add an item when the plan takes shape.', 'traveler' ); ?></p>
+                                <?php endif; ?>
                                 <?php foreach ( $day_segments as $segment ) : ?>
                                     <?php $index = (int) $segment['_index']; ?>
                                     <?php $timeline_kind = (string) ( $segment['_timeline_kind'] ?? 'start' ); ?>
@@ -1609,62 +2001,73 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                     <?php
                                     if ( 'checkout' === $timeline_kind ) {
                                         $type_label = __( 'Check out', 'traveler' );
+                                        $timeline_icon = 'checkout';
                                     } elseif ( 'return' === $timeline_kind ) {
                                         $type_label = __( 'Return car', 'traveler' );
+                                        $timeline_icon = 'return';
                                     } elseif ( 'car' === ( $segment['type'] ?? '' ) ) {
                                         $type_label = __( 'Rental car', 'traveler' );
+                                        $timeline_icon = 'car';
                                     } else {
                                         $type_label = $segment_type_labels[ $segment['type'] ?? 'other' ] ?? ucfirst( $segment['type'] ?: __( 'other', 'traveler' ) );
+                                        $timeline_icon = $segment['type'] ?? 'other';
                                     }
+                                    $initial_state = $day < $today ? __( 'Passed', 'traveler' ) : ( $is_end_timeline_entry ? __( 'Generated', 'traveler' ) : __( 'Planned', 'traveler' ) );
                                     ?>
                                     <?php $url_preview = isset( $segment['url_preview'] ) && is_array( $segment['url_preview'] ) ? $segment['url_preview'] : []; ?>
                                     <?php $attachments = $show_attachments && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
                                     <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
-                                        <div class="timeline-item" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-end-date="<?php echo esc_attr( (string) ( $segment['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $segment['end_time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
+                                        <div class="timeline-item<?php echo $day < $today ? ' past' : ''; ?>" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-end-date="<?php echo esc_attr( (string) ( $segment['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $segment['end_time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>" data-generated="<?php echo $is_end_timeline_entry ? '1' : '0'; ?>">
                                             <div class="timeline-meta">
-                                                <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
-                                                <div class="type"><?php echo esc_html( $type_label ); ?></div>
+                                                <time class="time" datetime="<?php echo esc_attr( $segment_datetime ); ?>"><?php echo esc_html( $segment['time'] ?: '—' ); ?></time>
+                                                <?php if ( ! $is_end_timeline_entry && ! empty( $segment['end_time'] ) && ( '' === $segment_end_date || $segment_end_date === $segment_start_date ) ) : ?>
+                                                    <span class="time timeline-end-time"><span class="screen-reader-text"><?php esc_html_e( 'Ends at', 'traveler' ); ?> </span>– <?php echo esc_html( $segment['end_time'] ); ?></span>
+                                                <?php endif; ?>
                                             </div>
-                                            <div>
+                                            <span class="timeline-symbol"><?php $render_timeline_icon( $timeline_icon ); ?></span>
+                                            <div class="timeline-event">
                                                 <div class="timeline-title-row title">
                                                     <?php if ( $is_readonly_timeline ) : ?>
                                                         <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
                                                     <?php elseif ( ! $is_end_timeline_entry ) : ?>
                                                         <button class="timeline-title-button" type="button" data-inline-edit-toggle aria-controls="<?php echo esc_attr( 'edit-segment-' . $index ); ?>">
                                                             <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
+                                                            <?php $render_timeline_icon( 'edit' ); ?>
+                                                            <span class="screen-reader-text"> — <?php esc_html_e( 'Edit item', 'traveler' ); ?></span>
                                                         </button>
                                                     <?php else : ?>
                                                         <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'traveler' ) ); ?></span>
                                                     <?php endif; ?>
                                                     <?php if ( $show_url_preview && ! $has_url_preview && ! empty( $segment['url'] ) ) : ?>
                                                         <a class="timeline-url-link" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer" title="<?php esc_attr_e( 'Open item URL', 'traveler' ); ?>">
-                                                            <span aria-hidden="true">↗</span>
+                                                            <?php $render_timeline_icon( 'external' ); ?>
                                                             <span class="screen-reader-text"><?php esc_html_e( 'Open item URL', 'traveler' ); ?></span>
                                                         </a>
                                                     <?php endif; ?>
                                                 </div>
+                                                <span class="timeline-event-type"><?php echo esc_html( $type_label ); ?></span>
                                                 <?php if ( '' !== $segment_end_date && $segment_end_date !== $segment_start_date ) : ?>
                                                     <div class="detail"><?php echo esc_html( $traveler->get_segment_date_range_label( $segment ) ); ?></div>
                                                 <?php endif; ?>
-                                                <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
+                                                <?php if ( $show_location && ( ! empty( $segment['location'] ) || ! empty( $segment['end_location'] ) ) ) : ?>
+                                                <div class="detail timeline-route">
+                                                <?php if ( ! empty( $segment['location'] ) ) : ?>
                                                     <?php $location = (string) $segment['location']; ?>
-                                                    <div class="detail">
                                                         <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
-                                                            <span aria-hidden="true">&#x1F4CD;</span>
+                                                            <?php $render_timeline_icon( 'pin' ); ?>
                                                             <span<?php echo esc_attr( App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-location' ) ); ?>><?php echo esc_html( $location ); ?></span>
                                                         </a>
-                                                    </div>
                                                 <?php endif; ?>
-                                                <?php if ( $show_location && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                                                <?php if ( ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
                                                     <?php $end_location = (string) $segment['end_location']; ?>
-                                                    <div class="detail">
-                                                        <?php esc_html_e( 'To:', 'traveler' ); ?>
+                                                        <?php $render_timeline_icon( 'arrow' ); ?>
+                                                        <span class="screen-reader-text"><?php esc_html_e( 'To:', 'traveler' ); ?></span>
                                                         <a href="<?php echo esc_url( $get_google_maps_url( $end_location ) ); ?>" target="_blank" rel="noopener noreferrer">
-                                                            <span aria-hidden="true">&#x1F4CD;</span>
                                                             <span<?php echo esc_attr( App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-end-location' ) ); ?>><?php echo esc_html( $end_location ); ?></span>
                                                         </a>
-                                                    </div>
+                                                <?php endif; ?>
+                                                </div>
                                                 <?php endif; ?>
                                                 <?php if ( $show_private_share_details && ! empty( $segment['details'] ) ) : ?>
                                                     <div class="detail timeline-note"<?php echo esc_attr( App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-details' ) ); ?>><?php echo esc_html( $segment['details'] ); ?></div>
@@ -1713,6 +2116,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                                     </a>
                                                 <?php endif; ?>
                                             </div>
+                                            <span class="timeline-state<?php echo $is_end_timeline_entry && $day >= $today ? ' generated' : ''; ?>" data-timeline-state><?php echo esc_html( $initial_state ); ?></span>
                                         </div>
                                         <?php if ( ! $is_readonly_timeline && ! $is_end_timeline_entry ) : ?>
                                             <div class="timeline-edit-panel" id="<?php echo esc_attr( 'edit-segment-' . $index ); ?>" data-inline-edit-panel hidden>
@@ -1720,10 +2124,12 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
                                         <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
+                                </div>
                             </section>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
+                </div>
             </section>
 
             <?php if ( ! empty( $unscheduled_segments ) ) : ?>

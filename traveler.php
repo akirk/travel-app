@@ -3,7 +3,7 @@
  * Plugin Name: Traveler
  * Plugin URI: https://github.com/akirk/traveler
  * Description: Turn booking confirmations into day-by-day travel itineraries you can follow, map, share and journal, all kept privately on your own site.
- * Version: 1.0.0
+ * Version: 1.0.0+3957bb590931
  * Requires at least: 6.0
  * Tested up to: 7.1
  * Requires PHP: 7.4

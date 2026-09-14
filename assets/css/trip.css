@@ -44,15 +44,20 @@ h3 { font-size: 1rem; margin-bottom: 5px; }
 }
 label { display: block; font-weight: 650; margin-bottom: 5px; }
 input, select, textarea {
+    color-scheme: light;
     box-sizing: border-box;
     width: 100%;
-    border: 1px solid var(--wp-app-color-border);
+    border: 1px solid #7b8790;
     border-radius: 6px;
     padding: 9px 10px;
-    background: var(--wp-app-color-background);
-    color: var(--wp-app-color-text);
+    background: #fff;
+    color: #101820;
+    caret-color: #942b14;
     font: inherit;
 }
+input::placeholder, textarea::placeholder { color: #66727a; opacity: 1; }
+input:hover, select:hover, textarea:hover { border-color: #101820; }
+input:focus, select:focus, textarea:focus { border-color: #942b14; }
 textarea { min-height: 92px; resize: vertical; }
 button {
     appearance: none;

@@ -123,7 +123,7 @@
                 });
 
                 if (hasGap) {
-                    window.alert((window.travelerTripData && window.travelerTripData.continuousLodgingRange) || 'Select one continuous lodging date range.');
+                    window.alert((window.travelAppTripData && window.travelAppTripData.continuousLodgingRange) || 'Select one continuous lodging date range.');
                     return;
                 }
 
@@ -255,9 +255,9 @@
                     button.classList.remove('copied');
                 }
             });
-            button.textContent = (window.travelerTripData && window.travelerTripData.copied) || 'Copied!';
+            button.textContent = (window.travelAppTripData && window.travelAppTripData.copied) || 'Copied!';
             button.classList.add('copied');
-            setStatus((button.getAttribute('data-share-kind') || 'timeline') === 'calendar' ? ((window.travelerTripData && window.travelerTripData.calendarCopied) || 'Calendar subscription link copied.') : ((window.travelerTripData && window.travelerTripData.shareCopied) || 'Share link copied.'));
+            setStatus((button.getAttribute('data-share-kind') || 'timeline') === 'calendar' ? ((window.travelAppTripData && window.travelAppTripData.calendarCopied) || 'Calendar subscription link copied.') : ((window.travelAppTripData && window.travelAppTripData.shareCopied) || 'Share link copied.'));
 
             if (copyResetTimers[timerKey]) {
                 window.clearTimeout(copyResetTimers[timerKey]);
@@ -290,7 +290,7 @@
             }).then(function(response) {
                 return response.json().then(function(data) {
                     if (!response.ok || !data || !data.success) {
-                        throw new Error(data && data.data && data.data.message ? data.data.message : ((window.travelerTripData && window.travelerTripData.shareFailed) || 'The sharing change could not be saved.'));
+                        throw new Error(data && data.data && data.data.message ? data.data.message : ((window.travelAppTripData && window.travelAppTripData.shareFailed) || 'The sharing change could not be saved.'));
                     }
 
                     return data.data || {};
@@ -302,7 +302,7 @@
                 setStatus(data.message || '');
                 return data;
             }).catch(function(error) {
-                setStatus(error.message || ((window.travelerTripData && window.travelerTripData.shareFailed) || 'The sharing change could not be saved.'));
+                setStatus(error.message || ((window.travelAppTripData && window.travelAppTripData.shareFailed) || 'The sharing change could not be saved.'));
                 throw error;
             }).finally(function() {
                 setBusy(false);
@@ -311,7 +311,7 @@
 
         removeButtons.forEach(function(removeButton) {
             removeButton.addEventListener('click', function() {
-                requestShareAction('traveler_remove_share_link', removeButton.getAttribute('data-share-mode') || 'fellow');
+                requestShareAction('travel_app_remove_share_link', removeButton.getAttribute('data-share-mode') || 'fellow');
             });
         });
 
@@ -320,12 +320,12 @@
                 return navigator.clipboard.writeText(url).then(function() {
                     confirmCopied(button);
                 }).catch(function() {
-                    window.prompt((window.travelerTripData && window.travelerTripData.copyPrompt) || 'Copy this link:', url);
+                    window.prompt((window.travelAppTripData && window.travelAppTripData.copyPrompt) || 'Copy this link:', url);
                     confirmCopied(button);
                 });
             }
 
-            window.prompt((window.travelerTripData && window.travelerTripData.copyPrompt) || 'Copy this link:', url);
+            window.prompt((window.travelAppTripData && window.travelAppTripData.copyPrompt) || 'Copy this link:', url);
             confirmCopied(button);
             return Promise.resolve();
         }
@@ -341,8 +341,8 @@
                     return;
                 }
 
-                copyButton.textContent = (window.travelerTripData && window.travelerTripData.generating) || 'Generating...';
-                requestShareAction('traveler_generate_share_link', mode).then(function(data) {
+                copyButton.textContent = (window.travelAppTripData && window.travelAppTripData.generating) || 'Generating...';
+                requestShareAction('travel_app_generate_share_link', mode).then(function(data) {
                     var generatedUrl = data ? (kind === 'calendar' ? data.calendar_url : data.url) : '';
                     if (generatedUrl) {
                         copyShareUrl(generatedUrl, copyButton);

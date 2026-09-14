@@ -1,5 +1,5 @@
 <?php
-namespace Traveler;
+namespace TravelApp;
 
 /**
  * Pure helpers for the Web Share Target request, kept free of WordPress so

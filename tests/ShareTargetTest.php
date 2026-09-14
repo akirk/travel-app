@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use Traveler\ShareTarget;
+use TravelApp\ShareTarget;
 
 final class ShareTargetTest extends TestCase {
     public function test_joins_title_text_and_file_contents(): void {

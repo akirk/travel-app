@@ -1,4 +1,4 @@
-# Traveler
+# Travel App
 
 - Contributors: akirk
 - Tags: travel, itinerary, trip-planner, travel-journal, wp-app
@@ -13,17 +13,17 @@ Turn booking confirmations into day-by-day travel itineraries you can follow, ma
 
 ## Description
 
-[Try Traveler in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/traveler/main/blueprint.json)
-· [Try it with demo data](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/traveler/main/demo.json)
+[Try Travel App in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/blueprint.json)
+· [Try it with demo data](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/demo.json)
 
-[Try it in OpenStation](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/traveler/main/blueprint-openstation.json) — the same app opened in desktop mode with the [OpenStation](https://github.com/WordPress/openstation) plugin.
+[Try it in OpenStation](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/blueprint-openstation.json) — the same app opened in desktop mode with the [OpenStation](https://github.com/WordPress/openstation) plugin.
 
-Traveler is a private travel organizer that lives on your own WordPress. Paste or
-upload booking confirmations, calendar exports and itinerary notes, and Traveler
+Travel App is a private travel organizer that lives on your own WordPress. Paste or
+upload booking confirmations, calendar exports and itinerary notes, and Travel App
 turns them into a structured trip: flights, lodging, trains, rental cars,
 activities and anything else you want to keep track of. Built on
 [WpApp](https://github.com/akirk/wp-app), so it runs as its own app at
-`/traveler/` instead of inside wp-admin.
+`/travel-app/` instead of inside wp-admin.
 
 Nothing leaves your site unless you decide it should. Trips are stored in your
 own database, and every sharing feature is opt-in and revocable.
@@ -41,7 +41,7 @@ itinerary notes to turn them into structured trip timelines.
 - A quick-plan parser understands short one-line notes ("Train to the coast,
   Friday 9:40") for entries you type by hand.
 - On a phone the app registers as a Web Share Target, so a confirmation e-mail
-  or a booking page can be shared straight into Traveler from another app.
+  or a booking page can be shared straight into Travel App from another app.
 - Imports land on a review screen first, so you can correct what the parser got
   wrong before anything is saved.
 
@@ -86,28 +86,28 @@ with a category and tags of your choosing, ready for you to publish.
 
 ### Works offline
 
-Traveler installs as a Progressive Web App. The timeline, its assets and its
+Travel App installs as a Progressive Web App. The timeline, its assets and its
 attachments are cached for offline use, and edits made while offline are queued
 and synced when the connection comes back.
 
 ### AI Assistant
 
-When the AI Assistant plugin is active, Traveler registers WordPress Abilities
+When the AI Assistant plugin is active, Travel App registers WordPress Abilities
 for listing, creating, importing, inspecting, renaming, sharing and editing
 travel plans and their itinerary items, so an assistant can work with your trips
 without a separate integration.
 
 ### How it is stored
 
-Trips are `traveler_trip` taxonomy terms. Itinerary entries are first-class
-`traveler_item` posts assigned to the trip term, so each entry has a stable ID
-and a dedicated edit page. Journal entries are `traveler_journal` posts. No
+Trips are `travel_app_trip` taxonomy terms. Itinerary entries are first-class
+`travel_app_item` posts assigned to the trip term, so each entry has a stable ID
+and a dedicated edit page. Journal entries are `travel_app_journal` posts. No
 custom database tables are created; remove the plugin and your WordPress is as
 slim as it was before.
 
 ### External services
 
-Traveler works without any third-party service, but two optional features talk
+Travel App works without any third-party service, but two optional features talk
 to the outside world:
 
 - The route map loads map tiles from [OpenStreetMap](https://www.openstreetmap.org/)
@@ -123,9 +123,9 @@ uses the built-in local parsers and nothing is sent anywhere.
 
 ## Installation
 
-1. Upload the `traveler` directory to the `/wp-content/plugins/` directory
+1. Upload the `travel-app` directory to the `/wp-content/plugins/` directory
 1. Activate the plugin through the 'Plugins' menu in WordPress
-1. Open `/traveler/` on your site
+1. Open `/travel-app/` on your site
 
 ## Frequently Asked Questions
 
@@ -154,7 +154,7 @@ all of your trips at once.
 
 ### Does it work without a connection?
 
-Yes. Traveler is a Progressive Web App: the timeline is cached for offline use
+Yes. Travel App is a Progressive Web App: the timeline is cached for offline use
 and changes you make offline are queued and synced when you are back online.
 
 ### Where is the map data from?

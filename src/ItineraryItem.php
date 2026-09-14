@@ -1,6 +1,6 @@
 <?php
 
-namespace Traveler;
+namespace TravelApp;
 
 class ItineraryItem {
     public const TYPES = [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ];
@@ -32,19 +32,19 @@ class ItineraryItem {
         $this->trip_id = $trip_id ?? self::resolve_trip_id( $post->ID );
         $preview_service = new UrlPreviewService();
 
-        $this->type = (string) get_post_meta( $this->id, '_traveler_type', true );
+        $this->type = (string) get_post_meta( $this->id, '_travel_app_type', true );
         $this->title = (string) $this->post->post_title;
-        $this->date = (string) get_post_meta( $this->id, '_traveler_date', true );
-        $this->end_date = (string) get_post_meta( $this->id, '_traveler_end_date', true );
-        $this->time = (string) get_post_meta( $this->id, '_traveler_time', true );
-        $this->end_time = (string) get_post_meta( $this->id, '_traveler_end_time', true );
-        $this->starts_at_utc = (string) get_post_meta( $this->id, '_traveler_starts_at_utc', true );
-        $this->ends_at_utc = (string) get_post_meta( $this->id, '_traveler_ends_at_utc', true );
-        $this->timezone = (string) get_post_meta( $this->id, '_traveler_timezone', true );
-        $this->location = (string) get_post_meta( $this->id, '_traveler_location', true );
-        $this->end_location = (string) get_post_meta( $this->id, '_traveler_end_location', true );
-        $this->url = (string) get_post_meta( $this->id, '_traveler_url', true );
-        $this->app_url = $this->trip_id ? home_url( '/traveler/trip/' . $this->trip_id . '/#segment-' . $this->id ) : '';
+        $this->date = (string) get_post_meta( $this->id, '_travel_app_date', true );
+        $this->end_date = (string) get_post_meta( $this->id, '_travel_app_end_date', true );
+        $this->time = (string) get_post_meta( $this->id, '_travel_app_time', true );
+        $this->end_time = (string) get_post_meta( $this->id, '_travel_app_end_time', true );
+        $this->starts_at_utc = (string) get_post_meta( $this->id, '_travel_app_starts_at_utc', true );
+        $this->ends_at_utc = (string) get_post_meta( $this->id, '_travel_app_ends_at_utc', true );
+        $this->timezone = (string) get_post_meta( $this->id, '_travel_app_timezone', true );
+        $this->location = (string) get_post_meta( $this->id, '_travel_app_location', true );
+        $this->end_location = (string) get_post_meta( $this->id, '_travel_app_end_location', true );
+        $this->url = (string) get_post_meta( $this->id, '_travel_app_url', true );
+        $this->app_url = $this->trip_id ? home_url( '/travel-app/trip/' . $this->trip_id . '/#segment-' . $this->id ) : '';
         $this->url_preview = $preview_service->get_item_preview( $this->id );
         $this->url_preview_debug = $preview_service->get_item_preview_debug( $this->id );
         $this->attachments = $this->attachments();
@@ -115,7 +115,7 @@ class ItineraryItem {
                 'schema' => [ 'type' => 'string', 'description' => 'Booking, map, source, or reference URL saved on the itinerary item.' ],
             ],
             'app_url'           => [
-                'schema' => [ 'type' => 'string', 'description' => 'Traveler URL for this itinerary item.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Travel App URL for this itinerary item.' ],
                 'input'  => false,
             ],
             'details'           => [
@@ -251,16 +251,16 @@ class ItineraryItem {
     // phpcs:enable WordPress.Security.NonceVerification.Missing
 
     public static function get_user_item( int $trip_id, int $item_id ): ?self {
-        if ( ! current_user_can( 'read_traveler_trip', $trip_id ) || $item_id <= 0 ) {
+        if ( ! current_user_can( 'read_travel_app_trip', $trip_id ) || $item_id <= 0 ) {
             return null;
         }
 
         $post = get_post( $item_id );
-        if ( ! $post || 'traveler_item' !== $post->post_type ) {
+        if ( ! $post || 'travel_app_item' !== $post->post_type ) {
             return null;
         }
 
-        if ( 'trash' === $post->post_status || ! has_term( $trip_id, 'traveler_trip', $post ) ) {
+        if ( 'trash' === $post->post_status || ! has_term( $trip_id, 'travel_app_trip', $post ) ) {
             return null;
         }
 
@@ -271,17 +271,17 @@ class ItineraryItem {
         $user_id = $user_id ?? get_current_user_id();
 
         $posts = get_posts( [
-            'post_type'      => 'traveler_item',
+            'post_type'      => 'travel_app_item',
             'post_status'    => [ 'private', 'publish', 'draft' ],
             'posts_per_page' => -1,
             'orderby'        => 'meta_value',
             // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Itinerary order is stored as post meta so items remain normal WordPress posts.
-            'meta_key'       => '_traveler_sort',
+            'meta_key'       => '_travel_app_sort',
             'order'          => 'ASC',
             // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Items are attached to the trip taxonomy; this is the canonical WordPress relationship query.
             'tax_query'      => [
                 [
-                    'taxonomy' => 'traveler_trip',
+                    'taxonomy' => 'travel_app_trip',
                     'field'    => 'term_id',
                     'terms'    => [ $trip_id ],
                 ],
@@ -316,7 +316,7 @@ class ItineraryItem {
     }
 
     private static function resolve_trip_id( int $post_id ): int {
-        $trip_ids = wp_get_object_terms( $post_id, 'traveler_trip', [ 'fields' => 'ids' ] );
+        $trip_ids = wp_get_object_terms( $post_id, 'travel_app_trip', [ 'fields' => 'ids' ] );
 
         return ! is_wp_error( $trip_ids ) && ! empty( $trip_ids ) ? (int) $trip_ids[0] : 0;
     }

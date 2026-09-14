@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: Traveler
- * Plugin URI: https://github.com/akirk/traveler
+ * Plugin Name: Travel App
+ * Plugin URI: https://github.com/akirk/travel-app
  * Description: Turn booking confirmations into day-by-day travel itineraries you can follow, map, share and journal, all kept privately on your own site.
  * Version: 1.0.0
  * Requires at least: 6.0
@@ -10,12 +10,12 @@
  * Author URI: https://alex.kirk.at/
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: traveler
+ * Text Domain: travel-app
  *
- * @package Traveler
+ * @package TravelApp
  */
 
-namespace Traveler;
+namespace TravelApp;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -29,7 +29,7 @@ function is_playground(): bool {
 
 // Autoloader for plugin classes.
 spl_autoload_register( function( $class ) {
-    $prefix = 'Traveler\\';
+    $prefix = 'TravelApp\\';
     $len = strlen( $prefix );
     if ( strncmp( $prefix, $class, $len ) !== 0 ) {
         return;

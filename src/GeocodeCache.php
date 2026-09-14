@@ -1,5 +1,5 @@
 <?php
-namespace Traveler;
+namespace TravelApp;
 
 /**
  * Remembers the coordinates a browser looked up on Nominatim so the route map
@@ -8,7 +8,7 @@ namespace Traveler;
  * an uncached map slow, and the answers do not change.
  */
 class GeocodeCache {
-    const OPTION = 'traveler_geocode_cache';
+    const OPTION = 'travel_app_geocode_cache';
     const MAX_LOCATIONS = 500;
     const MAX_CANDIDATES = 5;
 

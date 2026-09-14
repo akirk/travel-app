@@ -1,5 +1,5 @@
 (function() {
-    var data = window.travelerMapData || {};
+    var data = window.travelAppMapData || {};
     var entries = data.entries || [];
     var seeded = data.seeded || {};
     var i18n = data.i18n || {};
@@ -11,8 +11,8 @@
     // Nominatim allows one lookup per second, so a fresh itinerary takes a while. What it
     // answers does not change, so coordinates are kept both in this browser and, through
     // admin-ajax, on the site itself, and the route is drawn as waypoints arrive.
-    var CACHE_KEY = 'traveler-geocode-v2';
-    var PICK_KEY = 'traveler-geocode-picks-v1';
+    var CACHE_KEY = 'travel-app-geocode-v2';
+    var PICK_KEY = 'travel-app-geocode-picks-v1';
     var CACHE_TTL = 30 * 24 * 60 * 60 * 1000;
     var MISS_TTL = 24 * 60 * 60 * 1000;
     var LOOKUP_DELAY = 1100;
@@ -909,7 +909,7 @@
             }
     
             var body = new URLSearchParams();
-            body.set('action', 'traveler_cache_geocode');
+            body.set('action', 'travel_app_cache_geocode');
             body.set('nonce', ajax.nonce);
             body.set('locations', JSON.stringify(found));
     

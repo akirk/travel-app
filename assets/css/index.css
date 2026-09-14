@@ -193,6 +193,9 @@ button:disabled { cursor: not-allowed; opacity: 0.52; }
     text-decoration: none;
 }
 .trip-card:last-child { border-bottom: 1px solid var(--ledger-line); }
+.trip-card-empty { display: flex; align-items: center; }
+.trip-card-empty h3 { margin-bottom: 0; }
+.trip-card-empty .trip-meta { display: none; }
 .trip-card::after {
     content: "→";
     position: absolute;

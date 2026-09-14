@@ -117,8 +117,8 @@ class App extends BaseApp {
                 ],
             ],
             'precache'                         => [
-                plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/traveler.php' ),
-                plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
+                plugins_url( 'build/timeline-time.js', dirname( __DIR__ ) . '/traveler.php' ),
+                plugins_url( 'build/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
             ],
             'cache_name'                       => 'traveler-v8',
             'cache_prefix'                     => 'traveler-',
@@ -145,8 +145,8 @@ class App extends BaseApp {
     }
 
     public function enqueue_assets(): void {
-        $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
-        $offline_script_path = dirname( __DIR__ ) . '/assets/js/offline-sync.js';
+        $timeline_asset = $this->get_script_asset( 'timeline-time' );
+        $offline_asset = $this->get_script_asset( 'offline-sync' );
 
         // Naming the scope means these register on Traveler's own hook, so
         // this does not need to run during a render. It runs on init because
@@ -155,9 +155,9 @@ class App extends BaseApp {
 
         wp_app_enqueue_script(
             'traveler-timeline-time',
-            plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/traveler.php' ),
-            [],
-            file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
+            plugins_url( 'build/timeline-time.js', dirname( __DIR__ ) . '/traveler.php' ),
+            $timeline_asset['dependencies'],
+            $timeline_asset['version'],
             true,
             $scope
         );
@@ -180,12 +180,31 @@ class App extends BaseApp {
 
         wp_app_enqueue_script(
             'traveler-offline-sync',
-            plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
-            [],
-            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
+            plugins_url( 'build/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
+            $offline_asset['dependencies'],
+            $offline_asset['version'],
             true,
             $scope
         );
+    }
+
+    private function get_script_asset( string $name ): array {
+        $script_path = dirname( __DIR__ ) . '/build/' . $name . '.js';
+        $asset_path = dirname( __DIR__ ) . '/build/' . $name . '.asset.php';
+        $asset = is_readable( $asset_path ) ? require $asset_path : [];
+
+        if ( ! is_array( $asset ) ) {
+            $asset = [];
+        }
+
+        return [
+            'dependencies' => isset( $asset['dependencies'] ) && is_array( $asset['dependencies'] )
+                ? array_values( $asset['dependencies'] )
+                : [],
+            'version'      => isset( $asset['version'] )
+                ? (string) $asset['version']
+                : ( file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0' ),
+        ];
     }
 
     public function get_manifest_url( int $trip_id = 0, string $share_token = '' ): string {
@@ -3091,7 +3110,7 @@ class App extends BaseApp {
     }
 
     public function get_static_timeline_script(): string {
-        $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
+        $script_path = dirname( __DIR__ ) . '/build/timeline-time.js';
 
         return is_readable( $script_path ) ? (string) file_get_contents( $script_path ) : '';
     }

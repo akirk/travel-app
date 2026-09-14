@@ -30,6 +30,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Build JavaScript assets
+        run: |
+          npm ci
+          npm run build
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -111,7 +122,8 @@ jobs:
           if [ -d vendor ]; then
             git add -f vendor/
           fi
-          git diff --cached --quiet || git commit -m "Build: add vendor"
+          git add build/
+          git diff --cached --quiet || git commit -m "Build: add production dependencies and assets"
           git push origin HEAD:refs/heads/${DIST_REF} --force
 
   update-pr-description:

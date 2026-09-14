@@ -18,6 +18,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  javascript:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build JavaScript assets
+        run: npm run build
+
+      - name: Verify committed build artifacts
+        run: git diff --exit-code -- build/
+
   phpunit:
     runs-on: ubuntu-latest
 

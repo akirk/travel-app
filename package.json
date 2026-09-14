@@ -1,0 +1,55 @@
+{
+	"name": "traveler",
+	"version": "1.0.0",
+	"description": "Build tooling for the Traveler WordPress plugin.",
+	"author": "Alex Kirk",
+	"license": "GPL-2.0-or-later",
+	"keywords": [
+		"itinerary",
+		"travel",
+		"wordpress"
+	],
+	"homepage": "https://github.com/akirk/traveler",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/akirk/traveler.git"
+	},
+	"bugs": {
+		"url": "https://github.com/akirk/traveler/issues"
+	},
+	"files": [
+		"assets/icon.svg",
+		"assets/vendor",
+		"build",
+		"src",
+		"templates",
+		"composer.json",
+		"LICENSE",
+		"README.md",
+		"traveler.php",
+		"vendor",
+		"!vendor/bin",
+		"!vendor/doctrine",
+		"!vendor/myclabs",
+		"!vendor/nikic",
+		"!vendor/phar-io",
+		"!vendor/phpunit",
+		"!vendor/sebastian",
+		"!vendor/theseer",
+		"!vendor/**/.git*",
+		"!vendor/**/.github",
+		"!vendor/**/test",
+		"!vendor/**/tests",
+		"!vendor/**/Test",
+		"!vendor/**/Tests"
+	],
+	"devDependencies": {
+		"@wordpress/scripts": "^35.0.0"
+	},
+	"scripts": {
+		"build": "wp-scripts build assets/js/timeline-time.js assets/js/offline-sync.js",
+		"plugin-zip": "npm run build && wp-scripts plugin-zip",
+		"start": "wp-scripts start assets/js/timeline-time.js assets/js/offline-sync.js"
+	},
+	"private": true
+}

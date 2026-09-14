@@ -183,7 +183,27 @@ visits do not query it again.
 
 ## Development
 
-Run the parser tests with:
+Install the JavaScript build tools and Composer dependencies with:
+
+```sh
+npm install
+composer install
+```
+
+Create optimized JavaScript assets in `build/` with:
+
+```sh
+npm run build
+```
+
+Use `npm start` while editing files in `assets/js/` to rebuild automatically.
+To create an installable `traveler.zip` artifact, run:
+
+```sh
+npm run plugin-zip
+```
+
+Run the PHP tests with:
 
 ```sh
 composer test

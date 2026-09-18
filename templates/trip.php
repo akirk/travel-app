@@ -9,11 +9,11 @@ use TravelApp\LodgingCoverage;
 use TravelApp\Parser\AiParser;
 use TravelApp\Trip;
 
-$traveler = App::get_instance();
+$travel_app = App::get_instance();
 $travel_app_template_context = isset( $travel_app_template_context ) && is_array( $travel_app_template_context ) ? $travel_app_template_context : [];
-$demo_mode_enabled = $traveler->is_demo_mode_enabled();
-$trip_id    = isset( $travel_app_template_context['trip_id'] ) ? absint( $travel_app_template_context['trip_id'] ) : absint( $traveler->get_route_param( 'id' ) );
-$share_token = isset( $travel_app_template_context['share_token'] ) ? sanitize_text_field( (string) $travel_app_template_context['share_token'] ) : $traveler->get_route_param( 'token' );
+$demo_mode_enabled = $travel_app->is_demo_mode_enabled();
+$trip_id    = isset( $travel_app_template_context['trip_id'] ) ? absint( $travel_app_template_context['trip_id'] ) : absint( $travel_app->get_route_param( 'id' ) );
+$share_token = isset( $travel_app_template_context['share_token'] ) ? sanitize_text_field( (string) $travel_app_template_context['share_token'] ) : $travel_app->get_route_param( 'token' );
 $is_static_download = ! empty( $travel_app_template_context['is_static_download'] );
 $is_shared_timeline = ! empty( $travel_app_template_context['is_shared_timeline'] ) || '' !== $share_token;
 $is_readonly_timeline = $is_shared_timeline || $is_static_download;
@@ -25,11 +25,11 @@ if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
         [ 'response' => 404 ]
     );
 }
-$share_mode = $is_static_download ? ( isset( $travel_app_template_context['static_share_mode'] ) ? (string) $travel_app_template_context['static_share_mode'] : 'fellow' ) : ( $is_shared_timeline ? $traveler->get_trip_share_mode_by_token( $trip_id, $share_token ) : '' );
+$share_mode = $is_static_download ? ( isset( $travel_app_template_context['static_share_mode'] ) ? (string) $travel_app_template_context['static_share_mode'] : 'fellow' ) : ( $is_shared_timeline ? $travel_app->get_trip_share_mode_by_token( $trip_id, $share_token ) : '' );
 $show_private_share_details = ( ! $is_shared_timeline && ! $is_static_download ) || 'fellow' === $share_mode;
-$error      = $traveler->get_query_arg_key( 'travel_app_error' );
-$quick_plan_draft_key = $traveler->get_query_arg_key( 'quick_plan_draft' );
-$quick_plan_draft = '' !== $quick_plan_draft_key ? $traveler->get_quick_plan_draft( $quick_plan_draft_key ) : [];
+$error      = $travel_app->get_query_arg_key( 'travel_app_error' );
+$quick_plan_draft_key = $travel_app->get_query_arg_key( 'quick_plan_draft' );
+$quick_plan_draft = '' !== $quick_plan_draft_key ? $travel_app->get_quick_plan_draft( $quick_plan_draft_key ) : [];
 $quick_plan_draft_target = isset( $quick_plan_draft['target_trip_id'] ) ? absint( $quick_plan_draft['target_trip_id'] ) : 0;
 $quick_plan_segment = $quick_plan_draft_target === $trip_id && isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] )
     ? $quick_plan_draft['segment']
@@ -42,7 +42,7 @@ if ( $is_shared_timeline ) {
 }
 $trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
 $segments  = $trip_data['segments'] ?? [];
-$traveller_label = $traveler->get_trip_traveller_label( $trip_data );
+$traveller_label = $travel_app->get_trip_traveller_label( $trip_data );
 $editable_trip_data = [];
 if ( ! $is_readonly_timeline ) {
     $editable_trip_data = $trip_data;
@@ -54,22 +54,22 @@ if ( ! $is_readonly_timeline ) {
         return $editable_segment;
     }, $segments );
 }
-$is_trip_active = $traveler->is_trip_active( $trip_data );
+$is_trip_active = $travel_app->is_trip_active( $trip_data );
 $show_now_next_section = '0' !== (string) get_term_meta( $trip_id, '_travel_app_show_now_next', true );
 $journal_enabled = '1' === (string) get_term_meta( $trip_id, '_travel_app_journal_enabled', true );
-$journal_entries_by_day = ( ! $is_readonly_timeline && $journal_enabled ) ? $traveler->get_journal_entries_for_trip( $trip_id ) : [];
+$journal_entries_by_day = ( ! $is_readonly_timeline && $journal_enabled ) ? $travel_app->get_journal_entries_for_trip( $trip_id ) : [];
 $journal_category_id = absint( get_term_meta( $trip_id, '_travel_app_journal_category_id', true ) );
 $journal_tags = (string) get_term_meta( $trip_id, '_travel_app_journal_tags', true );
-$can_manage_trip_editors = ! $is_readonly_timeline && $traveler->current_user_can_manage_trip_editors( $trip_id );
-$trip_editor_ids = $can_manage_trip_editors ? $traveler->get_trip_editor_ids( $trip_id ) : [];
-$trip_editor_candidates = $can_manage_trip_editors ? $traveler->get_trip_editor_candidates( $trip_id ) : [];
+$can_manage_trip_editors = ! $is_readonly_timeline && $travel_app->current_user_can_manage_trip_editors( $trip_id );
+$trip_editor_ids = $can_manage_trip_editors ? $travel_app->get_trip_editor_ids( $trip_id ) : [];
+$trip_editor_candidates = $can_manage_trip_editors ? $travel_app->get_trip_editor_candidates( $trip_id ) : [];
 $journal_categories = ! $is_readonly_timeline ? get_categories( [
     'hide_empty' => false,
 ] ) : [];
-$fellow_share_url = ! $is_shared_timeline ? $traveler->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
-$public_share_url = ! $is_shared_timeline ? $traveler->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
-$fellow_calendar_url = ! $is_shared_timeline ? $traveler->get_trip_calendar_url( (int) $trip_data['id'], 'fellow' ) : '';
-$public_calendar_url = ! $is_shared_timeline ? $traveler->get_trip_calendar_url( (int) $trip_data['id'], 'public' ) : '';
+$fellow_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'fellow' ) : '';
+$public_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
+$fellow_calendar_url = ! $is_shared_timeline ? $travel_app->get_trip_calendar_url( (int) $trip_data['id'], 'fellow' ) : '';
+$public_calendar_url = ! $is_shared_timeline ? $travel_app->get_trip_calendar_url( (int) $trip_data['id'], 'public' ) : '';
 $segment_type_labels = [
     'flight'   => __( 'Flight', 'travel-app' ),
     'lodging'  => __( 'Lodging', 'travel-app' ),
@@ -182,7 +182,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
 }
 
 if ( ! $is_static_download ) {
-    $traveler->enqueue_template_assets(
+    $travel_app->enqueue_template_assets(
         'trip',
         ! $is_readonly_timeline,
         ! $is_readonly_timeline ? 'travelAppTripData' : '',
@@ -205,12 +205,12 @@ if ( ! $is_static_download ) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php wp_app_the_title( $trip_data ? $trip_data['title'] : __( 'Travel Plan', 'travel-app' ) ); ?></title>
     <?php if ( ! $is_static_download ) : ?>
-        <link rel="manifest" href="<?php echo esc_url( $traveler->get_manifest_url( (int) $trip_data['id'], $share_token ) ); ?>">
+        <link rel="manifest" href="<?php echo esc_url( $travel_app->get_manifest_url( (int) $trip_data['id'], $share_token ) ); ?>">
         <meta name="theme-color" content="#0b6bcb">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-title" content="<?php echo esc_attr( $trip_data['title'] ?: __( 'Timeline', 'travel-app' ) ); ?>">
     <?php else : ?>
-        <?php $traveler->print_static_trip_styles(); ?>
+        <?php $travel_app->print_static_trip_styles(); ?>
     <?php endif; ?>
     <?php remove_action( 'wp_head', '_wp_render_title_tag', 1 ); ?>
     <?php if ( ! $is_static_download ) : ?>
@@ -224,7 +224,7 @@ if ( ! $is_static_download ) {
 
     <main>
         <?php if ( ! $is_readonly_timeline && $error ) : ?>
-            <div class="notice error" role="alert"><?php echo esc_html( $traveler->get_error_notice_message( $error ) ); ?></div>
+            <div class="notice error" role="alert"><?php echo esc_html( $travel_app->get_error_notice_message( $error ) ); ?></div>
         <?php endif; ?>
 
         <?php if ( ! $trip_data ) : ?>
@@ -259,7 +259,7 @@ if ( ! $is_static_download ) {
                     <?php if ( '' !== $traveller_label ) : ?>
                         <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $traveller_label ); ?></span>
                     <?php endif; ?>
-                    <?php foreach ( $traveler->get_trip_summary_parts( $trip_data, null, ! $is_static_download ) as $summary_part ) : ?>
+                    <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, null, ! $is_static_download ) as $summary_part ) : ?>
                         <span><?php echo esc_html( $summary_part ); ?></span>
                     <?php endforeach; ?>
                     <span>
@@ -323,11 +323,11 @@ if ( ! $is_static_download ) {
                             $step_effective_end_date = '' !== $step_end_date ? $step_end_date : ( '' !== $step_end_time ? $step_date : '' );
                             $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['time'] ?? '' ) ?: '00:00' ) );
                             $step_time_label = ( '' !== $step_effective_end_date && $step_effective_end_date === $step_date && '' !== $step_end_time )
-                                ? $traveler->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
+                                ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
                                 : (string) ( $step['time'] ?? '' );
-                            $step_start_label = trim( $traveler->format_date_label( $step_date ) . ' ' . (string) ( $step['time'] ?? '' ) );
+                            $step_start_label = trim( $travel_app->format_date_label( $step_date ) . ' ' . (string) ( $step['time'] ?? '' ) );
                             $step_end_label = '' !== $step_effective_end_date && $step_effective_end_date !== $step_date
-                                ? trim( $traveler->format_date_label( $step_effective_end_date ) . ' ' . $step_end_time )
+                                ? trim( $travel_app->format_date_label( $step_effective_end_date ) . ' ' . $step_end_time )
                                 : '';
                             $step_show_location = 'checkout' !== $step_timeline_kind && ( $show_private_share_details || $is_transport_segment( $step ) );
                             $step_location = $step_show_location ? (string) ( $step['location'] ?? '' ) : '';
@@ -415,9 +415,9 @@ if ( ! $is_static_download ) {
                                         checked
                                     >
                                     <span>
-                                        <?php echo esc_html( $traveler->format_date_label( (string) $missing_lodging_night['date'], false ) ); ?>
+                                        <?php echo esc_html( $travel_app->format_date_label( (string) $missing_lodging_night['date'], false ) ); ?>
                                         <span aria-hidden="true">→</span>
-                                        <?php echo esc_html( $traveler->format_date_label( (string) $missing_lodging_night['end_date'] ) ); ?>
+                                        <?php echo esc_html( $travel_app->format_date_label( (string) $missing_lodging_night['end_date'] ) ); ?>
                                     </span>
                                 </label>
                                 <label>
@@ -463,9 +463,9 @@ if ( ! $is_static_download ) {
                                 <span class="lodging-checker-night-status">
                                     <span class="lodging-checker-icon" aria-hidden="true">✓</span>
                                     <span>
-                                        <?php echo esc_html( $traveler->format_date_label( (string) $covered_lodging_night['date'], false ) ); ?>
+                                        <?php echo esc_html( $travel_app->format_date_label( (string) $covered_lodging_night['date'], false ) ); ?>
                                         <span aria-hidden="true">→</span>
-                                        <?php echo esc_html( $traveler->format_date_label( (string) $covered_lodging_night['end_date'] ) ); ?>
+                                        <?php echo esc_html( $travel_app->format_date_label( (string) $covered_lodging_night['end_date'] ) ); ?>
                                     </span>
                                 </span>
                                 <span class="lodging-checker-brief">
@@ -650,7 +650,7 @@ if ( ! $is_static_download ) {
                             ?>
                             <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" data-date="<?php echo esc_attr( $day ); ?>">
                                 <div class="day-heading-row">
-                                    <h3 class="day-heading"><?php echo esc_html( $traveler->format_date_label( $day ) ); ?></h3>
+                                    <h3 class="day-heading"><?php echo esc_html( $travel_app->format_date_label( $day ) ); ?></h3>
                                     <?php if ( ! $is_readonly_timeline && $journal_enabled ) : ?>
                                         <div class="day-journal-actions">
                                             <form class="day-journal-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -727,7 +727,7 @@ if ( ! $is_static_download ) {
                                                     <?php endif; ?>
                                                 </div>
                                                 <?php if ( '' !== $segment_end_date && $segment_end_date !== $segment_start_date ) : ?>
-                                                    <div class="detail"><?php echo esc_html( $traveler->get_segment_date_range_label( $segment ) ); ?></div>
+                                                    <div class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></div>
                                                 <?php endif; ?>
                                                 <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
                                                     <?php $location = (string) $segment['location']; ?>
@@ -829,7 +829,7 @@ if ( ! $is_static_download ) {
                                                 </button>
                                             <?php endif; ?>
                                             <?php if ( ! empty( $segment['end_date'] ) ) : ?>
-                                                <br><span class="detail"><?php echo esc_html( $traveler->get_segment_date_range_label( $segment ) ); ?></span>
+                                                <br><span class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></span>
                                             <?php endif; ?>
                                             <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
                                                 <?php $location = (string) $segment['location']; ?>
@@ -902,10 +902,10 @@ if ( ! $is_static_download ) {
                                     <span class="empty"><?php esc_html_e( 'Includes addresses and attachments.', 'travel-app' ); ?></span>
                                 </span>
                                 <span class="share-actions">
-                                    <a class="ghost-button" href="<?php echo esc_url( $traveler->get_trip_html_download_url( (int) $trip_data['id'], 'fellow' ) ); ?>">
+                                    <a class="ghost-button" href="<?php echo esc_url( $travel_app->get_trip_html_download_url( (int) $trip_data['id'], 'fellow' ) ); ?>">
                                         <?php esc_html_e( 'HTML', 'travel-app' ); ?>
                                     </a>
-                                    <?php if ( ! $traveler->is_playground() ) : ?>
+                                    <?php if ( ! $travel_app->is_playground() ) : ?>
                                         <button class="ghost-button" type="button" data-share-copy data-share-kind="timeline" data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_share_url ); ?>"><?php esc_html_e( 'URL', 'travel-app' ); ?></button>
                                         <button class="ghost-button" type="button" data-share-copy data-share-kind="calendar" data-share-mode="fellow" data-share-url="<?php echo esc_attr( $fellow_calendar_url ); ?>"><?php esc_html_e( 'ICS', 'travel-app' ); ?></button>
                                         <button class="ghost-button" type="button" data-share-remove data-share-mode="fellow" <?php echo '' === $fellow_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Stop sharing', 'travel-app' ); ?></button>
@@ -918,10 +918,10 @@ if ( ! $is_static_download ) {
                                     <span class="empty"><?php esc_html_e( 'Shows transport start and end locations; hides other addresses and attachments.', 'travel-app' ); ?></span>
                                 </span>
                                 <span class="share-actions">
-                                    <a class="ghost-button" href="<?php echo esc_url( $traveler->get_trip_html_download_url( (int) $trip_data['id'], 'public' ) ); ?>">
+                                    <a class="ghost-button" href="<?php echo esc_url( $travel_app->get_trip_html_download_url( (int) $trip_data['id'], 'public' ) ); ?>">
                                         <?php esc_html_e( 'HTML', 'travel-app' ); ?>
                                     </a>
-                                    <?php if ( ! $traveler->is_playground() ) : ?>
+                                    <?php if ( ! $travel_app->is_playground() ) : ?>
                                         <button class="ghost-button" type="button" data-share-copy data-share-kind="timeline" data-share-mode="public" data-share-url="<?php echo esc_attr( $public_share_url ); ?>"><?php esc_html_e( 'URL', 'travel-app' ); ?></button>
                                         <button class="ghost-button" type="button" data-share-copy data-share-kind="calendar" data-share-mode="public" data-share-url="<?php echo esc_attr( $public_calendar_url ); ?>"><?php esc_html_e( 'ICS', 'travel-app' ); ?></button>
                                         <button class="ghost-button" type="button" data-share-remove data-share-mode="public" <?php echo '' === $public_share_url ? 'hidden' : ''; ?>><?php esc_html_e( 'Stop sharing', 'travel-app' ); ?></button>
@@ -929,7 +929,7 @@ if ( ! $is_static_download ) {
                                 </span>
                             </div>
                         </div>
-                        <?php if ( ! $traveler->is_playground() ) : ?>
+                        <?php if ( ! $travel_app->is_playground() ) : ?>
                             <p class="empty" data-share-status aria-live="polite"></p>
                         <?php endif; ?>
                     </details>

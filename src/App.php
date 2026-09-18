@@ -202,9 +202,7 @@ class App extends BaseApp {
         $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
         $offline_script_path = dirname( __DIR__ ) . '/assets/js/offline-sync.js';
 
-        // Naming the scope means these register on Travel App's own hook, so
-        // this does not need to run during a render. It runs on init because
-        // the messages below are translated.
+        // Register only on Travel App's scoped hooks, outside the dashboard.
         $scope = $this->get_url_path();
 
         wp_app_enqueue_script(
@@ -216,8 +214,6 @@ class App extends BaseApp {
             $scope
         );
 
-        // Registered before offline-sync.js so the messages are defined by the
-        // time it runs, which is what wp_add_inline_script( 'before' ) did.
         wp_app_add_inline_script(
             'travel-app-offline-sync-data',
             'window.travelAppPwa=' . wp_json_encode( [
@@ -258,9 +254,9 @@ class App extends BaseApp {
             return;
         }
 
-        echo '<style id="' . esc_attr( 'travel-app-static-trip-css' ) . '">';
-        echo $css; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Static download CSS is a bundled plugin asset, not user input.
-        echo '</style>';
+        wp_register_style( 'travel-app-static-trip', false, [], $this->get_asset_version( 'css/trip.css' ) );
+        wp_add_inline_style( 'travel-app-static-trip', $css );
+        wp_print_styles( 'travel-app-static-trip' );
     }
 
     private function get_asset_contents( string $path ): string {
@@ -2089,22 +2085,25 @@ class App extends BaseApp {
         // The share sheet cannot carry a nonce; nothing is saved here, the
         // text is only prefilled into the form the user still has to submit.
         $fields = [];
+        // phpcs:disable WordPress.Security.NonceVerification.Missing -- Web Share Target has no nonce; this only creates a short-lived prefill.
         foreach ( [ 'title', 'text', 'url' ] as $field ) {
-            // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Share target prefill only; values are stored in a transient and shown in the import form.
-            $fields[ $field ] = isset( $_POST[ $field ] ) ? (string) wp_unslash( $_POST[ $field ] ) : '';
+            // Share targets cannot include a nonce; no trip is saved until the user submits the import form.
+            $fields[ $field ] = isset( $_POST[ $field ] ) && is_string( $_POST[ $field ] )
+                ? sanitize_textarea_field( wp_unslash( $_POST[ $field ] ) ) : '';
         }
+        // phpcs:enable WordPress.Security.NonceVerification.Missing
 
         $unsupported_file = false;
         $contents = [];
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Share target prefill only; accepted files are read as text for later user confirmation.
-        foreach ( ShareTarget::normalize_files( $_FILES['files'] ?? null ) as $file ) {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Upload metadata is validated by read_uploaded_text_file().
+        foreach ( ShareTarget::normalize_files( isset( $_FILES['files'] ) && is_array( $_FILES['files'] ) ? $_FILES['files'] : null ) as $file ) {
             if ( ! ShareTarget::is_text_file( $file ) ) {
                 $unsupported_file = true;
                 continue;
             }
             $file_text = $this->read_uploaded_text_file( $file );
             if ( ! is_wp_error( $file_text ) ) {
-                $contents[] = $file_text;
+                $contents[] = sanitize_textarea_field( $file_text );
             }
         }
 
@@ -3072,7 +3071,7 @@ class App extends BaseApp {
             require_once $config_file;
         }
 
-        $phase2_file = WP_CONTENT_DIR . '/plugins/wp-super-cache/wp-cache-phase2.php';
+        $phase2_file = WP_PLUGIN_DIR . '/wp-super-cache/wp-cache-phase2.php';
         if ( is_readable( $phase2_file ) ) {
             require_once $phase2_file;
         }
@@ -3081,7 +3080,7 @@ class App extends BaseApp {
             return true;
         }
 
-        $plugin_file = WP_CONTENT_DIR . '/plugins/wp-super-cache/wp-cache.php';
+        $plugin_file = WP_PLUGIN_DIR . '/wp-super-cache/wp-cache.php';
         if ( ! function_exists( 'wp_cache_clean_cache' ) && is_readable( $plugin_file ) ) {
             require_once $plugin_file;
         }
@@ -3151,14 +3150,21 @@ class App extends BaseApp {
             return new \WP_Error( 'upload_failed', __( 'The itinerary file could not be uploaded.', 'travel-app' ) );
         }
 
-        $tmp_name = isset( $file['tmp_name'] ) ? (string) $file['tmp_name'] : '';
+        $tmp_name = isset( $file['tmp_name'] ) && is_string( $file['tmp_name'] ) ? $file['tmp_name'] : '';
         if ( '' === $tmp_name || ! is_uploaded_file( $tmp_name ) ) {
             return new \WP_Error( 'upload_invalid', __( 'The itinerary file upload was invalid.', 'travel-app' ) );
         }
 
-        $size = isset( $file['size'] ) ? (int) $file['size'] : 0;
-        if ( $size > 2 * 1024 * 1024 ) {
+        $size = isset( $file['size'] ) && is_numeric( $file['size'] ) ? (int) $file['size'] : 0;
+        $actual_size = filesize( $tmp_name );
+        if ( $size > 2 * 1024 * 1024 || false === $actual_size || $actual_size > 2 * 1024 * 1024 ) {
             return new \WP_Error( 'upload_too_large', __( 'The itinerary file is too large.', 'travel-app' ) );
+        }
+
+        $name = isset( $file['name'] ) && is_string( $file['name'] ) ? $file['name'] : '';
+        $extension = strtolower( pathinfo( $name, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $extension, [ 'ics', 'txt', 'ical', 'ifb', 'icalendar' ], true ) ) {
+            return new \WP_Error( 'upload_invalid', __( 'The itinerary file upload was invalid.', 'travel-app' ) );
         }
 
         $contents = file_get_contents( $tmp_name );
@@ -3166,7 +3172,7 @@ class App extends BaseApp {
             return new \WP_Error( 'upload_read_failed', __( 'The itinerary file could not be read.', 'travel-app' ) );
         }
 
-        return (string) $contents;
+        return sanitize_textarea_field( $contents );
     }
 
     public function get_trip_share_url( int $trip_id, string $mode = 'fellow' ): string {
@@ -3594,9 +3600,8 @@ class App extends BaseApp {
             $format = 'F j, Y';
         }
 
-        // The stored option is core's untranslated default here, so reuse core's own
-        // translation of it rather than shipping a second copy of the same string.
-        // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch -- Deliberately reusing core's 'date format' string.
+        // Reuse the site's core translation for WordPress's default date format.
+        // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch -- The string belongs to core.
         $localized_default_format = _x( 'F j, Y', 'date format', 'default' );
         if ( 'F j, Y' === $format && 'F j, Y' !== $localized_default_format ) {
             $format = $localized_default_format;

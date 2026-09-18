@@ -9,25 +9,25 @@ use TravelApp\LodgingCoverage;
 use TravelApp\Parser\AiParser;
 use TravelApp\Trip;
 
-$traveler = App::get_instance();
+$travel_app = App::get_instance();
 $trips      = array_map( static function( Trip $trip ): array {
     return $trip->to_array();
 }, Trip::for_current_user() );
-$imported   = $traveler->get_query_arg_absint( 'imported' );
-$deleted    = $traveler->get_query_arg_absint( 'deleted' );
-$error      = $traveler->get_query_arg_key( 'travel_app_error' );
-$shared_draft_key = $traveler->get_query_arg_key( 'shared_draft' );
-$shared_text = '' !== $shared_draft_key ? $traveler->take_share_target_text( $shared_draft_key ) : '';
-$quick_plan_draft_key = $traveler->get_query_arg_key( 'quick_plan_draft' );
-$quick_plan_draft = '' !== $quick_plan_draft_key ? $traveler->get_quick_plan_draft( $quick_plan_draft_key ) : [];
+$imported   = $travel_app->get_query_arg_absint( 'imported' );
+$deleted    = $travel_app->get_query_arg_absint( 'deleted' );
+$error      = $travel_app->get_query_arg_key( 'travel_app_error' );
+$shared_draft_key = $travel_app->get_query_arg_key( 'shared_draft' );
+$shared_text = '' !== $shared_draft_key ? $travel_app->take_share_target_text( $shared_draft_key ) : '';
+$quick_plan_draft_key = $travel_app->get_query_arg_key( 'quick_plan_draft' );
+$quick_plan_draft = '' !== $quick_plan_draft_key ? $travel_app->get_quick_plan_draft( $quick_plan_draft_key ) : [];
 $quick_plan_segment = isset( $quick_plan_draft['segment'] ) && is_array( $quick_plan_draft['segment'] ) ? $quick_plan_draft['segment'] : [];
 $quick_plan_matches = isset( $quick_plan_draft['matches'] ) && is_array( $quick_plan_draft['matches'] ) ? $quick_plan_draft['matches'] : [];
 $has_ai     = AiParser::is_available();
 $has_ai_assistant = defined( 'AI_ASSISTANT_VERSION' ) || class_exists( '\AI_Assistant' );
-$delegated_owner_options = $traveler->get_delegated_trip_owner_options();
-$demo_mode_enabled = $traveler->is_demo_mode_enabled();
-$is_playground = $traveler->is_playground();
-$all_trips_calendar_url = $is_playground ? '' : $traveler->get_user_calendar_url( get_current_user_id(), true );
+$delegated_owner_options = $travel_app->get_delegated_trip_owner_options();
+$demo_mode_enabled = $travel_app->is_demo_mode_enabled();
+$is_playground = $travel_app->is_playground();
+$all_trips_calendar_url = $is_playground ? '' : $travel_app->get_user_calendar_url( get_current_user_id(), true );
 $today      = current_time( 'Y-m-d' );
 $segment_type_labels = [
     'flight'   => __( 'Flight', 'travel-app' ),
@@ -147,7 +147,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
     ];
 };
 
-$traveler->enqueue_template_assets(
+$travel_app->enqueue_template_assets(
     'index',
     true,
     'travelAppIndexData',
@@ -192,10 +192,10 @@ $traveler->enqueue_template_assets(
             <div class="notice" role="status"><?php esc_html_e( 'Travel plan imported.', 'travel-app' ); ?></div>
         <?php elseif ( $deleted ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Travel plan deleted.', 'travel-app' ); ?></div>
-        <?php elseif ( $traveler->has_query_arg( 'settings_updated' ) ) : ?>
+        <?php elseif ( $travel_app->has_query_arg( 'settings_updated' ) ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Settings saved.', 'travel-app' ); ?></div>
         <?php elseif ( $error ) : ?>
-            <div class="notice error" role="alert"><?php echo esc_html( $traveler->get_error_notice_message( $error, __( 'The itinerary could not be imported.', 'travel-app' ) ) ); ?></div>
+            <div class="notice error" role="alert"><?php echo esc_html( $travel_app->get_error_notice_message( $error, __( 'The itinerary could not be imported.', 'travel-app' ) ) ); ?></div>
         <?php endif; ?>
 
         <?php if ( $demo_mode_enabled && ! empty( $trips ) ) : ?>
@@ -224,11 +224,11 @@ $traveler->enqueue_template_assets(
                         <article class="current-card">
                             <h3><a href="<?php echo esc_url( $get_trip_url( $current_trip ) ); ?>#timeline-heading"><span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $current_trip['id'] ?? '' ) ) ); ?>><?php echo esc_html( $current_trip['title'] ); ?></span></a></h3>
                             <div class="trip-meta">
-                                <?php $current_trip_owner_label = $traveler->get_trip_traveller_label( $current_trip ); ?>
+                                <?php $current_trip_owner_label = $travel_app->get_trip_traveller_label( $current_trip ); ?>
                                 <?php if ( '' !== $current_trip_owner_label ) : ?>
                                     <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $current_trip['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $current_trip_owner_label ); ?></span>
                                 <?php endif; ?>
-                                <?php foreach ( $traveler->get_trip_summary_parts( $current_trip, $today ) as $summary_part ) : ?>
+                                <?php foreach ( $travel_app->get_trip_summary_parts( $current_trip, $today ) as $summary_part ) : ?>
                                     <span><?php echo esc_html( $summary_part ); ?></span>
                                 <?php endforeach; ?>
                             </div>
@@ -244,11 +244,11 @@ $traveler->enqueue_template_assets(
                                     $step_effective_end_date = '' !== $step_end_date ? $step_end_date : ( '' !== $step_end_time ? $step_date : '' );
                                     $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['time'] ?? '' ) ?: '00:00' ) );
                                     $step_time_label = ( '' !== $step_effective_end_date && $step_effective_end_date === $step_date && '' !== $step_end_time )
-                                        ? $traveler->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
+                                        ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
                                         : (string) ( $step['time'] ?? '' );
-                                    $step_start_label = trim( $traveler->format_date_label( $step_date ) . ' ' . (string) ( $step['time'] ?? '' ) );
+                                    $step_start_label = trim( $travel_app->format_date_label( $step_date ) . ' ' . (string) ( $step['time'] ?? '' ) );
                                     $step_end_label = '' !== $step_effective_end_date && $step_effective_end_date !== $step_date
-                                        ? trim( $traveler->format_date_label( $step_effective_end_date ) . ' ' . $step_end_time )
+                                        ? trim( $travel_app->format_date_label( $step_effective_end_date ) . ' ' . $step_end_time )
                                         : '';
                                     $step_title = (string) ( $step['title'] ?? '' );
                                     if ( 'checkout' === $step_timeline_kind ) {
@@ -290,11 +290,11 @@ $traveler->enqueue_template_assets(
                                 <a class="trip-card <?php echo (int) $trip_data['id'] === $imported ? 'highlight' : ''; ?>" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
                                     <div class="trip-meta">
-                                        <?php $trip_owner_label = $traveler->get_trip_traveller_label( $trip_data ); ?>
+                                        <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
                                             <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
-                                        <?php foreach ( $traveler->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
+                                        <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
                                             <span><?php echo esc_html( $summary_part ); ?></span>
                                         <?php endforeach; ?>
                                     </div>
@@ -314,11 +314,11 @@ $traveler->enqueue_template_assets(
                                 <a class="trip-card" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
                                     <div class="trip-meta">
-                                        <?php $trip_owner_label = $traveler->get_trip_traveller_label( $trip_data ); ?>
+                                        <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
                                             <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
-                                        <?php foreach ( $traveler->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
+                                        <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
                                             <span><?php echo esc_html( $summary_part ); ?></span>
                                         <?php endforeach; ?>
                                     </div>
@@ -427,7 +427,7 @@ $traveler->enqueue_template_assets(
                                             <input type="radio" name="quick_plan_target" value="<?php echo esc_attr( (string) ( $match['id'] ?? 0 ) ); ?>" <?php checked( 0, $index ); ?>>
                                             <span>
                                                 <strong><?php echo esc_html( (string) ( $match['title'] ?? __( 'Travel plan', 'travel-app' ) ) ); ?></strong>
-                                                <?php echo esc_html( $traveler->format_date_range_label( (string) ( $match['starts_at'] ?? '' ), (string) ( $match['ends_at'] ?? '' ) ) ); ?>
+                                                <?php echo esc_html( $travel_app->format_date_range_label( (string) ( $match['starts_at'] ?? '' ), (string) ( $match['ends_at'] ?? '' ) ) ); ?>
                                             </span>
                                         </label>
                                     <?php endforeach; ?>
@@ -463,7 +463,7 @@ $traveler->enqueue_template_assets(
                                                         echo esc_html(
                                                             trim(
                                                                 (string) ( $trip_data['title'] ?? __( 'Travel plan', 'travel-app' ) ) . ' - ' .
-                                                                $traveler->format_date_range_label( (string) ( $trip_data['starts_at'] ?? '' ), (string) ( $trip_data['ends_at'] ?? '' ) )
+                                                                $travel_app->format_date_range_label( (string) ( $trip_data['starts_at'] ?? '' ), (string) ( $trip_data['ends_at'] ?? '' ) )
                                                             )
                                                         );
                                                         ?>

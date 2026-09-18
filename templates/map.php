@@ -8,8 +8,8 @@ use TravelApp\App;
 use TravelApp\GeocodeCache;
 use TravelApp\Trip;
 
-$traveler = App::get_instance();
-$trip_id    = absint( $traveler->get_route_param( 'id' ) );
+$travel_app = App::get_instance();
+$trip_id    = absint( $travel_app->get_route_param( 'id' ) );
 $trip       = Trip::get( $trip_id );
 if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
     wp_die(
@@ -113,7 +113,7 @@ $map_strings = [
 $leaflet_base_url = plugins_url( 'assets/vendor/leaflet/', dirname( __DIR__ ) . '/travel-app.php' );
 wp_app_enqueue_style( 'travel-app-leaflet', $leaflet_base_url . 'leaflet.css', [], '1.9.4', 'travel-app' );
 wp_app_enqueue_script( 'travel-app-leaflet', $leaflet_base_url . 'leaflet.js', [], '1.9.4', false, 'travel-app' );
-$traveler->enqueue_template_assets(
+$travel_app->enqueue_template_assets(
     'map',
     true,
     'travelAppMapData',
@@ -122,7 +122,7 @@ $traveler->enqueue_template_assets(
         'seeded'   => (object) $known_locations,
         'i18n'     => $map_strings,
         'icons'    => $playback_icons,
-        'demoMode' => $traveler->is_demo_mode_enabled(),
+        'demoMode' => $travel_app->is_demo_mode_enabled(),
         'ajax'     => [
             'url'   => admin_url( 'admin-ajax.php' ),
             'nonce' => wp_create_nonce( 'travel_app_geocode' ),

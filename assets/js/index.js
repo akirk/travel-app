@@ -28,7 +28,7 @@
     function showFileName() {
         fileName.textContent = fileInput.files && fileInput.files.length
             ? fileInput.files[0].name
-            : (window.travelerIndexData && window.travelerIndexData.fileLabel) || 'ICS or text file';
+            : (window.travelAppIndexData && window.travelAppIndexData.fileLabel) || 'ICS or text file';
     }
 
     ['dragenter', 'dragover'].forEach(function(eventName) {
@@ -68,12 +68,12 @@
     }
 
     function confirmCopied() {
-        button.textContent = (window.travelerIndexData && window.travelerIndexData.copied) || 'Copied!';
+        button.textContent = (window.travelAppIndexData && window.travelAppIndexData.copied) || 'Copied!';
         if (status) {
-            status.textContent = (window.travelerIndexData && window.travelerIndexData.calendarCopied) || 'Calendar subscription link copied.';
+            status.textContent = (window.travelAppIndexData && window.travelAppIndexData.calendarCopied) || 'Calendar subscription link copied.';
         }
         window.setTimeout(function() {
-            button.textContent = (window.travelerIndexData && window.travelerIndexData.copyUrl) || 'Copy URL';
+            button.textContent = (window.travelAppIndexData && window.travelAppIndexData.copyUrl) || 'Copy URL';
         }, 1800);
     }
 
@@ -85,13 +85,13 @@
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(url).then(confirmCopied).catch(function() {
-                window.prompt((window.travelerIndexData && window.travelerIndexData.copyPrompt) || 'Copy this link:', url);
+                window.prompt((window.travelAppIndexData && window.travelAppIndexData.copyPrompt) || 'Copy this link:', url);
                 confirmCopied();
             });
             return;
         }
 
-        window.prompt((window.travelerIndexData && window.travelerIndexData.copyPrompt) || 'Copy this link:', url);
+        window.prompt((window.travelAppIndexData && window.travelAppIndexData.copyPrompt) || 'Copy this link:', url);
         confirmCopied();
     });
 }());

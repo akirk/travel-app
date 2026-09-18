@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
-<ruleset name="Traveler">
-	<description>PHPCS rules for Traveler's shipped plugin code.</description>
+<ruleset name="Travel App">
+	<description>PHPCS rules for Travel App's shipped plugin code.</description>
 
-	<file>traveler.php</file>
+	<file>travel-app.php</file>
 	<file>src</file>
 	<file>templates</file>
 
@@ -22,7 +22,7 @@
 	<rule ref="WordPress.WP.I18n">
 		<properties>
 			<property name="text_domain" type="array">
-				<element value="traveler"/>
+				<element value="travel-app"/>
 			</property>
 		</properties>
 	</rule>

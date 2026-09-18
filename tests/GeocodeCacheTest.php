@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use Traveler\GeocodeCache;
+use TravelApp\GeocodeCache;
 
 final class GeocodeCacheTest extends TestCase {
     public function test_normalizes_case_spacing_and_trailing_commas(): void {

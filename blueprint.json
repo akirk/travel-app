@@ -1,7 +1,7 @@
 {
 	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
 	"meta": {
-		"title": "Traveler",
+		"title": "Travel App",
 		"description": "A private travel organizer for WordPress: turn booking confirmations into itineraries, follow them on a day-by-day timeline, and keep a travel journal.",
 		"author": "Alex Kirk",
 		"categories": [
@@ -9,20 +9,20 @@
 			"Travel"
 		]
 	},
-	"landingPage": "/traveler/",
+	"landingPage": "/travel-app/",
 	"login": true,
 	"steps": [
 		{
 			"step": "installPlugin",
 			"pluginData": {
 				"resource": "git:directory",
-				"url": "https://github.com/akirk/traveler",
+				"url": "https://github.com/akirk/travel-app",
 				"ref": "main",
 				"refType": "branch"
 			},
 			"options": {
 				"activate": false,
-				"targetFolderName": "traveler"
+				"targetFolderName": "travel-app"
 			}
 		},
 		{
@@ -36,25 +36,25 @@
 			},
 			"options": {
 				"activate": false,
-				"targetFolderName": "traveler/vendor/akirk/wp-app"
+				"targetFolderName": "travel-app/vendor/akirk/wp-app"
 			}
 		},
 		{
 			"step": "mkdir",
-			"path": "wordpress/wp-content/plugins/traveler/vendor"
+			"path": "wordpress/wp-content/plugins/travel-app/vendor"
 		},
 		{
 			"step": "writeFile",
-			"path": "/wordpress/wp-content/plugins/traveler/vendor/autoload.php",
+			"path": "/wordpress/wp-content/plugins/travel-app/vendor/autoload.php",
 			"data": "<?php\nrequire_once __DIR__ . '/akirk/wp-app/functions.php';\nspl_autoload_register( static function ( $class ) {\n\t$map = [\n\t\t'WpApp\\\\BaseApp' => 'abstract-baseapp.php',\n\t\t'WpApp\\\\BaseStorage' => 'BaseStorage.php',\n\t\t'WpApp\\\\Masterbar' => 'class-masterbar.php',\n\t\t'WpApp\\\\Openstation' => 'class-openstation.php',\n\t\t'WpApp\\\\Pwa' => 'class-pwa.php',\n\t\t'WpApp\\\\Registry' => 'class-registry.php',\n\t\t'WpApp\\\\Router' => 'class-router.php',\n\t\t'WpApp\\\\Settings' => 'class-settings.php',\n\t\t'WpApp\\\\WpApp' => 'class-wpapp.php',\n\t\t'WpApp\\\\Rest\\\\Access' => 'rest/class-access.php',\n\t\t'WpApp\\\\Rest\\\\Private_Posts_Controller' => 'rest/class-private-posts-controller.php',\n\t\t'WpApp\\\\Rest\\\\Private_Terms_Controller' => 'rest/class-private-terms-controller.php',\n\t];\n\tif ( isset( $map[ $class ] ) ) {\n\t\trequire_once __DIR__ . '/akirk/wp-app/' . $map[ $class ];\n\t}\n} );\n"
 		},
 		{
 			"step": "activatePlugin",
-			"pluginPath": "traveler/traveler.php"
+			"pluginPath": "travel-app/travel-app.php"
 		},
 		{
 			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require_once ABSPATH . 'wp-admin/includes/plugin.php'; $old = 'travel-app/travel-app.php'; if ( file_exists( WP_PLUGIN_DIR . '/' . $old ) ) { deactivate_plugins( $old ); $it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( WP_PLUGIN_DIR . '/travel-app', FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST ); foreach ( $it as $f ) { $f->isDir() ? rmdir( $f ) : unlink( $f ); } rmdir( WP_PLUGIN_DIR . '/travel-app' ); }"
+			"code": "<?php require '/wordpress/wp-load.php'; require_once ABSPATH . 'wp-admin/includes/plugin.php'; $old = 'traveler/traveler.php'; if ( file_exists( WP_PLUGIN_DIR . '/' . $old ) ) { deactivate_plugins( $old ); $it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( WP_PLUGIN_DIR . '/traveler', FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST ); foreach ( $it as $f ) { $f->isDir() ? rmdir( $f ) : unlink( $f ); } rmdir( WP_PLUGIN_DIR . '/traveler' ); }"
 		}
 	]
 }

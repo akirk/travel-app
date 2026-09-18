@@ -1,7 +1,7 @@
 (function() {
-    var config = window.travelerPwa || {};
+    var config = window.travelAppPwa || {};
     var messages = config.messages || {};
-    var dbName = 'traveler-offline';
+    var dbName = 'travel-app-offline';
     var storeName = 'mutations';
     var offlineState = {
         connection: navigator.onLine ? 'Online' : 'Offline',
@@ -35,7 +35,7 @@
     }
 
     function setWorkerVersion(value) {
-        workerVersion = value ? String(value).replace(/^traveler-/, '') : '';
+        workerVersion = value ? String(value).replace(/^travel-app-/, '') : '';
         offlineState.worker = workerVersion ? workerState + ', ' + workerVersion : workerState;
         updateOfflinePanel();
     }
@@ -289,11 +289,11 @@
 
         setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Registering');
 
-        window.addEventListener('traveler-sync', function() {
+        window.addEventListener('travel-app-sync', function() {
             flushQueue();
         });
 
-        window.addEventListener('traveler-cache-status', function(event) {
+        window.addEventListener('travel-app-cache-status', function(event) {
             var detail = event.detail || {};
             setOfflineState('cache', detail.ok ? 'Ready offline' : 'Not cached');
             if (typeof detail.cachedCount === 'number' && typeof detail.totalCount === 'number') {
@@ -302,7 +302,7 @@
             updateAttachmentAvailability(detail.cachedUrls || []);
         });
 
-        window.addEventListener('traveler-version', function(event) {
+        window.addEventListener('travel-app-version', function(event) {
             var detail = event.detail || {};
             setWorkerState(navigator.serviceWorker.controller ? 'Active' : 'Ready');
             setWorkerVersion(detail.version || '');
@@ -334,7 +334,7 @@
         }
 
         return navigator.serviceWorker.ready.then(function(registration) {
-            return registration.sync.register('traveler-sync');
+            return registration.sync.register('travel-app-sync');
         }).catch(function() {});
     }
 
@@ -404,7 +404,7 @@
     }
 
     function getTripData() {
-        var source = document.getElementById('traveler-trip-data');
+        var source = document.getElementById('travel-app-trip-data');
         if (!source || !source.textContent) {
             return null;
         }

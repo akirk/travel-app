@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use Traveler\ItineraryItem;
-use Traveler\Trip;
+use TravelApp\ItineraryItem;
+use TravelApp\Trip;
 
 final class DomainSchemaTest extends TestCase {
     public function test_trip_schema_matches_public_properties(): void {

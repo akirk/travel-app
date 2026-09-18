@@ -1,5 +1,5 @@
 <?php
-namespace Traveler;
+namespace TravelApp;
 
 /**
  * Pure helpers for the Web Share Target request, kept free of WordPress so
@@ -64,8 +64,12 @@ class ShareTarget {
      * are rejected.
      */
     public static function is_text_file( array $file ): bool {
-        $name = strtolower( (string) ( $file['name'] ?? '' ) );
-        $type = strtolower( trim( (string) strtok( (string) ( $file['type'] ?? '' ), ';' ) ) );
+        if ( ! isset( $file['name'], $file['type'] ) || ! is_string( $file['name'] ) || ! is_string( $file['type'] ) ) {
+            return false;
+        }
+
+        $name = strtolower( $file['name'] );
+        $type = strtolower( trim( (string) strtok( $file['type'], ';' ) ) );
         $extension = pathinfo( $name, PATHINFO_EXTENSION );
 
         return in_array( $extension, [ 'ics', 'txt', 'ical', 'ifb', 'icalendar' ], true )

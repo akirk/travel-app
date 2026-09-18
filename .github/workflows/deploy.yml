@@ -20,6 +20,8 @@ jobs:
     name: Deploy to WP.org
     environment: production
     runs-on: ubuntu-latest
+    env:
+      PLUGIN_SLUG: travel-app
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -35,12 +37,12 @@ jobs:
       # which is the same rule the deploy action applies on its own.
       - name: Build the release tree
         run: |
-          mkdir -p "build/${{ github.event.repository.name }}"
-          git archive HEAD | tar -x -C "build/${{ github.event.repository.name }}"
+          mkdir -p "build/${PLUGIN_SLUG}"
+          git archive HEAD | tar -x -C "build/${PLUGIN_SLUG}"
 
       - name: Install production dependencies
-        if: hashFiles(format('build/{0}/composer.json', github.event.repository.name)) != ''
-        working-directory: build/${{ github.event.repository.name }}
+        if: hashFiles('build/travel-app/composer.json') != ''
+        working-directory: build/travel-app
         run: composer install --no-dev --optimize-autoloader --no-interaction
 
       # Plugin files come from BUILD_DIR; the banner, icon and screenshots come
@@ -53,5 +55,5 @@ jobs:
         env:
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
-          SLUG: ${{ github.event.repository.name }}
-          BUILD_DIR: build/${{ github.event.repository.name }}
+          SLUG: travel-app
+          BUILD_DIR: build/travel-app

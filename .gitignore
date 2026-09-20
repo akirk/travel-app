@@ -3,3 +3,4 @@ node_modules/
 traveler.zip
 composer.lock
 .phpunit.result.cache
+.impeccable/

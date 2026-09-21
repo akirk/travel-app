@@ -110,7 +110,7 @@ $map_strings = [
 
 // Leaflet ships with the plugin: wordpress.org does not allow loading assets
 // from a CDN. Printed in the head so the route map script can use L.
-$leaflet_base_url = plugins_url( 'assets/vendor/leaflet/', dirname( __DIR__ ) . '/travel-app.php' );
+$leaflet_base_url = TRAVEL_APP_PLUGIN_URL . 'assets/vendor/leaflet/';
 wp_app_enqueue_style( 'travel-app-leaflet', $leaflet_base_url . 'leaflet.css', [], '1.9.4', 'travel-app' );
 wp_app_enqueue_script( 'travel-app-leaflet', $leaflet_base_url . 'leaflet.js', [], '1.9.4', false, 'travel-app' );
 $travel_app->enqueue_template_assets(

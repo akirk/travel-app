@@ -203,6 +203,16 @@ To create an installable `traveler.zip` artifact, run:
 npm run plugin-zip
 ```
 
+The packaging command generates a production autoloader with Composer, then
+creates the ZIP with `wp-scripts plugin-zip`. PHP and Composer must be available
+when packaging.
+
+After packaging, restore development autoloading before running PHP tests:
+
+```sh
+composer dump-autoload --dev
+```
+
 Run the PHP tests with:
 
 ```sh

@@ -21,7 +21,11 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-require_once __DIR__ . '/vendor/autoload.php';
+define( 'TRAVEL_APP_PLUGIN_FILE', __FILE__ );
+define( 'TRAVEL_APP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'TRAVEL_APP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+
+require_once TRAVEL_APP_PLUGIN_DIR . 'vendor/autoload.php';
 
 function is_playground(): bool {
     return defined( 'PLAYGROUND_AUTO_LOGIN_AS_USER' );
@@ -34,7 +38,7 @@ spl_autoload_register( function( $class ) {
     if ( strncmp( $prefix, $class, $len ) !== 0 ) {
         return;
     }
-    $file = __DIR__ . '/src/' . str_replace( '\\', '/', substr( $class, $len ) ) . '.php';
+    $file = TRAVEL_APP_PLUGIN_DIR . 'src/' . str_replace( '\\', '/', substr( $class, $len ) ) . '.php';
     if ( file_exists( $file ) ) {
         require $file;
     }

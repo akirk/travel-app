@@ -91,7 +91,7 @@ class App extends BaseApp {
     }
 
     protected function get_template_dir(): string {
-        return dirname( __DIR__ ) . '/templates';
+        return TRAVEL_APP_PLUGIN_DIR . 'templates';
     }
 
     public function get_route_param( string $key, string $default = '' ): string {
@@ -149,7 +149,7 @@ class App extends BaseApp {
     }
 
     private function get_pwa_config(): array {
-        $asset_base_url = plugins_url( 'assets/', dirname( __DIR__ ) . '/travel-app.php' );
+        $asset_base_url = TRAVEL_APP_PLUGIN_URL . 'assets/';
         $asset_path = (string) wp_parse_url( $asset_base_url, PHP_URL_PATH );
         $upload_dir = wp_upload_dir();
         $upload_path = ! empty( $upload_dir['baseurl'] ) ? (string) wp_parse_url( (string) $upload_dir['baseurl'], PHP_URL_PATH ) : '';
@@ -165,14 +165,14 @@ class App extends BaseApp {
             'theme_color'                      => '#0b6bcb',
             'icons'                            => [
                 [
-                    'src'   => plugins_url( 'assets/icon.svg', dirname( __DIR__ ) . '/travel-app.php' ),
+                    'src'   => TRAVEL_APP_PLUGIN_URL . 'assets/icon.svg',
                     'sizes' => 'any',
                     'type'  => 'image/svg+xml',
                 ],
             ],
             'precache'                         => [
-                plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/travel-app.php' ),
-                plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/travel-app.php' ),
+                TRAVEL_APP_PLUGIN_URL . 'assets/js/timeline-time.js',
+                TRAVEL_APP_PLUGIN_URL . 'assets/js/offline-sync.js',
             ],
             'cache_name'                       => 'travel-app-v8',
             'cache_prefix'                     => 'travel-app-',
@@ -199,15 +199,15 @@ class App extends BaseApp {
     }
 
     public function enqueue_assets(): void {
-        $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
-        $offline_script_path = dirname( __DIR__ ) . '/assets/js/offline-sync.js';
+        $script_path = TRAVEL_APP_PLUGIN_DIR . 'assets/js/timeline-time.js';
+        $offline_script_path = TRAVEL_APP_PLUGIN_DIR . 'assets/js/offline-sync.js';
 
         // Register only on Travel App's scoped hooks, outside the dashboard.
         $scope = $this->get_url_path();
 
         wp_app_enqueue_script(
             'travel-app-timeline-time',
-            plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/travel-app.php' ),
+            TRAVEL_APP_PLUGIN_URL . 'assets/js/timeline-time.js',
             [],
             file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
             true,
@@ -230,7 +230,7 @@ class App extends BaseApp {
 
         wp_app_enqueue_script(
             'travel-app-offline-sync',
-            plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/travel-app.php' ),
+            TRAVEL_APP_PLUGIN_URL . 'assets/js/offline-sync.js',
             [],
             file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
             true,
@@ -239,11 +239,11 @@ class App extends BaseApp {
     }
 
     public function get_asset_url( string $path ): string {
-        return plugins_url( 'assets/' . ltrim( $path, '/' ), dirname( __DIR__ ) . '/travel-app.php' );
+        return TRAVEL_APP_PLUGIN_URL . 'assets/' . ltrim( $path, '/' );
     }
 
     public function get_asset_version( string $path ): string {
-        $file = dirname( __DIR__ ) . '/assets/' . ltrim( $path, '/' );
+        $file = TRAVEL_APP_PLUGIN_DIR . 'assets/' . ltrim( $path, '/' );
 
         return file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
     }
@@ -260,7 +260,7 @@ class App extends BaseApp {
     }
 
     private function get_asset_contents( string $path ): string {
-        $file = dirname( __DIR__ ) . '/assets/' . ltrim( $path, '/' );
+        $file = TRAVEL_APP_PLUGIN_DIR . 'assets/' . ltrim( $path, '/' );
 
         return is_readable( $file ) ? (string) file_get_contents( $file ) : '';
     }
@@ -1703,7 +1703,6 @@ class App extends BaseApp {
             return new \WP_Error( 'share_forbidden', __( 'This travel plan cannot be shared.', 'travel-app' ) );
         }
 
-        $this->clear_trip_public_cache( $trip_id );
         $mode = $this->normalize_share_mode( $mode );
 
         return [
@@ -1723,7 +1722,6 @@ class App extends BaseApp {
         }
 
         $mode = $this->normalize_share_mode( $mode );
-        $this->clear_trip_public_cache( $trip_id );
         delete_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ) );
 
         return [
@@ -1987,10 +1985,7 @@ class App extends BaseApp {
             return;
         }
 
-        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WordPress core cache-control constant.
-            define( 'DONOTCACHEPAGE', true );
-        }
+        nocache_headers();
 
         $this->render_template(
             'trip.php',
@@ -2029,11 +2024,6 @@ class App extends BaseApp {
                 esc_html__( 'Travel plan not found', 'travel-app' ),
                 [ 'response' => 404 ]
             );
-        }
-
-        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WordPress core cache-control constant.
-            define( 'DONOTCACHEPAGE', true );
         }
 
         $ics = $this->render_trip_ics( $trip_id, $mode );
@@ -2154,11 +2144,6 @@ class App extends BaseApp {
                 esc_html__( 'Calendar not found', 'travel-app' ),
                 [ 'response' => 404 ]
             );
-        }
-
-        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WordPress core cache-control constant.
-            define( 'DONOTCACHEPAGE', true );
         }
 
         $user = get_user_by( 'id', $user_id );
@@ -2365,8 +2350,6 @@ class App extends BaseApp {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be shared.', 'travel-app' ) ], 404 );
         }
 
-        $this->clear_trip_public_cache( $trip_id );
-
         wp_send_json_success( [
             'mode'         => $this->normalize_share_mode( $mode ),
             'url'          => $this->get_trip_share_url( $trip_id, $mode ),
@@ -2388,7 +2371,6 @@ class App extends BaseApp {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be updated.', 'travel-app' ) ], 404 );
         }
 
-        $this->clear_trip_public_cache( $trip_id );
         delete_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ) );
 
         wp_send_json_success( [
@@ -2464,8 +2446,6 @@ class App extends BaseApp {
         if ( ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be refreshed.', 'travel-app' ) ], 404 );
         }
-
-        $this->clear_trip_public_cache( $trip_id );
 
         wp_send_json_success( [
             'urls'    => [
@@ -2603,8 +2583,6 @@ class App extends BaseApp {
             return new \WP_Error( 'delete_forbidden', __( 'This travel plan cannot be deleted.', 'travel-app' ) );
         }
 
-        $this->clear_trip_public_cache( $trip_id );
-
         foreach ( ItineraryItem::get_for_trip( $trip_id ) as $item ) {
             wp_trash_post( $item->id );
         }
@@ -2640,8 +2618,6 @@ class App extends BaseApp {
         }
 
         update_term_meta( $trip_id, '_travel_app_show_now_next', $show_now_next ? '1' : '0' );
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
     }
 
@@ -2651,8 +2627,6 @@ class App extends BaseApp {
         }
 
         update_term_meta( $trip_id, '_travel_app_journal_enabled', $journal_enabled ? '1' : '0' );
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
     }
 
@@ -2873,8 +2847,6 @@ class App extends BaseApp {
             return $updated;
         }
 
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
     }
 
@@ -2901,8 +2873,6 @@ class App extends BaseApp {
 
         $this->update_item_meta( $item->id, $segment );
         $this->update_trip_bounds_from_items( $trip_id );
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
     }
 
@@ -2917,8 +2887,6 @@ class App extends BaseApp {
         }
 
         $this->update_trip_bounds_from_items( $trip_id );
-        $this->clear_trip_public_cache( $trip_id );
-
         return $item_id;
     }
 
@@ -2938,8 +2906,6 @@ class App extends BaseApp {
         }
 
         $this->update_trip_bounds_from_items( $trip_id );
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
     }
 
@@ -3010,8 +2976,6 @@ class App extends BaseApp {
             return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'travel-app' ) );
         }
 
-        $this->clear_trip_public_cache( $trip_id );
-
         return $uploaded;
     }
 
@@ -3030,62 +2994,7 @@ class App extends BaseApp {
             return new \WP_Error( 'attachment_delete_failed', __( 'This attachment could not be deleted.', 'travel-app' ) );
         }
 
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
-    }
-
-    private function clear_trip_public_cache( int $trip_id ): void {
-        if ( $trip_id <= 0 ) {
-            return;
-        }
-
-        $has_share_token = '' !== (string) get_term_meta( $trip_id, '_travel_app_share_token', true )
-            || '' !== (string) get_term_meta( $trip_id, '_travel_app_public_share_token', true );
-        if ( ! $has_share_token ) {
-            return;
-        }
-
-        if ( ! $this->load_wp_super_cache_functions() ) {
-            return;
-        }
-
-        if ( function_exists( 'wp_cache_clear_cache' ) ) {
-            wp_cache_clear_cache( get_current_blog_id() );
-            return;
-        }
-
-        if ( function_exists( 'wp_cache_clean_cache' ) ) {
-            global $file_prefix;
-            wp_cache_clean_cache( isset( $file_prefix ) ? (string) $file_prefix : 'wp-cache-' );
-        }
-    }
-
-    private function load_wp_super_cache_functions(): bool {
-        if ( function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' ) ) {
-            return true;
-        }
-
-        $config_file = WP_CONTENT_DIR . '/wp-cache-config.php';
-        if ( is_readable( $config_file ) ) {
-            require_once $config_file;
-        }
-
-        $phase2_file = WP_PLUGIN_DIR . '/wp-super-cache/wp-cache-phase2.php';
-        if ( is_readable( $phase2_file ) ) {
-            require_once $phase2_file;
-        }
-
-        if ( function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' ) ) {
-            return true;
-        }
-
-        $plugin_file = WP_PLUGIN_DIR . '/wp-super-cache/wp-cache.php';
-        if ( ! function_exists( 'wp_cache_clean_cache' ) && is_readable( $plugin_file ) ) {
-            require_once $plugin_file;
-        }
-
-        return function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' );
     }
 
     private function normalize_uploaded_files( array $file ): array {
@@ -3598,13 +3507,6 @@ class App extends BaseApp {
         $format = (string) get_option( 'date_format' );
         if ( '' === $format ) {
             $format = 'F j, Y';
-        }
-
-        // Reuse the site's core translation for WordPress's default date format.
-        // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch -- The string belongs to core.
-        $localized_default_format = _x( 'F j, Y', 'date format', 'default' );
-        if ( 'F j, Y' === $format && 'F j, Y' !== $localized_default_format ) {
-            $format = $localized_default_format;
         }
 
         if ( ! $include_year ) {

@@ -50,6 +50,15 @@ add_action( 'plugins_loaded', function() {
 
 register_activation_hook( __FILE__, function() {
     App::get_instance()->activate();
+
+    $playground_demo = TRAVEL_APP_PLUGIN_DIR . 'playground/demo.php';
+    if ( is_playground() && file_exists( $playground_demo ) ) {
+        try {
+            require $playground_demo;
+        } finally {
+            wp_delete_file( $playground_demo );
+        }
+    }
 } );
 
 register_deactivation_hook( __FILE__, function() {

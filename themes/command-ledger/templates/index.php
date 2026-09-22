@@ -147,7 +147,7 @@ $get_timeline_preview = static function( array $trip_data ) use ( $today ): arra
     ];
 };
 
-$travel_app->enqueue_template_assets(
+$travel_app->enqueue_command_ledger_template_assets(
     'index',
     true,
     'travelAppIndexData',
@@ -287,14 +287,16 @@ $travel_app->enqueue_template_assets(
                         </div>
                         <div class="trip-list">
                             <?php foreach ( $upcoming_trips as $trip_data ) : ?>
-                                <a class="trip-card <?php echo (int) $trip_data['id'] === $imported ? 'highlight' : ''; ?>" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
+                                <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
+                                <?php $trip_summary_parts = $travel_app->get_trip_summary_parts( $trip_data, $today ); ?>
+                                <?php $trip_card_is_empty = '' === $trip_owner_label && empty( $trip_summary_parts ); ?>
+                                <a class="trip-card<?php echo $trip_card_is_empty ? ' trip-card-empty' : ''; ?><?php echo (int) $trip_data['id'] === $imported ? ' highlight' : ''; ?>" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
                                     <div class="trip-meta">
-                                        <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
                                             <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
-                                        <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
+                                        <?php foreach ( $trip_summary_parts as $summary_part ) : ?>
                                             <span><?php echo esc_html( $summary_part ); ?></span>
                                         <?php endforeach; ?>
                                     </div>
@@ -311,14 +313,16 @@ $travel_app->enqueue_template_assets(
                         </div>
                         <div class="trip-list">
                             <?php foreach ( $year_trips as $trip_data ) : ?>
-                                <a class="trip-card" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
+                                <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
+                                <?php $trip_summary_parts = $travel_app->get_trip_summary_parts( $trip_data, $today ); ?>
+                                <?php $trip_card_is_empty = '' === $trip_owner_label && empty( $trip_summary_parts ); ?>
+                                <a class="trip-card<?php echo $trip_card_is_empty ? ' trip-card-empty' : ''; ?>" href="<?php echo esc_url( $get_trip_url( $trip_data ) ); ?>">
                                     <h3><span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $trip_data['id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h3>
                                     <div class="trip-meta">
-                                        <?php $trip_owner_label = $travel_app->get_trip_traveller_label( $trip_data ); ?>
                                         <?php if ( '' !== $trip_owner_label ) : ?>
                                             <span<?php echo esc_attr( App::mask_attr( 'person', (string) ( $trip_data['owner_id'] ?? '' ) ) ); ?>><?php echo esc_html( $trip_owner_label ); ?></span>
                                         <?php endif; ?>
-                                        <?php foreach ( $travel_app->get_trip_summary_parts( $trip_data, $today ) as $summary_part ) : ?>
+                                        <?php foreach ( $trip_summary_parts as $summary_part ) : ?>
                                             <span><?php echo esc_html( $summary_part ); ?></span>
                                         <?php endforeach; ?>
                                     </div>

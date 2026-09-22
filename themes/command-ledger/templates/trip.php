@@ -78,6 +78,29 @@ $segment_type_labels = [
     'activity' => __( 'Activity', 'travel-app' ),
     'other'    => __( 'Other', 'travel-app' ),
 ];
+// Decorative icons share one stroke system; the adjacent text supplies their meaning.
+$render_timeline_icon = static function( string $name ): void {
+    $paths = [
+        'flight'   => 'M22 2 9 15M22 2l-8 20-5-7-7-5 20-8Z',
+        'lodging'  => 'M3 18V7m18 11V7M3 14h18M5 14V9h14v5M7 9V6h10v3M3 18v3m18-3v3',
+        'train'    => 'M7 3h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM5 11h14M9 3v8m6-8v8M8 15h1m6 0h1M8 18l-3 4m11-4 3 4M7 21h10',
+        'car'      => 'm5 9 2-5h10l2 5M4 9h16l1 3v6H3v-6l1-3ZM6 13h2m8 0h2M5 18v3m14-3v3',
+        'activity' => 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm4 5-2 6-6 2 2-6 6-2Z',
+        'other'    => 'M6 3h9l4 4v14H5V3h1Zm9 0v5h4M8 12h8m-8 4h5',
+        'checkout'=> 'M10 3H4v18h6m4-14 5 5-5 5m-6-5h11',
+        'return'  => 'M8 4 3 9l5 5M3 9h11a6 6 0 0 1 0 12h-3',
+        'pin'     => 'M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0ZM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',
+        'arrow'   => 'M4 12h16m-6-6 6 6-6 6',
+        'external'=> 'M14 3h7v7m0-7L10 14M10 3H3v18h18v-7',
+        'chevron' => 'm6 9 6 6 6-6',
+        'clock'   => 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4v5l3 2',
+        'edit'    => 'm14 5 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15v6Z',
+        'map'     => 'm3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Zm6-2v16m6-14v16',
+    ];
+    ?>
+    <svg class="timeline-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="<?php echo esc_attr( $paths[ $name ] ?? $paths['other'] ); ?>" /></svg>
+    <?php
+};
 $lodging_coverage = LodgingCoverage::analyze( $trip_data, $segments );
 $timeline_segments = LodgingCoverage::timeline_segments( $segments );
 if ( $is_readonly_timeline ) {
@@ -182,7 +205,7 @@ if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
 }
 
 if ( ! $is_static_download ) {
-    $travel_app->enqueue_template_assets(
+    $travel_app->enqueue_command_ledger_template_assets(
         'trip',
         ! $is_readonly_timeline,
         ! $is_readonly_timeline ? 'travelAppTripData' : '',
@@ -349,12 +372,14 @@ if ( ! $is_static_download ) {
                         <?php endforeach; ?>
                         <?php foreach ( [ 'current' => __( 'Now', 'travel-app' ), 'next' => __( 'Next', 'travel-app' ) ] as $key => $label ) : ?>
                             <a class="mini-step <?php echo esc_attr( $key ); ?>" href="#" data-preview-slot="<?php echo esc_attr( $key ); ?>" data-slot-label="<?php echo esc_attr( $label ); ?>" data-ended-label="<?php esc_attr_e( 'Last', 'travel-app' ); ?>" data-empty-title="<?php esc_attr_e( 'No item', 'travel-app' ); ?>">
-                                <div class="mini-label" data-preview-label><?php echo esc_html( $label ); ?></div>
+                                <div class="mini-label"><?php $render_timeline_icon( 'current' === $key ? 'clock' : 'arrow' ); ?><span data-preview-label><?php echo esc_html( $label ); ?></span></div>
                                 <div class="mini-title" data-preview-title<?php echo esc_attr( App::mask_attr( 'title' ) ); ?>><?php esc_html_e( 'No item', 'travel-app' ); ?></div>
                                 <div class="mini-countdown" data-preview-countdown></div>
+                                <div class="mini-details">
                                 <div class="mini-location" data-preview-meta<?php echo esc_attr( App::mask_attr( 'text' ) ); ?>></div>
                                 <div class="mini-location" data-preview-location<?php echo esc_attr( App::mask_attr( 'place' ) ); ?>></div>
                                 <div class="mini-location" data-preview-end<?php echo esc_attr( App::mask_attr( 'text' ) ); ?>></div>
+                                </div>
                             </a>
                         <?php endforeach; ?>
                     </div>
@@ -362,18 +387,63 @@ if ( ! $is_static_download ) {
             <?php endif; ?>
 
             <section class="panel timeline-panel" aria-labelledby="timeline-heading" data-ai-assistant-important>
+                <aside class="timeline-day-rail" aria-label="<?php esc_attr_e( 'Timeline days', 'travel-app' ); ?>">
+                    <strong class="timeline-day-rail-title"><?php esc_html_e( 'Trip timeline', 'travel-app' ); ?></strong>
+                    <p class="timeline-day-rail-summary">
+                        <?php
+                        $timeline_day_count_label = sprintf(
+                            /* translators: %d: number of itinerary days. */
+                            _n( '%d day', '%d days', count( $segments_by_day ), 'travel-app' ),
+                            count( $segments_by_day )
+                        );
+                        $timeline_item_count_label = sprintf(
+                            /* translators: %d: number of itinerary items. */
+                            _n( '%d item', '%d items', count( $segments ), 'travel-app' ),
+                            count( $segments )
+                        );
+                        printf(
+                            /* translators: 1: formatted itinerary day count, 2: formatted trip item count. */
+                            esc_html__( '%1$s · %2$s', 'travel-app' ),
+                            esc_html( $timeline_day_count_label ),
+                            esc_html( $timeline_item_count_label )
+                        );
+                        ?>
+                    </p>
+                    <?php if ( ! empty( $segments_by_day ) ) : ?>
+                        <nav class="timeline-day-links" aria-label="<?php esc_attr_e( 'Jump to day', 'travel-app' ); ?>">
+                            <?php foreach ( array_keys( $segments_by_day ) as $day_index => $day_link_date ) : ?>
+                                <?php $day_link_timestamp = strtotime( $day_link_date . ' 12:00:00' ); ?>
+                                <a
+                                    class="timeline-day-link<?php echo 0 === $day_index ? ' is-active' : ''; ?><?php echo $day_link_date === $today ? ' is-current' : ''; ?>"
+                                    href="#timeline-day-<?php echo esc_attr( $day_link_date ); ?>"
+                                    data-timeline-day-link="<?php echo esc_attr( $day_link_date ); ?>"
+                                    <?php echo $day_link_date === $today ? 'aria-current="date"' : ''; ?>
+                                >
+                                    <strong><?php echo esc_html( $day_link_timestamp ? date_i18n( 'd', $day_link_timestamp ) : $day_link_date ); ?></strong>
+                                    <span><?php echo esc_html( $day_link_timestamp ? date_i18n( 'D', $day_link_timestamp ) : '' ); ?></span>
+                                    <small><?php echo esc_html( $day_link_timestamp ? date_i18n( 'M', $day_link_timestamp ) : '' ); ?></small>
+                                </a>
+                            <?php endforeach; ?>
+                        </nav>
+                    <?php endif; ?>
+                </aside>
+                <div class="timeline-ledger-content">
                 <div class="timeline-header">
-                    <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
+                    <div class="timeline-header-copy">
+                        <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
+                    </div>
                     <div class="timeline-header-actions">
                         <?php if ( '' !== $trip_direct_map_url ) : ?>
                             <a class="timeline-map-link" href="<?php echo esc_url( $trip_direct_map_url ); ?>" title="<?php esc_attr_e( 'Route map on OpenStreetMap', 'travel-app' ); ?>">
-                                <span aria-hidden="true">&#x1F5FA;</span>
+                                <?php $render_timeline_icon( 'map' ); ?>
                                 <?php esc_html_e( 'Map', 'travel-app' ); ?>
                             </a>
                         <?php endif; ?>
                         <?php if ( $is_trip_active ) : ?>
                             <button class="ghost-button timeline-now-button" type="button" data-timeline-now aria-controls="timeline" aria-label="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" title="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" disabled>
+                                <?php $render_timeline_icon( 'clock' ); ?>
                                 <?php esc_html_e( 'Now', 'travel-app' ); ?>
+                                <span class="timeline-now-time" data-timeline-clock aria-hidden="true"></span>
                             </button>
                         <?php endif; ?>
                         <?php if ( ! $is_readonly_timeline ) : ?>
@@ -639,20 +709,40 @@ if ( ! $is_static_download ) {
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'travel-app' ); ?></p>
                 <?php else : ?>
-                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_readonly_timeline ? ' data-readonly-timeline="1"' : ''; ?><?php echo $is_trip_active ? ' data-current-time="1" data-current-time-value="' . esc_attr( $timeline_current_time_value ) . '" data-current-time-captured="' . esc_attr( $timeline_current_time_captured ) . '"' : ''; ?>>
+                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>" data-state-current="<?php esc_attr_e( 'Current', 'travel-app' ); ?>" data-state-past="<?php esc_attr_e( 'Passed', 'travel-app' ); ?>" data-state-planned="<?php esc_attr_e( 'Planned', 'travel-app' ); ?>" data-state-generated="<?php esc_attr_e( 'Generated', 'travel-app' ); ?>"<?php echo $is_readonly_timeline ? ' data-readonly-timeline="1"' : ''; ?><?php echo $is_trip_active ? ' data-current-time="1" data-current-time-value="' . esc_attr( $timeline_current_time_value ) . '" data-current-time-captured="' . esc_attr( $timeline_current_time_captured ) . '"' : ''; ?>>
                         <?php if ( $show_timeline_time_marker ) : ?>
-                            <div class="time-marker"><span class="time-marker-label"></span></div>
+                            <div class="time-marker" aria-hidden="true"><span class="time-marker-label" hidden></span></div>
                         <?php endif; ?>
                         <?php foreach ( $segments_by_day as $day => $day_segments ) : ?>
                             <?php
                             $journal_entry = $journal_entries_by_day[ $day ] ?? [];
                             $journal_exists = ! empty( $journal_entry );
+                            $day_timestamp = strtotime( $day . ' 12:00:00' );
+                            $day_heading_id = 'timeline-day-heading-' . $day;
+                            $day_content_id = 'timeline-day-content-' . $day;
                             ?>
-                            <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" data-date="<?php echo esc_attr( $day ); ?>">
+                            <section class="timeline-day<?php echo empty( $day_segments ) ? ' empty' : ''; ?>" id="timeline-day-<?php echo esc_attr( $day ); ?>" data-date="<?php echo esc_attr( $day ); ?>" aria-labelledby="<?php echo esc_attr( $day_heading_id ); ?>">
                                 <div class="day-heading-row">
-                                    <h3 class="day-heading"><?php echo esc_html( $travel_app->format_date_label( $day ) ); ?></h3>
-                                    <?php if ( ! $is_readonly_timeline && $journal_enabled ) : ?>
-                                        <div class="day-journal-actions">
+                                    <div class="day-heading-copy">
+                                        <span class="day-number" aria-hidden="true"><?php echo esc_html( $day_timestamp ? date_i18n( 'd', $day_timestamp ) : $day ); ?></span>
+                                        <div class="day-heading-meta">
+                                            <h3 class="day-heading" id="<?php echo esc_attr( $day_heading_id ); ?>"><?php echo esc_html( $travel_app->format_date_label( $day ) ); ?></h3>
+                                            <span class="day-item-count">
+                                                <?php
+                                                echo esc_html(
+                                                    sprintf(
+                                                        /* translators: %d: number of items scheduled for the day. */
+                                                        _n( '%d timeline item', '%d timeline items', count( $day_segments ), 'travel-app' ),
+                                                        count( $day_segments )
+                                                    )
+                                                );
+                                                ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="day-heading-controls">
+                                        <?php if ( ! $is_readonly_timeline && $journal_enabled ) : ?>
+                                            <div class="day-journal-actions">
                                             <form class="day-journal-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                                                 <input type="hidden" name="action" value="travel_app_open_journal_entry">
                                                 <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
@@ -673,9 +763,18 @@ if ( ! $is_static_download ) {
                                                     </button>
                                                 </form>
                                             <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <button class="day-collapse-button" type="button" data-timeline-day-toggle aria-controls="<?php echo esc_attr( $day_content_id ); ?>" aria-expanded="true" data-expand-label="<?php esc_attr_e( 'Expand', 'travel-app' ); ?>" data-collapse-label="<?php esc_attr_e( 'Collapse', 'travel-app' ); ?>">
+                                            <span data-timeline-day-toggle-label><?php esc_html_e( 'Collapse', 'travel-app' ); ?></span>
+                                            <?php $render_timeline_icon( 'chevron' ); ?>
+                                        </button>
+                                    </div>
                                 </div>
+                                <div class="timeline-day-content" id="<?php echo esc_attr( $day_content_id ); ?>">
+                                <?php if ( empty( $day_segments ) ) : ?>
+                                    <p class="timeline-day-empty"><?php esc_html_e( 'Nothing scheduled. Add an item when the plan takes shape.', 'travel-app' ); ?></p>
+                                <?php endif; ?>
                                 <?php foreach ( $day_segments as $segment ) : ?>
                                     <?php $index = (int) $segment['_index']; ?>
                                     <?php $timeline_kind = (string) ( $segment['_timeline_kind'] ?? 'start' ); ?>
@@ -691,62 +790,73 @@ if ( ! $is_static_download ) {
                                     <?php
                                     if ( 'checkout' === $timeline_kind ) {
                                         $type_label = __( 'Check out', 'travel-app' );
+                                        $timeline_icon = 'checkout';
                                     } elseif ( 'return' === $timeline_kind ) {
                                         $type_label = __( 'Return car', 'travel-app' );
+                                        $timeline_icon = 'return';
                                     } elseif ( 'car' === ( $segment['type'] ?? '' ) ) {
                                         $type_label = __( 'Rental car', 'travel-app' );
+                                        $timeline_icon = 'car';
                                     } else {
                                         $type_label = $segment_type_labels[ $segment['type'] ?? 'other' ] ?? ucfirst( $segment['type'] ?: __( 'other', 'travel-app' ) );
+                                        $timeline_icon = $segment['type'] ?? 'other';
                                     }
+                                    $initial_state = $day < $today ? __( 'Passed', 'travel-app' ) : ( $is_end_timeline_entry ? __( 'Generated', 'travel-app' ) : __( 'Planned', 'travel-app' ) );
                                     ?>
                                     <?php $url_preview = isset( $segment['url_preview'] ) && is_array( $segment['url_preview'] ) ? $segment['url_preview'] : []; ?>
                                     <?php $attachments = $show_attachments && isset( $segment['attachments'] ) && is_array( $segment['attachments'] ) ? $segment['attachments'] : []; ?>
                                     <?php $has_url_preview = $show_url_preview && ! empty( $url_preview ) && ( ! empty( $url_preview['title'] ) || ! empty( $url_preview['description'] ) || ! empty( $url_preview['image'] ) ); ?>
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
-                                        <div class="timeline-item" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-end-date="<?php echo esc_attr( (string) ( $segment['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $segment['end_time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
+                                        <div class="timeline-item<?php echo $day < $today ? ' past' : ''; ?>" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-end-date="<?php echo esc_attr( (string) ( $segment['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $segment['end_time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>" data-generated="<?php echo $is_end_timeline_entry ? '1' : '0'; ?>">
                                             <div class="timeline-meta">
-                                                <div class="time"><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
-                                                <div class="type"><?php echo esc_html( $type_label ); ?></div>
+                                                <time class="time" datetime="<?php echo esc_attr( $segment_datetime ); ?>"><?php echo esc_html( $segment['time'] ?: '—' ); ?></time>
+                                                <?php if ( ! $is_end_timeline_entry && ! empty( $segment['end_time'] ) && ( '' === $segment_end_date || $segment_end_date === $segment_start_date ) ) : ?>
+                                                    <span class="time timeline-end-time"><span class="screen-reader-text"><?php esc_html_e( 'Ends at', 'travel-app' ); ?> </span>– <?php echo esc_html( $segment['end_time'] ); ?></span>
+                                                <?php endif; ?>
                                             </div>
-                                            <div>
+                                            <span class="timeline-symbol"><?php $render_timeline_icon( $timeline_icon ); ?></span>
+                                            <div class="timeline-event">
                                                 <div class="timeline-title-row title">
                                                     <?php if ( $is_readonly_timeline ) : ?>
                                                         <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
                                                     <?php elseif ( ! $is_end_timeline_entry ) : ?>
                                                         <button class="timeline-title-button" type="button" data-inline-edit-toggle aria-controls="<?php echo esc_attr( 'edit-segment-' . $index ); ?>">
                                                             <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
+                                                            <?php $render_timeline_icon( 'edit' ); ?>
+                                                            <span class="screen-reader-text"> — <?php esc_html_e( 'Edit item', 'travel-app' ); ?></span>
                                                         </button>
                                                     <?php else : ?>
                                                         <span<?php echo esc_attr( App::mask_attr( 'title', (string) ( $segment['id'] ?? $index ) . '-item' ) ); ?>><?php echo esc_html( $segment['title'] ?: __( 'Untitled item', 'travel-app' ) ); ?></span>
                                                     <?php endif; ?>
                                                     <?php if ( $show_url_preview && ! $has_url_preview && ! empty( $segment['url'] ) ) : ?>
                                                         <a class="timeline-url-link" href="<?php echo esc_url( (string) $segment['url'] ); ?>" target="_blank" rel="noopener noreferrer" title="<?php esc_attr_e( 'Open item URL', 'travel-app' ); ?>">
-                                                            <span aria-hidden="true">↗</span>
+                                                            <?php $render_timeline_icon( 'external' ); ?>
                                                             <span class="screen-reader-text"><?php esc_html_e( 'Open item URL', 'travel-app' ); ?></span>
                                                         </a>
                                                     <?php endif; ?>
                                                 </div>
+                                                <span class="timeline-event-type"><?php echo esc_html( $type_label ); ?></span>
                                                 <?php if ( '' !== $segment_end_date && $segment_end_date !== $segment_start_date ) : ?>
                                                     <div class="detail"><?php echo esc_html( $travel_app->get_segment_date_range_label( $segment ) ); ?></div>
                                                 <?php endif; ?>
-                                                <?php if ( $show_location && ! empty( $segment['location'] ) ) : ?>
+                                                <?php if ( $show_location && ( ! empty( $segment['location'] ) || ! empty( $segment['end_location'] ) ) ) : ?>
+                                                <div class="detail timeline-route">
+                                                <?php if ( ! empty( $segment['location'] ) ) : ?>
                                                     <?php $location = (string) $segment['location']; ?>
-                                                    <div class="detail">
                                                         <a href="<?php echo esc_url( $get_google_maps_url( $location ) ); ?>" target="_blank" rel="noopener noreferrer">
-                                                            <span aria-hidden="true">&#x1F4CD;</span>
+                                                            <?php $render_timeline_icon( 'pin' ); ?>
                                                             <span<?php echo esc_attr( App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-location' ) ); ?>><?php echo esc_html( $location ); ?></span>
                                                         </a>
-                                                    </div>
                                                 <?php endif; ?>
-                                                <?php if ( $show_location && ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
+                                                <?php if ( ! empty( $segment['end_location'] ) && $segment['end_location'] !== ( $segment['location'] ?? '' ) ) : ?>
                                                     <?php $end_location = (string) $segment['end_location']; ?>
-                                                    <div class="detail">
-                                                        <?php esc_html_e( 'To:', 'travel-app' ); ?>
+                                                        <?php $render_timeline_icon( 'arrow' ); ?>
+                                                        <span class="screen-reader-text"><?php esc_html_e( 'To:', 'travel-app' ); ?></span>
                                                         <a href="<?php echo esc_url( $get_google_maps_url( $end_location ) ); ?>" target="_blank" rel="noopener noreferrer">
-                                                            <span aria-hidden="true">&#x1F4CD;</span>
                                                             <span<?php echo esc_attr( App::mask_attr( 'place', (string) ( $segment['id'] ?? $index ) . '-end-location' ) ); ?>><?php echo esc_html( $end_location ); ?></span>
                                                         </a>
-                                                    </div>
+                                                <?php endif; ?>
+                                                </div>
                                                 <?php endif; ?>
                                                 <?php if ( $show_private_share_details && ! empty( $segment['details'] ) ) : ?>
                                                     <div class="detail timeline-note"<?php echo esc_attr( App::mask_attr( 'text', (string) ( $segment['id'] ?? $index ) . '-details' ) ); ?>><?php echo esc_html( $segment['details'] ); ?></div>
@@ -795,6 +905,7 @@ if ( ! $is_static_download ) {
                                                     </a>
                                                 <?php endif; ?>
                                             </div>
+                                            <span class="timeline-state<?php echo $is_end_timeline_entry && $day >= $today ? ' generated' : ''; ?>" data-timeline-state><?php echo esc_html( $initial_state ); ?></span>
                                         </div>
                                         <?php if ( ! $is_readonly_timeline && ! $is_end_timeline_entry ) : ?>
                                             <div class="timeline-edit-panel" id="<?php echo esc_attr( 'edit-segment-' . $index ); ?>" data-inline-edit-panel hidden>
@@ -802,10 +913,12 @@ if ( ! $is_static_download ) {
                                         <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
+                                </div>
                             </section>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
+                </div>
             </section>
 
             <?php if ( ! empty( $unscheduled_segments ) ) : ?>

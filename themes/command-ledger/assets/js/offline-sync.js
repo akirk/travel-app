@@ -405,12 +405,13 @@
 
     function getTripData() {
         var source = document.getElementById('travel-app-trip-data');
-        if (!source || !source.textContent) {
+        var data = source && (source.content || source).textContent;
+        if (!data) {
             return null;
         }
 
         try {
-            return JSON.parse(source.textContent);
+            return JSON.parse(data);
         } catch (error) {
             return null;
         }
@@ -504,6 +505,10 @@
     }
 
     function bindInlineEditors() {
+        function scrollBehavior() {
+            return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+        }
+
         document.querySelectorAll('[data-inline-edit-toggle]').forEach(function(button) {
             button.addEventListener('click', function() {
                 var id = button.getAttribute('aria-controls');
@@ -524,10 +529,10 @@
                     view.hidden = true;
                 }
                 panel.hidden = false;
-                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                panel.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
                 var titleInput = form.elements.segment_title;
                 if (titleInput) {
-                    titleInput.focus();
+                    titleInput.focus({ preventScroll: true });
                     titleInput.select();
                 }
             });
@@ -549,8 +554,12 @@
             replaceContent(panel);
             panel.hidden = true;
             if (view) {
+                var editToggle = view.querySelector('[data-inline-edit-toggle]');
                 view.hidden = false;
-                view.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                view.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest' });
+                if (editToggle) {
+                    editToggle.focus({ preventScroll: true });
+                }
             }
         });
     }

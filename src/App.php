@@ -53,7 +53,9 @@ class App extends BaseApp {
             'pwa'        => $this->get_pwa_config(),
         ] );
 
-        add_action( 'init', [ $this, 'enqueue_assets' ] );
+        add_filter( 'wp_app_init_travel-app', [ $this, 'register_themes' ] );
+        add_action( 'wp_app_load_theme_travel-app_default', [ $this, 'enqueue_assets' ] );
+        add_action( 'wp_app_load_theme_travel-app_command-ledger', [ $this, 'enqueue_command_ledger_assets' ] );
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_travel_app_import', [ $this, 'handle_import' ] );
@@ -92,6 +94,16 @@ class App extends BaseApp {
 
     protected function get_template_dir(): string {
         return TRAVEL_APP_PLUGIN_DIR . 'templates';
+    }
+
+    public function register_themes( WpApp $app ): WpApp {
+        $app->register_theme(
+            'command-ledger',
+            __( 'Command Ledger', 'travel-app' ),
+            TRAVEL_APP_PLUGIN_DIR . 'themes/command-ledger/templates'
+        );
+
+        return $app;
     }
 
     public function get_route_param( string $key, string $default = '' ): string {
@@ -135,7 +147,7 @@ class App extends BaseApp {
             );
         }
 
-        $template_file = $this->get_template_dir() . '/' . $template;
+        $template_file = $this->app->router()->locate_template( $template );
         if ( ! is_readable( $template_file ) ) {
             wp_die(
                 esc_html__( 'Template not found.', 'travel-app' ),
@@ -199,15 +211,24 @@ class App extends BaseApp {
     }
 
     public function enqueue_assets(): void {
-        $script_path = TRAVEL_APP_PLUGIN_DIR . 'assets/js/timeline-time.js';
-        $offline_script_path = TRAVEL_APP_PLUGIN_DIR . 'assets/js/offline-sync.js';
+        $this->enqueue_shared_assets( 'assets', 'travel-app' );
+    }
+
+    public function enqueue_command_ledger_assets(): void {
+        $this->enqueue_shared_assets( 'themes/command-ledger/assets', 'travel-app-command-ledger' );
+    }
+
+    private function enqueue_shared_assets( string $asset_root, string $handle_prefix ): void {
+        $asset_root = trim( $asset_root, '/' );
+        $script_path = TRAVEL_APP_PLUGIN_DIR . $asset_root . '/js/timeline-time.js';
+        $offline_script_path = TRAVEL_APP_PLUGIN_DIR . $asset_root . '/js/offline-sync.js';
 
         // Register only on Travel App's scoped hooks, outside the dashboard.
         $scope = $this->get_url_path();
 
         wp_app_enqueue_script(
-            'travel-app-timeline-time',
-            TRAVEL_APP_PLUGIN_URL . 'assets/js/timeline-time.js',
+            $handle_prefix . '-timeline-time',
+            TRAVEL_APP_PLUGIN_URL . $asset_root . '/js/timeline-time.js',
             [],
             file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
             true,
@@ -215,7 +236,7 @@ class App extends BaseApp {
         );
 
         wp_app_add_inline_script(
-            'travel-app-offline-sync-data',
+            $handle_prefix . '-offline-sync-data',
             'window.travelAppPwa=' . wp_json_encode( [
                 'messages' => [
                     'offlineQueued' => __( 'Saved offline. Changes will sync when you are back online.', 'travel-app' ),
@@ -229,8 +250,8 @@ class App extends BaseApp {
         );
 
         wp_app_enqueue_script(
-            'travel-app-offline-sync',
-            TRAVEL_APP_PLUGIN_URL . 'assets/js/offline-sync.js',
+            $handle_prefix . '-offline-sync',
+            TRAVEL_APP_PLUGIN_URL . $asset_root . '/js/offline-sync.js',
             [],
             file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
             true,
@@ -249,24 +270,34 @@ class App extends BaseApp {
     }
 
     public function print_static_trip_styles(): void {
-        $css = $this->get_asset_contents( 'css/trip.css' );
+        $asset_root = 'command-ledger' === $this->app->get_selected_theme() ? 'themes/command-ledger/assets' : 'assets';
+        $css = $this->get_asset_contents( 'css/trip.css', $asset_root );
         if ( '' === $css ) {
             return;
         }
 
-        wp_register_style( 'travel-app-static-trip', false, [], $this->get_asset_version( 'css/trip.css' ) );
+        wp_register_style( 'travel-app-static-trip', false, [], $this->get_asset_version_from( 'css/trip.css', $asset_root ) );
         wp_add_inline_style( 'travel-app-static-trip', $css );
         wp_print_styles( 'travel-app-static-trip' );
     }
 
-    private function get_asset_contents( string $path ): string {
-        $file = TRAVEL_APP_PLUGIN_DIR . 'assets/' . ltrim( $path, '/' );
+    private function get_asset_contents( string $path, string $asset_root = 'assets' ): string {
+        $file = TRAVEL_APP_PLUGIN_DIR . trim( $asset_root, '/' ) . '/' . ltrim( $path, '/' );
 
         return is_readable( $file ) ? (string) file_get_contents( $file ) : '';
     }
 
     public function enqueue_template_assets( string $template, bool $script = false, string $data_object = '', array $data = [] ): void {
+        $this->enqueue_template_assets_from( $template, 'assets', 'travel-app', $script, $data_object, $data );
+    }
+
+    public function enqueue_command_ledger_template_assets( string $template, bool $script = false, string $data_object = '', array $data = [] ): void {
+        $this->enqueue_template_assets_from( $template, 'themes/command-ledger/assets', 'travel-app-command-ledger', $script, $data_object, $data );
+    }
+
+    private function enqueue_template_assets_from( string $template, string $asset_root, string $handle_prefix, bool $script, string $data_object, array $data ): void {
         $template = sanitize_key( $template );
+        $asset_root = trim( $asset_root, '/' );
         if ( '' !== $data_object && 1 !== preg_match( '/\A[A-Za-z_$][A-Za-z0-9_$]*\z/', $data_object ) ) {
             $data_object = '';
         }
@@ -275,16 +306,16 @@ class App extends BaseApp {
         $style_path = 'css/' . $template . '.css';
 
         wp_app_enqueue_style(
-            'travel-app-' . $template,
-            $this->get_asset_url( $style_path ),
+            $handle_prefix . '-' . $template,
+            TRAVEL_APP_PLUGIN_URL . $asset_root . '/' . $style_path,
             [],
-            $this->get_asset_version( $style_path ),
+            $this->get_asset_version_from( $style_path, $asset_root ),
             $scope
         );
 
         if ( '' !== $data_object ) {
             wp_app_add_inline_script(
-                'travel-app-' . $template . '-data',
+                $handle_prefix . '-' . $template . '-data',
                 'window.' . $data_object . '=' . wp_json_encode( $data ) . ';',
                 true,
                 $scope
@@ -294,14 +325,20 @@ class App extends BaseApp {
         if ( $script ) {
             $script_path = 'js/' . $template . '.js';
             wp_app_enqueue_script(
-                'travel-app-' . $template,
-                $this->get_asset_url( $script_path ),
+                $handle_prefix . '-' . $template,
+                TRAVEL_APP_PLUGIN_URL . $asset_root . '/' . $script_path,
                 [],
-                $this->get_asset_version( $script_path ),
+                $this->get_asset_version_from( $script_path, $asset_root ),
                 true,
                 $scope
             );
         }
+    }
+
+    private function get_asset_version_from( string $path, string $asset_root ): string {
+        $file = TRAVEL_APP_PLUGIN_DIR . trim( $asset_root, '/' ) . '/' . ltrim( $path, '/' );
+
+        return file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
     }
 
     public function get_manifest_url( int $trip_id = 0, string $share_token = '' ): string {

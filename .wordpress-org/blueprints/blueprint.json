@@ -1,3 +1,13 @@
 {
-	"landingPage": "/travel-app/"
+	"landingPage": "/travel-app/",
+	"steps": [
+		{
+			"step": "writeFile",
+			"path": "/wordpress/wp-content/plugins/travel-app/playground/demo.php",
+			"data": {
+				"resource": "url",
+				"url": "https://raw.githubusercontent.com/akirk/travel-app/main/.playground/demo.php"
+			}
+		}
+	]
 }

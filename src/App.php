@@ -10,6 +10,8 @@ use TravelApp\Parser\IcsParser;
 use TravelApp\Parser\QuickPlanParser;
 
 class App extends BaseApp {
+    private const SHARE_PAGE_VERSION = '3';
+
     private static $instance = null;
     private $url_preview_service = null;
 
@@ -180,9 +182,6 @@ class App extends BaseApp {
                 $asset_path,
                 $upload_path,
             ] ) ),
-            'cacheable_search_params'          => [
-                'travel_app_share=',
-            ],
             'cache_message_type'               => 'travel-app-cache-url',
             'cache_status_message_type'        => 'travel-app-cache-status',
             'version_message_type'             => 'travel-app-version',
@@ -265,13 +264,13 @@ class App extends BaseApp {
         return is_readable( $file ) ? (string) file_get_contents( $file ) : '';
     }
 
-    public function enqueue_template_assets( string $template, bool $script = false, string $data_object = '', array $data = [] ): void {
+    public function enqueue_template_assets( string $template, bool $script = false, string $data_object = '', array $data = [], string $scope = '' ): void {
         $template = sanitize_key( $template );
         if ( '' !== $data_object && 1 !== preg_match( '/\A[A-Za-z_$][A-Za-z0-9_$]*\z/', $data_object ) ) {
             $data_object = '';
         }
 
-        $scope = $this->get_url_path();
+        $scope = '' !== $scope ? $scope : $this->get_url_path();
         $style_path = 'css/' . $template . '.css';
 
         wp_app_enqueue_style(
@@ -351,10 +350,10 @@ class App extends BaseApp {
                 if ( '' !== $token ) {
                     $manifest['start_url'] = add_query_arg(
                         [
-                            'travel_app_share' => $trip_id,
-                            'travel_app_token' => $token,
+                            'token' => $token,
+                            'v'     => self::SHARE_PAGE_VERSION,
                         ],
-                        home_url( '/' )
+                        home_url( '/' . $this->get_url_path() . '/share/' . $trip_id . '/' )
                     );
                 }
             }
@@ -851,14 +850,19 @@ class App extends BaseApp {
     }
 
     private function request_has_trip_share_token( int $trip_id ): bool {
-        $shared_trip_id = $this->get_query_arg_absint( 'travel_app_share' );
+        $shared_trip_id = $this->get_requested_shared_trip_id();
         if ( $shared_trip_id !== $trip_id ) {
             return false;
         }
 
-        $token = $this->get_query_arg_text( 'travel_app_token' );
+        $token = $this->get_query_arg_text( 'token' );
 
         return '' !== $this->get_trip_share_mode_by_token( $trip_id, $token );
+    }
+
+    private function get_requested_shared_trip_id(): int {
+        $request_path = (string) get_query_var( 'wp_app_request', '' );
+        return 1 === preg_match( '#\Ashare/([0-9]+)/?\z#', $request_path, $matches ) ? absint( $matches[1] ) : 0;
     }
 
     public function register_dashboard_widgets(): void {
@@ -1978,8 +1982,8 @@ class App extends BaseApp {
     }
 
     public function maybe_render_shared_timeline(): void {
-        $trip_id = $this->get_query_arg_absint( 'travel_app_share' );
-        $token = $this->get_query_arg_text( 'travel_app_token' );
+        $trip_id = $this->get_requested_shared_trip_id();
+        $token = $this->get_query_arg_text( 'token' );
 
         if ( $trip_id <= 0 || '' === $token ) {
             return;
@@ -3092,10 +3096,10 @@ class App extends BaseApp {
 
         return add_query_arg(
             [
-                'travel_app_share' => $trip_id,
-                'travel_app_token' => $token,
+                'token' => $token,
+                'v'     => self::SHARE_PAGE_VERSION,
             ],
-            home_url( '/' )
+            home_url( '/' . $this->get_url_path() . '/share/' . $trip_id . '/' )
         );
     }
 

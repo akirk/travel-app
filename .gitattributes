@@ -25,6 +25,8 @@ composer.lock export-ignore
 blueprint.json export-ignore
 blueprint-openstation.json export-ignore
 demo.json export-ignore
+.playground/demo.php export-ignore
+playground/demo.php export-ignore
 
 # Dev vendors
 vendor/bin export-ignore

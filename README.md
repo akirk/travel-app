@@ -1,7 +1,7 @@
 # Travel App
 
 - Contributors: akirk
-- Tags: itinerary, trip-planner, wp-app
+- Tags: itinerary, trip-planner, wpapp
 - Requires at least: 6.0
 - Requires PHP: 7.4
 - Tested up to: 7.1
@@ -12,9 +12,6 @@
 Turn booking confirmations into day-by-day travel itineraries you can follow, map, share and journal, all kept privately on your own site.
 
 ## Description
-
-[Try Travel App in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/blueprint.json)
-· [Try it with demo data](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/demo.json)
 
 Travel App is a [WP App](https://wpapps.kirk.at/), an app for WordPress with the primary focus of being
 used by yourself, or your family or social group. It can only be accessed logged-in
@@ -102,8 +99,4 @@ visits do not query it again.
 
 ## Development
 
-Run the parser tests with:
-
-```sh
-composer test
-```
+You find the source at [https://github.com/akirk/travel-app](https://github.com/akirk/travel-app)

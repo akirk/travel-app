@@ -2,6 +2,10 @@
 	"landingPage": "/travel-app/",
 	"steps": [
 		{
+			"step": "mkdir",
+			"path": "/wordpress/wp-content/plugins/travel-app/playground"
+		},
+		{
 			"step": "writeFile",
 			"path": "/wordpress/wp-content/plugins/travel-app/playground/demo.php",
 			"data": {

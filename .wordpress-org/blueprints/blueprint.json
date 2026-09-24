@@ -2,6 +2,16 @@
 	"landingPage": "/travel-app/",
 	"steps": [
 		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "travel-app"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
 			"step": "mkdir",
 			"path": "/wordpress/wp-content/plugins/travel-app/playground"
 		},

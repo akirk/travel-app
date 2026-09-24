@@ -50,6 +50,12 @@ jobs:
         working-directory: build/travel-app
         run: composer install --no-dev --optimize-autoloader --no-interaction
 
+      # Cover review-team policies which are intentionally broader than the
+      # checks supplied by PHPCS and Plugin Check. Run this against the built
+      # tree so bundled production dependencies are checked too.
+      - name: Run WordPress.org review policy checks
+        run: php scripts/check-plugin-review-policy.php "build/${PLUGIN_SLUG}"
+
       - name: Run Plugin Check
         uses: wordpress/plugin-check-action@v1
         with:

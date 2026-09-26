@@ -42,7 +42,7 @@ class App extends BaseApp {
             'app_name'   => 'Travel App',
             // 'launcher'   => true,
             'app_icon'            => 'dashicons-location-alt',
-            'app_icon_background' => 'linear-gradient(135deg, #38bdf8, #0369a1)',
+            'app_icon_background' => 'linear-gradient(135deg, #72aee6, #2271b1)',
             'app_icon_color'      => '#ffffff',
             'app_icon_shadow'     => true,
             // Owned content: REST reads are gated with the app's capability and
@@ -54,6 +54,7 @@ class App extends BaseApp {
         ] );
 
         add_filter( 'wp_app_init_travel-app', [ $this, 'register_themes' ] );
+        add_action( 'wp_app_masterbar_styles', [ $this, 'print_masterbar_contrast_styles' ] );
         add_action( 'wp_app_load_theme_travel-app_default', [ $this, 'enqueue_assets' ] );
         add_action( 'wp_app_load_theme_travel-app_command-ledger', [ $this, 'enqueue_command_ledger_assets' ] );
         add_action( 'init', [ $this, 'register_post_types' ] );
@@ -173,8 +174,8 @@ class App extends BaseApp {
             'service_worker_path'              => 'service-worker.js',
             'scope'                            => home_url( '/' ),
             'service_worker_allowed'           => '/',
-            'background_color'                 => '#f8fafc',
-            'theme_color'                      => '#0b6bcb',
+            'background_color'                 => '#f6f7f7',
+            'theme_color'                      => '#2271b1',
             'icons'                            => [
                 [
                     'src'   => TRAVEL_APP_PLUGIN_URL . 'assets/icon.svg',
@@ -276,6 +277,15 @@ class App extends BaseApp {
             return;
         }
 
+        /*
+         * The live pages receive the WordPress admin color scheme through
+         * wp_app_head(); the static download needs it inlined so the
+         * --wp-app-color-* custom properties resolve there as well.
+         */
+        if ( 'assets' === $asset_root && function_exists( 'wp_app_get_admin_color_scheme_css' ) ) {
+            $css = wp_app_get_admin_color_scheme_css() . $css;
+        }
+
         wp_register_style( 'travel-app-static-trip', false, [], $this->get_asset_version_from( 'css/trip.css', $asset_root ) );
         wp_add_inline_style( 'travel-app-static-trip', $css );
         wp_print_styles( 'travel-app-static-trip' );
@@ -324,11 +334,12 @@ class App extends BaseApp {
 
         if ( $script ) {
             $script_path = 'js/' . $template . '.js';
+            $script_asset_root = file_exists( TRAVEL_APP_PLUGIN_DIR . $asset_root . '/' . $script_path ) ? $asset_root : 'assets';
             wp_app_enqueue_script(
                 $handle_prefix . '-' . $template,
-                TRAVEL_APP_PLUGIN_URL . $asset_root . '/' . $script_path,
+                TRAVEL_APP_PLUGIN_URL . $script_asset_root . '/' . $script_path,
                 [],
-                $this->get_asset_version_from( $script_path, $asset_root ),
+                $this->get_asset_version_from( $script_path, $script_asset_root ),
                 true,
                 $scope
             );
@@ -353,6 +364,223 @@ class App extends BaseApp {
         return $this->app->get_pwa_manifest_url( $args );
     }
 
+    /**
+     * Get the primary color of the current user's WordPress admin color scheme.
+     *
+     * Falls back to the default admin scheme blue.
+     *
+     * @return string Hex color value.
+     */
+    public function get_theme_color(): string {
+        if ( function_exists( 'wp_app_get_admin_color_scheme' ) ) {
+            $scheme = wp_app_get_admin_color_scheme();
+            if ( ! empty( $scheme['colors'][2] ) && is_string( $scheme['colors'][2] ) ) {
+                return $scheme['colors'][2];
+            }
+        }
+
+        return '#2271b1';
+    }
+
+    /**
+     * Keep the app admin bar readable on every admin color scheme.
+     *
+     * Core's admin bar stylesheet assumes a dark bar with light text while the
+     * app paints the bar background with the scheme's base color, so schemes
+     * such as "Light" end up with unreadable combinations. Recompute readable
+     * text and highlight tones against the actual scheme backgrounds and emit
+     * them inside the masterbar style block.
+     */
+    public function print_masterbar_contrast_styles(): void {
+        if ( ! function_exists( 'wp_app_get_admin_color_scheme' ) ) {
+            return;
+        }
+
+        $scheme = wp_app_get_admin_color_scheme();
+        $colors = isset( $scheme['colors'] ) && is_array( $scheme['colors'] ) ? array_values( $scheme['colors'] ) : [];
+        $icons  = isset( $scheme['icon_colors'] ) && is_array( $scheme['icon_colors'] ) ? $scheme['icon_colors'] : [];
+        if ( empty( $colors ) ) {
+            return;
+        }
+
+        $background = (string) $colors[0];
+        $subtle     = isset( $colors[1] ) ? (string) $colors[1] : $background;
+        $highlight  = isset( $colors[3] ) ? (string) $colors[3] : (string) ( $icons['focus'] ?? '#72aee6' );
+        $text       = $this->get_contrast_adjusted_color( (string) ( $icons['current'] ?? '#f0f0f1' ), [ $background ] );
+        $sub_text   = $this->get_contrast_adjusted_color( $text, [ $subtle ] );
+        $highlight  = $this->get_contrast_adjusted_color( $highlight, [ $background, $subtle ] );
+        $icon_color = 'color-mix(in srgb, ' . $text . ' 65%, transparent)';
+
+        // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Values are computed hex colors and fixed selectors.
+        echo ":root, body.wp-app-body {\n";
+        echo "\t--wp-app-masterbar-text: {$text};\n";
+        echo "\t--wp-app-masterbar-highlight: {$highlight};\n";
+        echo "}\n";
+        echo "#wpadminbar,\n#wpadminbar .ab-empty-item,\n#wpadminbar a.ab-item,\n#wpadminbar > #wp-toolbar span.ab-label,\n#wpadminbar > #wp-toolbar span.noticon {\n\tcolor: {$text};\n}\n";
+        echo "#wpadminbar #adminbarsearch:before,\n#wpadminbar .ab-icon:before,\n#wpadminbar .ab-item:before {\n\tcolor: {$icon_color};\n}\n";
+        echo "#wpadminbar .ab-submenu .ab-item,\n#wpadminbar .quicklinks .menupop ul li a,\n#wpadminbar .quicklinks .menupop ul li a strong,\n#wpadminbar .quicklinks .menupop.hover ul li a {\n\tcolor: {$sub_text};\n}\n";
+        echo "#wpadminbar li:hover .ab-icon:before,\n#wpadminbar li.hover .ab-icon:before,\n#wpadminbar li .ab-item:focus .ab-icon:before,\n#wpadminbar li:hover .ab-item:before,\n#wpadminbar li.hover .ab-item:before,\n#wpadminbar:not(.mobile) > #wp-toolbar li:hover span.ab-label,\n#wpadminbar:not(.mobile) > #wp-toolbar a:focus span.ab-label,\n#wpadminbar li.hover span.ab-label {\n\tcolor: {$highlight};\n}\n";
+        // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
+    }
+
+    /**
+     * Adjust a color toward white or black until it has enough contrast against
+     * every provided background, keeping the original color when it already
+     * passes.
+     *
+     * @param string $color       Hex color to verify.
+     * @param array  $backgrounds Hex colors the text will sit on.
+     * @param float  $min_ratio   Minimum WCAG contrast ratio to reach.
+     * @return string Hex color with sufficient contrast.
+     */
+    private function get_contrast_adjusted_color( string $color, array $backgrounds, float $min_ratio = 4.5 ): string {
+        $color = $this->normalize_hex_color( $color );
+        if ( '' === $color ) {
+            $color = '#f0f0f1';
+        }
+
+        $backgrounds = array_values( array_filter( array_map( [ $this, 'normalize_hex_color' ], $backgrounds ) ) );
+        if ( empty( $backgrounds ) ) {
+            return $color;
+        }
+
+        if ( $this->get_min_contrast_ratio( $color, $backgrounds ) >= $min_ratio ) {
+            return $color;
+        }
+
+        // Move toward white or black, whichever direction gains contrast first.
+        $targets = [ '#ffffff', '#000000' ];
+        if ( $this->get_min_contrast_ratio( '#000000', $backgrounds ) > $this->get_min_contrast_ratio( '#ffffff', $backgrounds ) ) {
+            $targets = array_reverse( $targets );
+        }
+
+        $best = $color;
+        foreach ( $targets as $target ) {
+            $candidate = $color;
+            for ( $i = 0; $i < 12; $i++ ) {
+                $candidate = $this->mix_hex_colors( $candidate, $target, 0.15 );
+                if ( $this->get_min_contrast_ratio( $candidate, $backgrounds ) >= $min_ratio ) {
+                    return $candidate;
+                }
+                if ( $this->get_min_contrast_ratio( $candidate, $backgrounds ) > $this->get_min_contrast_ratio( $best, $backgrounds ) ) {
+                    $best = $candidate;
+                }
+            }
+
+            // The pure target closes each direction and can pass on its own.
+            if ( $this->get_min_contrast_ratio( $target, $backgrounds ) >= $min_ratio ) {
+                return $target;
+            }
+            if ( $this->get_min_contrast_ratio( $target, $backgrounds ) > $this->get_min_contrast_ratio( $best, $backgrounds ) ) {
+                $best = $target;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Get the lowest WCAG contrast ratio between a color and a set of backgrounds.
+     *
+     * @param string $color       Hex color.
+     * @param array  $backgrounds Hex background colors.
+     * @return float Contrast ratio.
+     */
+    private function get_min_contrast_ratio( string $color, array $backgrounds ): float {
+        $ratio = PHP_FLOAT_MAX;
+        foreach ( $backgrounds as $background ) {
+            $ratio = min( $ratio, $this->get_contrast_ratio( $color, (string) $background ) );
+        }
+
+        return PHP_FLOAT_MAX === $ratio ? 0.0 : $ratio;
+    }
+
+    /**
+     * Get the WCAG contrast ratio between two hex colors.
+     *
+     * @param string $color_a Hex color.
+     * @param string $color_b Hex color.
+     * @return float Contrast ratio (1-21).
+     */
+    private function get_contrast_ratio( string $color_a, string $color_b ): float {
+        $lighter = max( $this->get_relative_luminance( $color_a ), $this->get_relative_luminance( $color_b ) );
+        $darker  = min( $this->get_relative_luminance( $color_a ), $this->get_relative_luminance( $color_b ) );
+
+        return ( $lighter + 0.05 ) / ( $darker + 0.05 );
+    }
+
+    /**
+     * Get the relative luminance of a hex color.
+     *
+     * @param string $color Hex color.
+     * @return float Relative luminance.
+     */
+    private function get_relative_luminance( string $color ): float {
+        $hex = $this->normalize_hex_color( $color );
+        if ( '' === $hex ) {
+            return 0.0;
+        }
+
+        $channels = [];
+        foreach ( [ 'r', 'g', 'b' ] as $index => $channel ) {
+            $value = hexdec( substr( $hex, 1 + ( $index * 2 ), 2 ) ) / 255;
+            $channels[ $channel ] = $value <= 0.04045 ? $value / 12.92 : pow( ( $value + 0.055 ) / 1.055, 2.4 );
+        }
+
+        return ( 0.2126 * $channels['r'] ) + ( 0.7152 * $channels['g'] ) + ( 0.0722 * $channels['b'] );
+    }
+
+    /**
+     * Mix two hex colors together.
+     *
+     * @param string $color_a Hex color.
+     * @param string $color_b Hex color.
+     * @param float  $weight  Weight of the second color (0-1).
+     * @return string Mixed hex color.
+     */
+    private function mix_hex_colors( string $color_a, string $color_b, float $weight ): string {
+        $a = $this->normalize_hex_color( $color_a );
+        $b = $this->normalize_hex_color( $color_b );
+        if ( '' === $a ) {
+            return $b;
+        }
+        if ( '' === $b ) {
+            return $a;
+        }
+
+        $mixed = '#';
+        foreach ( [ 1, 3, 5 ] as $offset ) {
+            $channel_a = hexdec( substr( $a, $offset, 2 ) );
+            $channel_b = hexdec( substr( $b, $offset, 2 ) );
+            $mixed    .= str_pad( dechex( (int) round( ( $channel_a * ( 1 - $weight ) ) + ( $channel_b * $weight ) ) ), 2, '0', STR_PAD_LEFT );
+        }
+
+        return $mixed;
+    }
+
+    /**
+     * Normalize a hex color to the #rrggbb form.
+     *
+     * @param string $color Hex color, with 3 or 6 digits.
+     * @return string Normalized color or empty string when invalid.
+     */
+    private function normalize_hex_color( string $color ): string {
+        $color = trim( $color );
+        if ( '' === $color ) {
+            return '';
+        }
+
+        if ( '#' !== $color[0] ) {
+            $color = '#' . $color;
+        }
+
+        if ( 4 === strlen( $color ) ) {
+            $color = '#' . $color[1] . $color[1] . $color[2] . $color[2] . $color[3] . $color[3];
+        }
+
+        return 1 === preg_match( '/\A#[0-9a-fA-F]{6}\z/', $color ) ? strtolower( $color ) : '';
+    }
+
     public function filter_pwa_manifest( array $manifest, array $config ): array {
         $trip_id = $this->get_query_arg_absint( 'trip_id' );
         $token = $this->get_query_arg_text( 'token' );
@@ -360,6 +588,9 @@ class App extends BaseApp {
         $manifest['short_name'] = __( 'Timeline', 'travel-app' );
         $manifest['start_url'] = home_url( '/' . $this->get_url_path() . '/' );
         $manifest['scope'] = home_url( '/' );
+        // Match the browser UI to the user's WordPress admin color scheme.
+        $manifest['theme_color'] = $this->get_theme_color();
+        $manifest['background_color'] = '#f6f7f7';
         // Lets Android/Chromium users share an email body or a calendar file
         // straight into the import form from the OS share sheet.
         $manifest['share_target'] = [

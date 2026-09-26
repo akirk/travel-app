@@ -5,12 +5,13 @@
     --wp-app-color-text: #f7f8f5;
     --wp-app-color-muted: #aab2b8;
     --wp-app-color-border: #52606b;
-    --wp-app-color-link: #e4532f;
+    --wp-app-color-link: var(--wp-app-color-primary, #e4532f);
     --ledger-ink: #101820;
     --ledger-paper: #f7f8f5;
     --ledger-muted: #52606b;
     --ledger-line: #ccd2d5;
-    --ledger-signal: #e4532f;
+    --ledger-signal: var(--wp-app-color-primary, #e4532f);
+    --ledger-signal-ink: color-mix(in srgb, var(--ledger-signal) 70%, #101820);
     --ledger-current: #eaf0eb;
     --field-background: #fff;
     --field-text: #101820;
@@ -18,7 +19,7 @@
 }
 
 * { box-sizing: border-box; }
-::selection { background: #f8c3af; color: var(--ledger-ink); }
+::selection { background: color-mix(in srgb, var(--ledger-signal) 30%, #fff); color: var(--ledger-ink); }
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
@@ -114,7 +115,7 @@ label { display: block; margin-bottom: 0; font-weight: 700; }
     border-radius: 4px;
     background: var(--field-background);
     color: var(--field-text);
-    caret-color: #942b14;
+    caret-color: var(--ledger-signal-ink);
     font: inherit;
 }
 .import-panel textarea { min-height: 126px; resize: vertical; }
@@ -126,8 +127,8 @@ label { display: block; margin-bottom: 0; font-weight: 700; }
 .import-panel input:focus,
 .import-panel select:focus,
 .import-panel textarea:focus {
-    border-color: #942b14;
-    outline: 2px solid #942b14;
+    border-color: var(--ledger-signal-ink);
+    outline: 2px solid var(--ledger-signal-ink);
     outline-offset: 2px;
 }
 
@@ -144,7 +145,7 @@ label { display: block; margin-bottom: 0; font-weight: 700; }
     cursor: pointer;
 }
 .drop-zone:hover,
-.drop-zone.dragging { border-color: var(--ledger-signal); background: rgba(228, 83, 47, 0.12); }
+.drop-zone.dragging { border-color: var(--ledger-signal); background: color-mix(in srgb, var(--ledger-signal) 12%, transparent); }
 .drop-zone:focus-within { outline: 2px solid var(--ledger-signal); outline-offset: 3px; }
 .drop-zone input { position: absolute; opacity: 0; pointer-events: none; }
 .drop-title { color: var(--ledger-paper); font-weight: 800; }
@@ -206,14 +207,14 @@ button:disabled { cursor: not-allowed; opacity: 0.52; }
     transform: translateY(-50%);
 }
 .trip-card:hover { background: #fff; }
-.trip-card:hover::after { color: #942b14; transform: translate(3px, -50%); }
+.trip-card:hover::after { color: var(--ledger-signal-ink); transform: translate(3px, -50%); }
 .trip-card:hover,
 .trip-card:focus,
 .trip-card:focus-visible,
 .trip-card:hover *,
 .trip-card:focus *,
 .trip-card:focus-visible * { text-decoration: none; }
-.trip-card:focus-visible { z-index: 1; outline-color: #942b14; }
+.trip-card:focus-visible { z-index: 1; outline-color: var(--ledger-signal-ink); }
 .trip-card.highlight {
     z-index: 1;
     padding-inline: 14px 44px;
@@ -229,12 +230,12 @@ button:disabled { cursor: not-allowed; opacity: 0.52; }
 .current-card { padding: 18px; background: var(--ledger-current); }
 .current-card h3 a { color: inherit; text-decoration: none; }
 .current-card h3 a:hover,
-.current-card h3 a:focus-visible { color: #942b14; text-decoration: underline; }
+.current-card h3 a:focus-visible { color: var(--ledger-signal-ink); text-decoration: underline; }
 .mini-timeline { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 16px 0 0; background: var(--ledger-line); }
 .mini-step { display: block; min-width: 0; padding: 14px; background: var(--ledger-paper); color: inherit; text-decoration: none; }
 .mini-step.current { box-shadow: inset 3px 0 0 var(--ledger-signal); }
 .mini-step:hover { background: #fff; }
-.mini-step:focus-visible { outline-color: #942b14; }
+.mini-step:focus-visible { outline-color: var(--ledger-signal-ink); }
 .mini-label { margin-bottom: 4px; color: var(--ledger-muted); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
 .mini-title { font-weight: 800; overflow-wrap: anywhere; }
 .mini-location, .mini-countdown { color: var(--ledger-muted); overflow-wrap: anywhere; font-size: 0.78rem; line-height: 1.42; }

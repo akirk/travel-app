@@ -23,6 +23,13 @@
     var loadButton = document.querySelector('[data-map-load]');
     var consent = document.querySelector('[data-map-consent]');
 
+    // Reuse the WordPress admin color scheme tones exposed as CSS custom properties.
+    function appColor(token, fallback) {
+        var value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+
+        return value || fallback;
+    }
+
     function beginRouteMap() {
         if (consent) {
             consent.hidden = true;
@@ -373,7 +380,7 @@
     
             if (coordinates.length > 1) {
                 L.polyline(coordinates, {
-                    color: '#0b6bcb',
+                    color: appColor('--wp-app-color-primary', '#2271b1'),
                     weight: 4,
                     opacity: span ? 0.25 : 0.84
                 }).addTo(layer);
@@ -384,7 +391,7 @@
     
                 if (leg.length > 1) {
                     L.polyline(leg, {
-                        color: '#d23f31',
+                        color: appColor('--travel-app-color-danger', '#d63638'),
                         weight: 5,
                         opacity: 0.95
                     }).addTo(layer);

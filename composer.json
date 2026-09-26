@@ -5,7 +5,7 @@
     "license": "GPL-2.0-or-later",
     "require": {
         "php": ">=7.4",
-        "akirk/wp-app": "^1.9"
+        "akirk/wp-app": "2.0.0-alpha.1"
     },
     "require-dev": {
         "dealerdirect/phpcodesniffer-composer-installer": "^1.2",

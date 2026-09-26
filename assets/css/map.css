@@ -1,4 +1,12 @@
-:root { color-scheme: light dark; }
+:root {
+    color-scheme: light dark;
+    /*
+     * Base UI colors reuse the current user's WordPress admin color scheme
+     * through the --wp-app-color-* tokens provided by the app framework.
+     * Status tones reuse the WordPress admin color palette.
+     */
+    --travel-app-color-danger: #d63638;
+}
 /* A display rule of ours would otherwise win over the browser's [hidden] default. */
 [hidden] { display: none !important; }
 body {
@@ -41,7 +49,7 @@ h1 {
 #route-map {
     position: absolute;
     inset: 0;
-    background: #d9e4dd;
+    background: var(--wp-app-color-surface-alt);
 }
 .map-consent {
     position: absolute;
@@ -79,14 +87,14 @@ h1 {
     gap: 4px;
     min-width: 220px;
     max-width: 300px;
-    color: #1f2933;
+    color: var(--wp-app-color-text);
 }
 .route-popup-title {
     font-weight: 800;
     line-height: 1.25;
 }
 .route-popup-meta {
-    color: #52606d;
+    color: var(--wp-app-color-muted);
     font-size: 0.88rem;
 }
 .route-popup-location {
@@ -94,7 +102,7 @@ h1 {
 }
 .route-popup-details {
     margin-top: 4px;
-    color: #323f4b;
+    color: var(--wp-app-color-text);
 }
 .route-popup-title a { font-weight: 800; }
 .route-marker {
@@ -102,10 +110,10 @@ h1 {
     place-items: center;
     width: 26px;
     height: 26px;
-    border: 2px solid #fff;
+    border: 2px solid var(--wp-app-color-on-primary);
     border-radius: 50%;
-    background: #0b6bcb;
-    color: #fff;
+    background: var(--wp-app-color-primary);
+    color: var(--wp-app-color-on-primary);
     font-size: 0.78rem;
     font-weight: 800;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
@@ -134,7 +142,7 @@ h1 {
     cursor: default;
     opacity: 0.6;
 }
-.playback-now { border-color: #d23f31; }
+.playback-now { border-color: var(--travel-app-color-danger); }
 .playback-role {
     margin-bottom: 2px;
     color: var(--wp-app-color-muted);
@@ -184,7 +192,7 @@ h1 {
     gap: 8px;
 }
 .playback-position { color: var(--wp-app-color-muted); font-size: 0.85rem; }
-.route-item[data-route-current] { border-color: #d23f31; }
+.route-item[data-route-current] { border-color: var(--travel-app-color-danger); }
 .route-list { margin-top: 22px; }
 .route-list-head {
     display: flex;
@@ -241,8 +249,8 @@ h1 {
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    background: #0b6bcb;
-    color: #fff;
+    background: var(--wp-app-color-primary);
+    color: var(--wp-app-color-on-primary);
     font-size: 0.78rem;
     font-weight: 800;
 }
@@ -287,7 +295,7 @@ h1 {
     white-space: nowrap;
 }
 .route-marker.is-current {
-    background: #d23f31;
+    background: var(--travel-app-color-danger);
     transform: scale(1.3);
 }
 .route-marker.is-dim { opacity: 0.45; }

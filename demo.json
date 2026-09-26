@@ -50,7 +50,7 @@
 		},
 		{
 			"step": "mkdir",
-			"path": "wordpress/wp-content/plugins/travel-app/playground"
+			"path": "/wordpress/wp-content/plugins/travel-app/playground"
 		},
 		{
 			"step": "writeFile",

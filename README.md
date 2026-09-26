@@ -1,7 +1,7 @@
 # Travel App
 
 - Contributors: akirk
-- Tags: travel, itinerary, trip-planner, travel-journal, wp-app
+- Tags: itinerary, trip-planner, wpapp
 - Requires at least: 6.0
 - Requires PHP: 7.4
 - Tested up to: 7.1
@@ -13,113 +13,28 @@ Turn booking confirmations into day-by-day travel itineraries you can follow, ma
 
 ## Description
 
-[Try Travel App in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/blueprint.json)
-· [Try it with demo data](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/demo.json)
+Travel App is a [WP App](https://wpapps.kirk.at/), an app for WordPress with the primary focus of being
+used by yourself, or your family or social group. It can only be accessed logged-in
+and adds a menu entry to the Masterbar to be reached.
 
-[Try it in OpenStation](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/akirk/travel-app/main/blueprint-openstation.json) — the same app opened in desktop mode with the [OpenStation](https://github.com/WordPress/openstation) plugin.
+Travel App is a private travel organizer that allows you to organize travel itineraries
+as timelines. You can paste booking confirmations, calendar exports and itinerary notes,
+and Travel App turns them into a structured trip: flights, lodging, trains, rental cars,
+activities and anything else you want to keep track of.
 
-Travel App is a private travel organizer that lives on your own WordPress. Paste or
-upload booking confirmations, calendar exports and itinerary notes, and Travel App
-turns them into a structured trip: flights, lodging, trains, rental cars,
-activities and anything else you want to keep track of. Built on
-[WpApp](https://github.com/akirk/wp-app), so it runs as its own app at
-`/travel-app/` instead of inside wp-admin.
+There are lots of other small features:
+- map view (with Open Street Map),
+- journal entries per day,
+- you can share your trip with a link,
+- subscribe to your trips in your Calendar,
+- access your trips (including reservation files) offline, and
+- delegate another user on your site to create or edit trips on your behalf.
 
-Nothing leaves your site unless you decide it should. Trips are stored in your
-own database, and every sharing feature is opt-in and revocable.
+As every WP App, Travel App comes with support for the Abilities API by providing all
+the abilities necessary to use the app with an AI.
 
-### Import instead of retype
-
-Paste or upload booking confirmations, TripIt-style calendar exports, and plain
-itinerary notes to turn them into structured trip timelines.
-
-- ICS calendar files are read by a dedicated calendar parser, so recurring
-  formats come in reliably without any external service.
-- Other text is handed to the WordPress AI Client (`wp_ai_client_prompt()`) when
-  an AI connector is configured, and falls back to a built-in local parser when
-  it is not — so the plugin still works with no AI at all.
-- A quick-plan parser understands short one-line notes ("Train to the coast,
-  Friday 9:40") for entries you type by hand.
-- On a phone the app registers as a Web Share Target, so a confirmation e-mail
-  or a booking page can be shared straight into Travel App from another app.
-- Imports land on a review screen first, so you can correct what the parser got
-  wrong before anything is saved.
-
-### A timeline you can actually follow
-
-Each trip has a day-by-day timeline of itinerary items, each with a stable ID
-and its own edit page. While a trip is running, the timeline highlights what is
-happening now and what comes next, and the WordPress toolbar shows the trip you
-are currently on.
-
-- Items carry times, locations, end locations, booking references, notes, links
-  and file attachments.
-- Links get a preview (title, description, image) fetched from the linked page,
-  so a booking URL turns into something recognisable.
-- A lodging check compares the nights your trip spans against the lodging you
-  have booked and points out the nights that are not covered yet.
-
-### Route map
-
-Every trip has a route map built from the locations in the itinerary, drawn with
-a bundled copy of Leaflet on OpenStreetMap tiles. Places are geocoded in the
-browser through OpenStreetMap's Nominatim service, and the coordinates are
-cached on your site so the same itinerary does not have to be looked up again on
-the next visit or on another device. When a place name is ambiguous you can pick
-the right match from a list. A playback mode walks the route step by step.
-
-### Travel journal
-
-Turn a trip into a diary: each day gets a journal entry that starts from what
-was on the itinerary that day, and entries can be prepared as blog post drafts
-with a category and tags of your choosing, ready for you to publish.
-
-### Sharing, on your terms
-
-- Generate a share link for a trip, in a read-only "fellow traveller" view or a
-  public one, and revoke it whenever you want.
-- Subscribe to a trip as an ICS calendar feed, or to all of your trips at once,
-  so the itinerary shows up in your usual calendar app.
-- Download a trip as a single self-contained HTML file to keep or hand on.
-- Delegate: let another user on the site create or edit trips on your behalf,
-  with the capability required for that under your control.
-
-### Works offline
-
-Travel App installs as a Progressive Web App. The timeline, its assets and its
-attachments are cached for offline use, and edits made while offline are queued
-and synced when the connection comes back.
-
-### AI Assistant
-
-When the AI Assistant plugin is active, Travel App registers WordPress Abilities
-for listing, creating, importing, inspecting, renaming, sharing and editing
-travel plans and their itinerary items, so an assistant can work with your trips
-without a separate integration.
-
-### How it is stored
-
-Trips are `travel_app_trip` taxonomy terms. Itinerary entries are first-class
-`travel_app_item` posts assigned to the trip term, so each entry has a stable ID
-and a dedicated edit page. Journal entries are `travel_app_journal` posts. No
-custom database tables are created; remove the plugin and your WordPress is as
-slim as it was before.
-
-### External services
-
-Travel App works without any third-party service, but two optional features talk
-to the outside world:
-
-- The route map loads map tiles from [OpenStreetMap](https://www.openstreetmap.org/)
-  and geocodes place names through its [Nominatim](https://nominatim.org/)
-  service, from your browser. See the
-  [OSMF privacy policy](https://wiki.osmfoundation.org/wiki/Privacy_Policy).
-- Link previews fetch the page behind a URL you entered on an itinerary item, to
-  read its title, description and preview image.
-
-If an AI connector is configured for the WordPress AI Client, imported text is
-sent to whichever provider you configured there. Without a connector, importing
-uses the built-in local parsers and nothing is sent anywhere.
+If WordPress has AI Connectors configured, it will use them to better parse your pasted
+booking confirmations.
 
 ## Installation
 
@@ -184,8 +99,4 @@ visits do not query it again.
 
 ## Development
 
-Run the parser tests with:
-
-```sh
-composer test
-```
+You find the source at [https://github.com/akirk/travel-app](https://github.com/akirk/travel-app)

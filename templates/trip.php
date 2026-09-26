@@ -17,6 +17,14 @@ $share_token = isset( $travel_app_template_context['share_token'] ) ? sanitize_t
 $is_static_download = ! empty( $travel_app_template_context['is_static_download'] );
 $is_shared_timeline = ! empty( $travel_app_template_context['is_shared_timeline'] ) || '' !== $share_token;
 $is_readonly_timeline = $is_shared_timeline || $is_static_download;
+if ( $is_shared_timeline && function_exists( 'show_admin_bar' ) ) {
+    show_admin_bar( false );
+    remove_action( 'wp_footer', 'wp_admin_bar_render', 1000 );
+    wp_dequeue_style( 'admin-bar' );
+    add_action( 'wp_head', static function(): void {
+        wp_dequeue_style( 'admin-bar' );
+    }, 0 );
+}
 $trip       = Trip::get( $trip_id );
 if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
     wp_die(
@@ -194,7 +202,8 @@ if ( ! $is_static_download ) {
             'shareFailed'            => __( 'The sharing change could not be saved.', 'travel-app' ),
             'copyPrompt'             => __( 'Copy this link:', 'travel-app' ),
             'generating'             => __( 'Generating...', 'travel-app' ),
-        ]
+        ],
+        $is_shared_timeline ? 'global' : ''
     );
 }
 ?>
@@ -218,7 +227,7 @@ if ( ! $is_static_download ) {
     <?php endif; ?>
 </head>
 <body>
-    <?php if ( ! $is_static_download ) : ?>
+    <?php if ( ! $is_static_download && ! $is_shared_timeline ) : ?>
         <?php wp_app_body_open(); ?>
     <?php endif; ?>
 

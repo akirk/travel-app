@@ -21,6 +21,7 @@
     "scripts": {
         "lint": "phpcs -n",
         "lint:all": "phpcs",
+        "lint:review-policy": "php scripts/check-plugin-review-policy.php",
         "test": "vendor/bin/phpunit"
     },
     "authors": [

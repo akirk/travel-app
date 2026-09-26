@@ -455,7 +455,7 @@ if ( ! $is_static_download ) {
                 </div>
                 <?php
                 if ( $show_timeline_demo_controls ) {
-                    require __DIR__ . '/partials/demo-controls.php';
+                    require TRAVEL_APP_PLUGIN_DIR . 'templates/partials/demo-controls.php';
                 }
                 ?>
 
@@ -595,7 +595,18 @@ if ( ! $is_static_download ) {
                             </form>
                         </details>
 
-                        <form class="edit-form add-item-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"<?php echo empty( $quick_plan_segment ) ? ' data-offline-sync' : ''; ?>>
+                        <form
+                            class="edit-form add-item-form"
+                            method="post"
+                            action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+                            <?php if ( empty( $quick_plan_segment ) ) : ?>
+                                data-offline-sync
+                            <?php endif; ?>
+                            <?php if ( empty( $quick_plan_segment ) && current_user_can( 'edit_travel_app_trip', $trip_id ) ) : ?>
+                                toolname="prepareTravelItem"
+                                tooldescription="<?php esc_attr_e( 'Fill in a new itinerary item for this travel plan. The user reviews the form and selects Add Item to save it.', 'travel-app' ); ?>"
+                            <?php endif; ?>
+                        >
                             <input type="hidden" name="action" value="<?php echo ! empty( $quick_plan_segment ) ? 'travel_app_import' : 'travel_app_add_segment'; ?>">
                             <input type="hidden" name="trip_id" value="<?php echo esc_attr( (string) $trip_data['id'] ); ?>">
                             <?php if ( ! empty( $quick_plan_segment ) ) : ?>
@@ -627,11 +638,11 @@ if ( ! $is_static_download ) {
                             <?php endif; ?>
                             <label class="field-wide">
                                 <?php esc_html_e( 'Title', 'travel-app' ); ?>
-                                <input name="segment_title" value="<?php echo esc_attr( (string) ( $quick_plan_segment['title'] ?? '' ) ); ?>">
+                                <input name="segment_title" toolparamdescription="<?php esc_attr_e( 'Short title of the itinerary item.', 'travel-app' ); ?>" value="<?php echo esc_attr( (string) ( $quick_plan_segment['title'] ?? '' ) ); ?>">
                             </label>
                             <label class="field-wide">
                                 <?php esc_html_e( 'Type', 'travel-app' ); ?>
-                                <select name="segment_type">
+                                <select name="segment_type" toolparamdescription="<?php esc_attr_e( 'Kind of travel itinerary item.', 'travel-app' ); ?>">
                                     <?php foreach ( [ 'flight', 'lodging', 'train', 'car', 'activity', 'other' ] as $type ) : ?>
                                         <option value="<?php echo esc_attr( $type ); ?>" <?php selected( $quick_plan_segment['type'] ?? 'activity', $type ); ?>><?php echo esc_html( $segment_type_labels[ $type ] ?? ucfirst( $type ) ); ?></option>
                                     <?php endforeach; ?>
@@ -639,39 +650,39 @@ if ( ! $is_static_download ) {
                             </label>
                             <label class="field-wide">
                                 <?php esc_html_e( 'URL', 'travel-app' ); ?>
-                                <input type="url" name="segment_url" value="<?php echo esc_attr( (string) ( $quick_plan_segment['url'] ?? '' ) ); ?>">
+                                <input type="url" name="segment_url" toolparamdescription="<?php esc_attr_e( 'Optional booking or reference URL for this item.', 'travel-app' ); ?>" value="<?php echo esc_attr( (string) ( $quick_plan_segment['url'] ?? '' ) ); ?>">
                             </label>
                             <label>
                                 <?php esc_html_e( 'Location', 'travel-app' ); ?>
-                                <input name="segment_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['location'] ?? '' ) ); ?>">
+                                <input name="segment_location" toolparamdescription="<?php esc_attr_e( 'Starting place or venue for this item.', 'travel-app' ); ?>" value="<?php echo esc_attr( (string) ( $quick_plan_segment['location'] ?? '' ) ); ?>">
                             </label>
                             <label>
                                 <?php esc_html_e( 'End Location', 'travel-app' ); ?>
-                                <input name="segment_end_location" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_location'] ?? '' ) ); ?>">
+                                <input name="segment_end_location" toolparamdescription="<?php esc_attr_e( 'Destination or ending place, when different from the start.', 'travel-app' ); ?>" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_location'] ?? '' ) ); ?>">
                             </label>
                             <div class="date-time-group">
                                 <label>
                                     <?php esc_html_e( 'Start Date', 'travel-app' ); ?>
-                                    <input type="date" name="segment_date" value="<?php echo esc_attr( (string) ( $quick_plan_segment['date'] ?? '' ) ); ?>">
+                                    <input type="date" name="segment_date" toolparamdescription="<?php esc_attr_e( 'Start date of the item.', 'travel-app' ); ?>" value="<?php echo esc_attr( (string) ( $quick_plan_segment['date'] ?? '' ) ); ?>">
                                 </label>
                                 <label>
                                     <?php esc_html_e( 'Start Time', 'travel-app' ); ?>
-                                    <input type="time" name="segment_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['time'] ?? '' ) ); ?>">
+                                    <input type="time" name="segment_time" toolparamdescription="<?php esc_attr_e( 'Local start time of the item.', 'travel-app' ); ?>" value="<?php echo esc_attr( (string) ( $quick_plan_segment['time'] ?? '' ) ); ?>">
                                 </label>
                             </div>
                             <div class="date-time-group">
                                 <label>
                                     <?php esc_html_e( 'End Date', 'travel-app' ); ?>
-                                    <input type="date" name="segment_end_date" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_date'] ?? '' ) ); ?>">
+                                    <input type="date" name="segment_end_date" toolparamdescription="<?php esc_attr_e( 'End date, if the item spans multiple days.', 'travel-app' ); ?>" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_date'] ?? '' ) ); ?>">
                                 </label>
                                 <label>
                                     <?php esc_html_e( 'End Time', 'travel-app' ); ?>
-                                    <input type="time" name="segment_end_time" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_time'] ?? '' ) ); ?>">
+                                    <input type="time" name="segment_end_time" toolparamdescription="<?php esc_attr_e( 'Local end time of the item.', 'travel-app' ); ?>" value="<?php echo esc_attr( (string) ( $quick_plan_segment['end_time'] ?? '' ) ); ?>">
                                 </label>
                             </div>
                             <label class="field-wide">
                                 <?php esc_html_e( 'Details', 'travel-app' ); ?>
-                                <textarea name="segment_details"><?php echo esc_textarea( (string) ( $quick_plan_segment['details'] ?? '' ) ); ?></textarea>
+                                <textarea name="segment_details" toolparamdescription="<?php esc_attr_e( 'Optional notes, booking details, or instructions.', 'travel-app' ); ?>"><?php echo esc_textarea( (string) ( $quick_plan_segment['details'] ?? '' ) ); ?></textarea>
                             </label>
                             <div class="form-actions">
                                 <button type="submit"><?php echo esc_html( ! empty( $quick_plan_segment ) ? __( 'Add to This Trip', 'travel-app' ) : __( 'Add Item', 'travel-app' ) ); ?></button>
@@ -700,7 +711,7 @@ if ( ! $is_static_download ) {
                         <?php
                         $segment = $segment_form_template_segment;
                         $index = $segment_form_template_index;
-                        require __DIR__ . '/partials/segment-form.php';
+                        require TRAVEL_APP_PLUGIN_DIR . 'templates/partials/segment-form.php';
                         ?>
                         <p class="attachment-note"><?php esc_html_e( 'Attachments can be opened from the timeline. Uploading or deleting attachments requires an online connection.', 'travel-app' ); ?></p>
                     </template>

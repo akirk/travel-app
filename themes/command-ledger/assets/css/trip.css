@@ -5,7 +5,9 @@
     --wp-app-color-text: #17202a;
     --wp-app-color-muted: #5f6b7a;
     --wp-app-color-border: #d8dee8;
-    --wp-app-color-link: #0b6bcb;
+    --wp-app-color-link: var(--wp-app-color-primary, #0b6bcb);
+    --ledger-signal: var(--wp-app-color-primary, #e4532f);
+    --ledger-signal-ink: color-mix(in srgb, var(--ledger-signal) 70%, #101820);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,7 +17,7 @@
         --wp-app-color-text: #f1f5f9;
         --wp-app-color-muted: #a7b0bd;
         --wp-app-color-border: #303844;
-        --wp-app-color-link: #7ab7ff;
+        --wp-app-color-link: var(--wp-app-color-primary, #7ab7ff);
     }
 }
 body {
@@ -52,12 +54,12 @@ input, select, textarea {
     padding: 9px 10px;
     background: #fff;
     color: #101820;
-    caret-color: #942b14;
+    caret-color: var(--ledger-signal-ink);
     font: inherit;
 }
 input::placeholder, textarea::placeholder { color: #66727a; opacity: 1; }
 input:hover, select:hover, textarea:hover { border-color: #101820; }
-input:focus, select:focus, textarea:focus { border-color: #942b14; }
+input:focus, select:focus, textarea:focus { border-color: var(--ledger-signal-ink); }
 textarea { min-height: 92px; resize: vertical; }
 button {
     appearance: none;
@@ -237,7 +239,7 @@ button {
     --ledger-paper: #f7f8f5;
     --ledger-muted: #52606b;
     --ledger-line: #ccd2d5;
-    --ledger-signal: #e4532f;
+    --ledger-signal: var(--wp-app-color-primary, #e4532f);
     --ledger-current: #eaf0eb;
 }
 .timeline-panel {
@@ -496,7 +498,7 @@ button {
 }
 .timeline-state::before { content: ""; width: 6px; height: 6px; border: 1px solid currentColor; border-radius: 50%; }
 .timeline-item.current .timeline-state {
-    color: #942b14;
+    color: var(--ledger-signal-ink);
 }
 .timeline-item.current .timeline-state::before { background: currentColor; }
 .timeline-item.past .timeline-state::before { width: 7px; height: 4px; border: 0; border-bottom: 1.5px solid; border-left: 1.5px solid; border-radius: 0; transform: rotate(-45deg); }
@@ -523,9 +525,9 @@ button {
     text-align: left;
     cursor: pointer;
 }
-.timeline-panel { --wp-app-color-link: #8f2d18; --wp-app-color-text: var(--ledger-ink); --wp-app-color-muted: var(--ledger-muted); --wp-app-color-border: var(--ledger-line); --wp-app-color-surface: #fff; color-scheme: light; }
-.timeline-panel ::selection { background: #f8c3af; color: var(--ledger-ink); }
-.timeline-panel :focus-visible { outline: 2px solid #942b14; outline-offset: 3px; }
+.timeline-panel { --wp-app-color-link: var(--wp-app-color-primary, #8f2d18); --wp-app-color-text: var(--ledger-ink); --wp-app-color-muted: var(--ledger-muted); --wp-app-color-border: var(--ledger-line); --wp-app-color-surface: #fff; color-scheme: light; }
+.timeline-panel ::selection { background: color-mix(in srgb, var(--ledger-signal) 30%, #fff); color: var(--ledger-ink); }
+.timeline-panel :focus-visible { outline: 2px solid var(--ledger-signal-ink); outline-offset: 3px; }
 .timeline-title-button .timeline-icon { width: 13px; height: 13px; margin-left: 6px; color: var(--ledger-muted); }
 .timeline-title-link:hover,
 .timeline-title-link:focus,
@@ -850,7 +852,7 @@ button {
 }
 .timeline-edit-panel input,
 .timeline-edit-panel select,
-.timeline-edit-panel textarea { color: var(--ledger-ink); background: #fff; border-color: #89949b; caret-color: #942b14; }
+.timeline-edit-panel textarea { color: var(--ledger-ink); background: #fff; border-color: #89949b; caret-color: var(--ledger-signal-ink); }
 .timeline-edit-panel .delete-segment-form {
     display: none;
 }

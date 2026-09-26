@@ -202,7 +202,7 @@ $travel_app->enqueue_command_ledger_template_assets(
             <?php
             $demo_control_id = $front_demo_control_id;
             $demo_control_value = $front_demo_control_value;
-            require __DIR__ . '/partials/demo-controls.php';
+            require TRAVEL_APP_PLUGIN_DIR . 'templates/partials/demo-controls.php';
             ?>
         <?php endif; ?>
 

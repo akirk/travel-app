@@ -1,4 +1,25 @@
-:root { color-scheme: light dark; }
+:root {
+    color-scheme: light dark;
+    /*
+     * Base UI colors reuse the current user's WordPress admin color scheme
+     * through the --wp-app-color-* tokens provided by the app framework.
+     * Status tones reuse the WordPress admin color palette.
+     */
+    --travel-app-color-success: #00a32a;
+    --travel-app-color-success-ink: #00710a;
+    --travel-app-color-warning: #dba617;
+    --travel-app-color-warning-ink: color-mix(in srgb, var(--travel-app-color-warning) 55%, #1d2327);
+    --travel-app-color-danger: #d63638;
+    --travel-app-color-danger-ink: #b32d2e;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --travel-app-color-success-ink: color-mix(in srgb, var(--travel-app-color-success) 65%, #fff);
+        --travel-app-color-warning-ink: color-mix(in srgb, var(--travel-app-color-warning) 65%, #fff);
+        --travel-app-color-danger-ink: color-mix(in srgb, var(--travel-app-color-danger) 65%, #fff);
+    }
+}
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
@@ -27,16 +48,16 @@ a { color: var(--wp-app-color-link); }
     font-size: 0.82rem;
     white-space: nowrap;
 }
-.status.available { color: #0f6b42; border-color: rgba(15, 107, 66, 0.32); background: rgba(15, 107, 66, 0.08); }
-.status.unavailable { color: #8a4b08; border-color: rgba(138, 75, 8, 0.28); background: rgba(138, 75, 8, 0.08); }
+.status.available { color: var(--travel-app-color-success-ink); border-color: color-mix(in srgb, var(--travel-app-color-success) 32%, transparent); background: color-mix(in srgb, var(--travel-app-color-success) 8%, transparent); }
+.status.unavailable { color: var(--travel-app-color-warning-ink); border-color: color-mix(in srgb, var(--travel-app-color-warning) 28%, transparent); background: color-mix(in srgb, var(--travel-app-color-warning) 8%, transparent); }
 .notice {
     margin-bottom: 18px;
     border-radius: 6px;
     padding: 12px 14px;
-    border: 1px solid rgba(15, 107, 66, 0.32);
-    background: rgba(15, 107, 66, 0.08);
+    border: 1px solid color-mix(in srgb, var(--travel-app-color-success) 32%, transparent);
+    background: color-mix(in srgb, var(--travel-app-color-success) 8%, transparent);
 }
-.notice.error { border-color: rgba(138, 75, 8, 0.28); background: rgba(138, 75, 8, 0.08); }
+.notice.error { border-color: color-mix(in srgb, var(--travel-app-color-danger) 28%, transparent); background: color-mix(in srgb, var(--travel-app-color-danger) 8%, transparent); }
 .dashboard { display: grid; grid-template-columns: minmax(0, 1.35fr) 340px; gap: 22px; align-items: start; }
 .panel {
     background: var(--wp-app-color-surface);
@@ -132,8 +153,8 @@ button {
     appearance: none;
     border: 0;
     border-radius: 6px;
-    background: var(--wp-app-color-link);
-    color: #fff;
+    background: var(--wp-app-color-primary);
+    color: var(--wp-app-color-on-primary);
     font: inherit;
     font-weight: 700;
     padding: 9px 12px;

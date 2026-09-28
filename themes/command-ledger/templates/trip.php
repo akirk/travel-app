@@ -238,7 +238,7 @@ if ( ! $is_static_download ) {
     <title><?php wp_app_the_title( $trip_data ? $trip_data['title'] : __( 'Travel Plan', 'travel-app' ) ); ?></title>
     <?php if ( ! $is_static_download ) : ?>
         <link rel="manifest" href="<?php echo esc_url( $travel_app->get_manifest_url( (int) $trip_data['id'], $share_token ) ); ?>">
-        <meta name="theme-color" content="#0b6bcb">
+        <meta name="theme-color" content="<?php echo esc_attr( $travel_app->get_theme_color() ); ?>">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-title" content="<?php echo esc_attr( $trip_data['title'] ?: __( 'Timeline', 'travel-app' ) ); ?>">
     <?php else : ?>

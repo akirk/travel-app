@@ -216,6 +216,65 @@ class App extends BaseApp {
 
     public function enqueue_command_ledger_assets(): void {
         $this->enqueue_shared_assets( 'themes/command-ledger/assets', 'travel-app-command-ledger' );
+        add_action( 'wp_app_head', [ $this, 'print_command_ledger_palette_styles' ] );
+    }
+
+    /**
+     * Print the Command Ledger signal tokens derived from the admin color scheme.
+     */
+    public function print_command_ledger_palette_styles(): void {
+        $css = $this->get_command_ledger_palette_css();
+        if ( '' === $css ) {
+            return;
+        }
+
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Computed hex colors and fixed selectors.
+        echo '<style id="travel-app-command-ledger-palette">' . "\n" . $css . '</style>' . "\n";
+    }
+
+    /**
+     * Build Command Ledger signal tokens from the admin primary color.
+     *
+     * The admin primary is kept as the signal fill, while the text drawn on it
+     * and the signal used as text on light and dark ledger surfaces are pushed
+     * until they reach WCAG AA contrast. The light and dark surface lists must
+     * match the palettes in the Command Ledger stylesheets.
+     *
+     * @return string CSS custom properties block.
+     */
+    public function get_command_ledger_palette_css(): string {
+        $signal = $this->normalize_hex_color( $this->get_theme_color() );
+        if ( '' === $signal ) {
+            return '';
+        }
+
+        $light_surfaces = [ '#e9ece7', '#f7f8f5', '#ffffff', '#e4ece6' ];
+        $dark_surfaces  = [ '#0b1117', '#141d25', '#1b2630', '#1a2a26', '#101820', '#070b0f' ];
+
+        $on_signal = $this->get_contrast_ratio( '#101820', $signal ) >= $this->get_contrast_ratio( '#ffffff', $signal ) ? '#101820' : '#ffffff';
+        // Mid-tone primaries (e.g. the "Light" scheme orange) pass with neither label, so shift the fill instead.
+        $signal    = $this->get_contrast_adjusted_color( $signal, [ $on_signal ] );
+        // Hover and pressed fills move away from the label so it stays readable.
+        $away      = '#101820' === $on_signal ? '#ffffff' : '#000000';
+        $hover     = $this->mix_hex_colors( $signal, $away, 0.14 );
+        $active    = $this->mix_hex_colors( $signal, $away, 0.26 );
+
+        $tokens = [
+            '--ledger-signal'            => $signal,
+            '--ledger-signal-hover'      => $hover,
+            '--ledger-signal-active'     => $active,
+            '--ledger-on-signal'         => $this->get_contrast_adjusted_color( $on_signal, [ $signal, $hover, $active ] ),
+            '--ledger-signal-ink-light'  => $this->get_contrast_adjusted_color( $signal, $light_surfaces ),
+            '--ledger-signal-ink-dark'   => $this->get_contrast_adjusted_color( $signal, $dark_surfaces ),
+        ];
+
+        // html:root outranks the stylesheet defaults regardless of print order.
+        $css = "html:root {\n";
+        foreach ( $tokens as $property => $value ) {
+            $css .= "\t{$property}: {$value};\n";
+        }
+
+        return $css . "}\n";
     }
 
     private function enqueue_shared_assets( string $asset_root, string $handle_prefix ): void {
@@ -283,6 +342,8 @@ class App extends BaseApp {
          */
         if ( 'assets' === $asset_root && function_exists( 'wp_app_get_admin_color_scheme_css' ) ) {
             $css = wp_app_get_admin_color_scheme_css() . $css;
+        } elseif ( 'assets' !== $asset_root ) {
+            $css .= $this->get_command_ledger_palette_css();
         }
 
         wp_register_style( 'travel-app-static-trip', false, [], $this->get_asset_version_from( 'css/trip.css', $asset_root ) );

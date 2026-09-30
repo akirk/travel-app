@@ -1203,7 +1203,7 @@ class App extends BaseApp {
 
         wp_register_ability( 'travel-app/add-itinerary-item', [
             'label'               => __( 'Add Itinerary Item', 'travel-app' ),
-            'description'         => 'Adds a flight, lodging, train, car, activity, or other itinerary item to an existing travel plan owned by the current user.',
+            'description'         => 'Immediately saves one flight, lodging stay, train journey, rental car, activity, or other itinerary item to an existing travel plan owned by the current user. This creates an item, not a draft for confirmation.',
             'category'            => 'travel-app',
             'input_schema'        => $this->get_itinerary_item_ability_input_schema( true ),
             'output_schema'       => [
@@ -1222,7 +1222,7 @@ class App extends BaseApp {
             },
             'meta'                => [
                 'annotations' => [
-                    'instructions' => 'Use this for adding one new reservation or plan to an existing trip. If the target trip is ambiguous, list or get trips first and ask the user to choose.',
+                    'instructions' => 'Use this when the user asks to save one new reservation or plan to an existing trip. Resolve trip_id with list-trips or get-trip; if the target is ambiguous, ask the user to choose. Check the existing trip items before adding a booking that may already be saved: repeated calls create duplicates. Supply a meaningful title and the known structured fields; omit unknown values instead of guessing. Resolve ambiguous dates or timezones before supplying them. Use update-itinerary-item to change an existing item.',
                     'readonly'     => false,
                     'destructive'  => false,
                     'idempotent'   => false,
@@ -1453,6 +1453,10 @@ class App extends BaseApp {
             'required'             => [ 'trip_id', 'segment' ],
             'additionalProperties' => false,
         ];
+
+        $schema['properties']['segment']['description'] = $creating
+            ? 'One new itinerary item. Supply a title and type plus all known fields. Omitted fields are saved blank, except type defaults to other and end_date defaults to date when end_time is supplied. Do not invent missing details.'
+            : 'Only the fields to change on the existing item. Omitted fields retain their saved values. An empty string clears a string field; type must be one of the supported item types.';
 
         if ( ! $creating ) {
             $schema['properties']['item_id'] = [

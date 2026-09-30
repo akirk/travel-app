@@ -79,47 +79,47 @@ class ItineraryItem {
                 'schema' => [ 'type' => 'integer', 'description' => 'Itinerary item ID. Use with traveler/get-itinerary-item, traveler/update-itinerary-item, or traveler/delete-itinerary-item.' ],
             ],
             'type'              => [
-                'schema' => [ 'type' => 'string', 'enum' => self::TYPES, 'description' => 'Kind of itinerary item.' ],
+                'schema' => [ 'type' => 'string', 'enum' => self::TYPES, 'description' => 'Kind of itinerary item: flight for air travel, lodging for a hotel or overnight stay, train for rail travel, car for a rental car, activity for an event or visit, and other when none fits. Defaults to other when omitted.' ],
             ],
             'title'             => [
-                'schema' => [ 'type' => 'string', 'description' => 'User-visible item title, often the flight number, hotel name, train, car booking, activity, or venue.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Short user-visible title, such as LH 123 Berlin to Frankfurt, Hotel Riverside, or Museum visit. Include a flight or train number when supplied. Do not invent booking details.' ],
             ],
             'date'              => [
-                'schema' => [ 'type' => 'string', 'description' => 'Start date in YYYY-MM-DD format.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Local start date as YYYY-MM-DD, for example 2026-10-03. Departure date for transport, check-in date for lodging, pickup date for a rental car, or event date for an activity. Omit when unknown.' ],
             ],
             'end_date'          => [
-                'schema' => [ 'type' => 'string', 'description' => 'End date in YYYY-MM-DD format when known.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Local end date as YYYY-MM-DD: arrival date for transport, checkout date for lodging, or return date for a rental car. Set explicitly for overnight travel. If omitted with end_time present, defaults to date. Omit when unknown.' ],
             ],
             'time'              => [
-                'schema' => [ 'type' => 'string', 'description' => 'Start time in local 24-hour HH:MM format when known.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Local start time as 24-hour HH:MM, for example 09:30: departure, check-in, pickup, or activity start time. Do not put a UTC timestamp here or invent a time for a date-only booking. Omit when unknown.' ],
             ],
             'end_time'          => [
-                'schema' => [ 'type' => 'string', 'description' => 'End time in local 24-hour HH:MM format when known.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Local end time as 24-hour HH:MM: arrival, checkout, return, or activity end time. For transport across timezones, use the destination local time. Omit when unknown.' ],
             ],
             'starts_at_utc'     => [
-                'schema' => [ 'type' => 'string', 'description' => 'UTC start timestamp from the booking or calendar source when known.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Absolute start timestamp in UTC using ISO 8601, for example 2026-10-03T07:30:00Z. Supply only when given by the source or reliably converted using a known timezone. Keep consistent with date and time; omit when unknown.' ],
             ],
             'ends_at_utc'       => [
-                'schema' => [ 'type' => 'string', 'description' => 'UTC end timestamp from the booking or calendar source when known.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Absolute end timestamp in UTC using ISO 8601, for example 2026-10-03T09:00:00Z. Useful for travel across timezones. Keep consistent with end_date and end_time; omit when unknown.' ],
             ],
             'timezone'          => [
-                'schema' => [ 'type' => 'string', 'description' => 'IANA timezone when known, such as Europe/Berlin.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'IANA timezone identifier for the item, such as Europe/Berlin; not an abbreviation such as CET or a UTC offset. A single timezone cannot describe both ends of travel across timezones; use UTC timestamps for those absolute instants. Omit when unknown.' ],
             ],
             'location'          => [
-                'schema' => [ 'type' => 'string', 'description' => 'Start location, hotel, venue, airport code, station, address, or city.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Departure airport or station for transport, hotel name or address for lodging, pickup location for a rental car, or venue for an activity. Preserve airport codes, station names, and addresses supplied by the user.' ],
             ],
             'end_location'      => [
-                'schema' => [ 'type' => 'string', 'description' => 'Destination location for transport items, such as an arrival airport code or station.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Arrival airport or station for transport, or return location for a rental car when different from pickup. Omit for a stay or activity at one location.' ],
             ],
             'url'               => [
-                'schema' => [ 'type' => 'string', 'description' => 'Booking, map, source, or reference URL saved on the itinerary item.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Full booking, map, source, or reference URL supplied by the user, for example https://example.com/reservation. Omit when none was supplied; do not invent a URL.' ],
             ],
             'app_url'           => [
                 'schema' => [ 'type' => 'string', 'description' => 'Travel App URL for this itinerary item.' ],
                 'input'  => false,
             ],
             'details'           => [
-                'schema' => [ 'type' => 'string', 'description' => 'Short overview-useful notes, excluding confirmation codes and payment details when imported cleanly.' ],
+                'schema' => [ 'type' => 'string', 'description' => 'Plain-text notes useful on the trip overview, such as baggage allowance, check-in instructions, or an activity meeting point. Keep structured dates, times, and locations in their own fields. Exclude payment details and avoid copying the entire confirmation.' ],
             ],
             'url_preview'       => [
                 'schema' => self::url_preview_schema(),

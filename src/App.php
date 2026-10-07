@@ -731,8 +731,18 @@ class App extends BaseApp {
             return [];
         }
 
+        $candidate_owner_ids = get_users( [
+            'fields'       => 'ids',
+            'exclude'      => [ $actor_user_id ],
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Global trip editor delegation is stored in user meta and filtered here to avoid scanning every user on the site.
+            'meta_key'     => '_travel_app_global_trip_editor_capability',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Excludes users who disabled global trip editing.
+            'meta_value'   => 'none',
+            'meta_compare' => '!=',
+        ] );
+
         $owner_ids = [];
-        foreach ( get_users( [ 'fields' => 'ids' ] ) as $owner_user_id ) {
+        foreach ( $candidate_owner_ids as $owner_user_id ) {
             $owner_user_id = (int) $owner_user_id;
             if ( $this->user_can_edit_trips_for_owner( $actor_user_id, $owner_user_id ) ) {
                 $owner_ids[] = $owner_user_id;
@@ -1431,7 +1441,7 @@ class App extends BaseApp {
     public function list_ability_items( $input ): array {
         $active = is_array( $input ) && array_key_exists( 'active', $input ) ? (bool) $input['active'] : null;
         $trips = array_map( static function( Trip $trip ): array {
-            return $trip->to_array();
+            return $trip->to_summary_array();
         }, Trip::for_current_user() );
 
         if ( null !== $active ) {
@@ -3027,13 +3037,12 @@ class App extends BaseApp {
 
     private function update_trip_bounds_from_items( int $trip_id ): void {
         $dates = [];
-        foreach ( ItineraryItem::get_for_trip( $trip_id ) as $item ) {
-            $segment = $item->to_array();
-            if ( ! empty( $segment['date'] ) ) {
-                $dates[] = (string) $segment['date'];
+        foreach ( ItineraryItem::get_for_trip( $trip_id, null, false ) as $item ) {
+            if ( '' !== $item->date ) {
+                $dates[] = $item->date;
             }
-            if ( ! empty( $segment['end_date'] ) ) {
-                $dates[] = (string) $segment['end_date'];
+            if ( '' !== $item->end_date ) {
+                $dates[] = $item->end_date;
             }
         }
 

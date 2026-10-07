@@ -26,7 +26,7 @@ class ItineraryItem {
     private \WP_Post $post;
     private int $trip_id;
 
-    public function __construct( \WP_Post $post, ?int $trip_id = null ) {
+    public function __construct( \WP_Post $post, ?int $trip_id = null, bool $load_attachments = true ) {
         $this->post = $post;
         $this->id = (int) $post->ID;
         $this->trip_id = $trip_id ?? self::resolve_trip_id( $post->ID );
@@ -47,7 +47,7 @@ class ItineraryItem {
         $this->app_url = $this->trip_id ? home_url( '/travel-app/trip/' . $this->trip_id . '/#segment-' . $this->id ) : '';
         $this->url_preview = $preview_service->get_item_preview( $this->id );
         $this->url_preview_debug = $preview_service->get_item_preview_debug( $this->id );
-        $this->attachments = $this->attachments();
+        $this->attachments = $load_attachments ? $this->attachments() : [];
         $this->details = (string) $this->post->post_content;
     }
 
@@ -267,7 +267,7 @@ class ItineraryItem {
         return new self( $post, $trip_id );
     }
 
-    public static function get_for_trip( int $trip_id, ?int $user_id = null ): array {
+    public static function get_for_trip( int $trip_id, ?int $user_id = null, bool $load_attachments = true ): array {
         $user_id = $user_id ?? get_current_user_id();
 
         $posts = get_posts( [
@@ -288,9 +288,31 @@ class ItineraryItem {
             ],
         ] );
 
-        return array_values( array_map( static function( \WP_Post $post ) use ( $trip_id ): self {
-            return new self( $post, $trip_id );
+        return array_values( array_map( static function( \WP_Post $post ) use ( $trip_id, $load_attachments ): self {
+            return new self( $post, $trip_id, $load_attachments );
         }, $posts ) );
+    }
+
+    public static function count_for_trip( int $trip_id ): int {
+        $post_ids = get_posts( [
+            'post_type'              => 'travel_app_item',
+            'post_status'            => [ 'private', 'publish', 'draft' ],
+            'posts_per_page'         => -1,
+            'fields'                 => 'ids',
+            'no_found_rows'          => true,
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false,
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Items are attached to the trip taxonomy; this is the canonical WordPress relationship query.
+            'tax_query'              => [
+                [
+                    'taxonomy' => 'travel_app_trip',
+                    'field'    => 'term_id',
+                    'terms'    => [ $trip_id ],
+                ],
+            ],
+        ] );
+
+        return is_array( $post_ids ) ? count( $post_ids ) : 0;
     }
 
     public static function get_user_attachment( int $trip_id, int $item_id, int $attachment_id ) {

@@ -427,7 +427,8 @@ class App extends BaseApp {
     }
 
     public function is_demo_mode_enabled(): bool {
-        $enabled = defined( 'TRAVELER_DEMO_MODE' ) && TRAVELER_DEMO_MODE;
+        $enabled = ( defined( 'TRAVEL_APP_DEMO_MODE' ) && TRAVEL_APP_DEMO_MODE )
+            || ( defined( 'TRAVELER_DEMO_MODE' ) && TRAVELER_DEMO_MODE );
 
         return (bool) apply_filters( 'travel_app_demo_mode_enabled', $enabled );
     }

@@ -76,7 +76,7 @@ class ItineraryItem {
     private static function field_definitions(): array {
         return [
             'id'                => [
-                'schema' => [ 'type' => 'integer', 'description' => 'Itinerary item ID. Use with traveler/get-itinerary-item, traveler/update-itinerary-item, or traveler/delete-itinerary-item.' ],
+                'schema' => [ 'type' => 'integer', 'description' => 'Itinerary item ID. Use with travel-app/get-itinerary-item, travel-app/update-itinerary-item, or travel-app/delete-itinerary-item.' ],
             ],
             'type'              => [
                 'schema' => [ 'type' => 'string', 'enum' => self::TYPES, 'description' => 'Kind of itinerary item.' ],

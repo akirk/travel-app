@@ -21,7 +21,15 @@
 
 	<!-- Review-team concerns which are outside the Security and DB subsets. -->
 	<rule ref="Generic.PHP.Syntax"/>
-	<rule ref="WordPress.WP.Capabilities"/>
+	<rule ref="WordPress.WP.Capabilities">
+		<properties>
+			<property name="custom_capabilities" type="array">
+				<element value="read_travel_app_trip"/>
+				<element value="edit_travel_app_trip"/>
+				<element value="delete_travel_app_trip"/>
+			</property>
+		</properties>
+	</rule>
 	<rule ref="WordPress.WP.DiscouragedConstants"/>
 	<rule ref="WordPress.WP.EnqueuedResources"/>
 

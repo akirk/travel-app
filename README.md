@@ -80,8 +80,9 @@ visits do not query it again.
 
 ## Screenshots
 
-1. A trip's day-by-day timeline, with the current and upcoming itinerary items highlighted.
+1. The Travel App dashboard, showing upcoming and past trips alongside the import panel.
 2. The trip list on a phone: the trips coming up with their dates and lengths, and the finished ones by year below.
+3. A trip's day-by-day timeline, with lodging coverage and itinerary items grouped by day.
 
 ## Changelog
 

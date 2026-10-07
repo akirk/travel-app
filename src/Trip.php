@@ -229,6 +229,17 @@ class Trip {
         return $trip;
     }
 
+    public function to_summary_array(): array {
+        return [
+            'id'            => $this->id,
+            'title'         => $this->title,
+            'starts_at'     => $this->starts_at,
+            'ends_at'       => $this->ends_at,
+            'is_active'     => $this->is_active(),
+            'segment_count' => ItineraryItem::count_for_trip( $this->id ),
+        ];
+    }
+
     public function to_ability_array( callable $share_url_callback ): array {
         $trip = $this->to_array();
         $trip['url'] = home_url( '/travel-app/trip/' . $this->id . '/' );

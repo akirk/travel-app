@@ -173,10 +173,14 @@ class App extends BaseApp {
                 ],
             ],
             'precache'                         => [
+                TRAVEL_APP_PLUGIN_URL . 'assets/css/index.css',
+                TRAVEL_APP_PLUGIN_URL . 'assets/css/trip.css',
+                TRAVEL_APP_PLUGIN_URL . 'assets/js/index.js',
+                TRAVEL_APP_PLUGIN_URL . 'assets/js/trip.js',
                 TRAVEL_APP_PLUGIN_URL . 'assets/js/timeline-time.js',
                 TRAVEL_APP_PLUGIN_URL . 'assets/js/offline-sync.js',
             ],
-            'cache_name'                       => 'travel-app-v8',
+            'cache_name'                       => 'travel-app-v9',
             'cache_prefix'                     => 'travel-app-',
             'cacheable_paths'                  => array_values( array_filter( [
                 $asset_path,

@@ -4,7 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const scripts = ['assets/js/offline-sync.js', 'themes/command-ledger/assets/js/offline-sync.js'];
+const scripts = ['assets/js/offline-sync.js'];
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 function database() {

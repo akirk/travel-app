@@ -3,7 +3,7 @@
  * Plugin Name: Travel App
  * Plugin URI: https://github.com/akirk/travel-app
  * Description: Turn booking confirmations into day-by-day travel itineraries you can follow, map, share and journal, all kept privately on your own site.
- * Version: 1.1.0
+ * Version: 1.1.0+0c691f63d38e
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: Alex Kirk

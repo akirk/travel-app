@@ -209,6 +209,11 @@ button {
     font-weight: 750;
     overflow-wrap: anywhere;
 }
+.offline-help {
+    margin: 12px 0 0;
+    color: var(--wp-app-color-muted);
+    font-size: 0.88rem;
+}
 .demo-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 18px; }
 .demo-controls label { min-width: 190px; margin: 0; }
 .ghost-button {

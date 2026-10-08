@@ -1092,6 +1092,7 @@ if ( ! $is_static_download ) {
                             <dd data-offline-queue><?php esc_html_e( 'Checking', 'travel-app' ); ?></dd>
                         </div>
                     </dl>
+                    <p class="offline-help"><?php esc_html_e( 'Offline access depends on the Travel App service worker. Online editing remains available when offline access is unavailable.', 'travel-app' ); ?></p>
                 </details>
             <?php endif; ?>
 

@@ -1,0 +1,31 @@
+{
+	"landingPage": "/travel-app/",
+	"steps": [
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "travel-app"
+			},
+			"options": {
+				"activate": false
+			}
+		},
+		{
+			"step": "mkdir",
+			"path": "/wordpress/wp-content/plugins/travel-app/playground"
+		},
+		{
+			"step": "writeFile",
+			"path": "/wordpress/wp-content/plugins/travel-app/playground/demo.php",
+			"data": {
+				"resource": "url",
+				"url": "https://raw.githubusercontent.com/akirk/travel-app/main/.playground/demo.php"
+			}
+		},
+		{
+			"step": "activatePlugin",
+			"pluginPath": "travel-app/travel-app.php"
+		}
+	]
+}

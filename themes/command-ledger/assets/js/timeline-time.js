@@ -1,0 +1,866 @@
+(function() {
+    function formatInputDate(date) {
+        var pad = function(value) {
+            return String(value).padStart(2, '0');
+        };
+        return [
+            date.getFullYear(),
+            pad(date.getMonth() + 1),
+            pad(date.getDate())
+        ].join('-') + 'T' + [pad(date.getHours()), pad(date.getMinutes())].join(':');
+    }
+
+    function parseDateTime(value) {
+        return value ? new Date(value).getTime() : 0;
+    }
+
+    function dateOffsetDays(date, baseDate) {
+        if (!date || !baseDate) {
+            return null;
+        }
+
+        var dateTime = parseDateTime(date + 'T12:00');
+        var baseTime = parseDateTime(baseDate + 'T12:00');
+        if (!dateTime || !baseTime) {
+            return null;
+        }
+
+        return Math.round((dateTime - baseTime) / 86400000);
+    }
+
+    function formatRelativeDateTime(date, timeLabel, fullLabel, currentDate) {
+        var offsetDays = dateOffsetDays(date, currentDate);
+
+        if (offsetDays === 0) {
+            return timeLabel || fullLabel || '';
+        }
+        if (offsetDays === 1) {
+            return ['tomorrow', timeLabel].filter(Boolean).join(' ');
+        }
+        if (offsetDays === -1) {
+            return ['yesterday', timeLabel].filter(Boolean).join(' ');
+        }
+
+        return fullLabel || [date, timeLabel].filter(Boolean).join(' ');
+    }
+
+    function getSourceEndTime(source) {
+        var date = source.getAttribute('data-date') || '';
+        var endDate = source.getAttribute('data-end-date') || date;
+        var endTime = source.getAttribute('data-end-time') || '';
+
+        return date && endDate && endTime ? parseDateTime(endDate + 'T' + endTime) : 0;
+    }
+
+    function hasSameDayEndTimeInMeta(source, dateTimeLabel) {
+        var date = source.getAttribute('data-date') || '';
+        var endDate = source.getAttribute('data-end-date') || '';
+        var endTime = source.getAttribute('data-end-time') || '';
+
+        return !!(date && endDate === date && endTime && dateTimeLabel.indexOf(endTime) !== -1);
+    }
+
+    function formatDuration(milliseconds) {
+        var past = milliseconds < 0;
+        var minutesTotal = Math.max(0, Math.round(Math.abs(milliseconds) / 60000));
+        var days = Math.floor(minutesTotal / 1440);
+        var hours = Math.floor((minutesTotal % 1440) / 60);
+        var minutes = minutesTotal % 60;
+        var parts = [];
+
+        if (days) {
+            parts.push(days + 'd');
+        }
+        if (hours || days) {
+            parts.push(hours + 'h');
+        }
+        if (!days && minutes) {
+            parts.push(minutes + 'm');
+        }
+        if (!parts.length) {
+            return 'Now';
+        }
+
+        return past ? parts.join(' ') + ' ago' : 'in ' + parts.join(' ');
+    }
+
+    function normalizeTime(value) {
+        var match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) {
+            return '12:00';
+        }
+
+        var hours = Math.max(0, Math.min(23, parseInt(match[1], 10) || 0));
+        var minutes = Math.max(0, Math.min(59, parseInt(match[2], 10) || 0));
+
+        return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+    }
+
+    function syncVisibleInputs(control) {
+        var input = control.querySelector('[data-demo-input]');
+        var dateInput = control.querySelector('[data-demo-date]');
+        var timeInput = control.querySelector('[data-demo-time]');
+        var value = input && input.value ? input.value : '';
+
+        if (dateInput) {
+            dateInput.value = value ? value.slice(0, 10) : '';
+        }
+        if (timeInput) {
+            timeInput.value = value ? value.slice(11, 16) : '12:00';
+        }
+    }
+
+    function syncHiddenInput(control) {
+        var input = control.querySelector('[data-demo-input]');
+        var dateInput = control.querySelector('[data-demo-date]');
+        var timeInput = control.querySelector('[data-demo-time]');
+        if (!input || !dateInput || !dateInput.value) {
+            return;
+        }
+
+        var time = normalizeTime(timeInput && timeInput.value ? timeInput.value : '12:00');
+        if (timeInput) {
+            timeInput.value = time;
+        }
+        input.value = dateInput.value + 'T' + time;
+    }
+
+    function updateControl(control) {
+        syncHiddenInput(control);
+        var id = control.getAttribute('data-demo-controls');
+        var input = control.querySelector('[data-demo-input]');
+        var value = input && input.value ? input.value : '';
+        var dateValue = value ? value.slice(0, 10) : '';
+        var currentTime = parseDateTime(value);
+
+        document.querySelectorAll('[data-demo-target="' + id + '"]').forEach(function(target) {
+            updateTimelineTarget(target, value, dateValue, currentTime);
+            updatePreviewTarget(target, value, currentTime);
+        });
+    }
+
+    function updateTimelineTarget(target, value, dateValue, currentTime) {
+        if (!target.classList.contains('timeline')) {
+            return;
+        }
+
+        target.querySelectorAll('.timeline-day').forEach(function(day) {
+            var date = day.getAttribute('data-date') || '';
+            day.classList.toggle('past', dateValue && date && date !== 'unscheduled' && date < dateValue);
+            day.classList.toggle('current', dateValue && date === dateValue);
+        });
+
+        var panel = target.closest('.timeline-panel');
+        if (panel) {
+            panel.querySelectorAll('[data-timeline-day-link]').forEach(function(link) {
+                var isCurrent = dateValue && link.getAttribute('data-timeline-day-link') === dateValue;
+                link.classList.toggle('is-current', isCurrent);
+                if (isCurrent) {
+                    link.setAttribute('aria-current', 'date');
+                } else {
+                    link.removeAttribute('aria-current');
+                }
+            });
+        }
+
+        target.querySelectorAll('.timeline-item').forEach(function(item) {
+            var itemRange = getItemTimeRange(item);
+            item.classList.remove('current', 'past');
+            if (!currentTime || !itemRange) {
+                return;
+            }
+
+            if (itemRange.start <= currentTime && currentTime < itemRange.end) {
+                item.classList.add('current');
+            } else if (itemRange.end <= currentTime) {
+                item.classList.add('past');
+            }
+        });
+
+        updateTimelineStateLabels(target);
+        updateTimelineJumpControls(target, positionMarker(target, value, currentTime));
+    }
+
+    function updateTimelineStateLabels(target) {
+        var currentLabel = target.getAttribute('data-state-current') || 'Current';
+        var pastLabel = target.getAttribute('data-state-past') || 'Passed';
+        var plannedLabel = target.getAttribute('data-state-planned') || 'Planned';
+        var generatedLabel = target.getAttribute('data-state-generated') || 'Generated';
+
+        target.querySelectorAll('.timeline-item').forEach(function(item) {
+            var state = item.querySelector('[data-timeline-state]');
+            var isGenerated = item.getAttribute('data-generated') === '1';
+
+            if (!state) {
+                return;
+            }
+
+            if (item.classList.contains('current')) {
+                state.textContent = currentLabel;
+            } else if (item.classList.contains('past')) {
+                state.textContent = pastLabel;
+            } else if (isGenerated) {
+                state.textContent = generatedLabel;
+            } else {
+                state.textContent = plannedLabel;
+            }
+
+            state.classList.toggle('generated', isGenerated && !item.classList.contains('current') && !item.classList.contains('past'));
+        });
+    }
+
+    function updatePreviewTarget(target, value, currentTime) {
+        if (!target.hasAttribute('data-demo-preview')) {
+            return;
+        }
+
+        var current = null;
+        var next = null;
+        var items = Array.prototype.slice.call(target.querySelectorAll('[data-preview-item]'));
+        var currentDate = value ? value.slice(0, 10) : '';
+
+        items.forEach(function(item, index) {
+            var itemTime = parseDateTime(item.getAttribute('data-datetime') || '');
+            item.hidden = true;
+            if (!currentTime || !itemTime) {
+                return;
+            }
+            if (itemTime <= currentTime) {
+                current = item;
+            } else if (!next) {
+                next = item;
+                if (isTodayCheckout(item, currentDate)) {
+                    current = item;
+                    next = findNextPreviewItem(items, index + 1, currentTime);
+                }
+            }
+        });
+
+        var currentSlot = target.querySelector('[data-preview-slot="current"]');
+        var nextSlot = target.querySelector('[data-preview-slot="next"]');
+        renderPreviewSlot(currentSlot, current, currentTime, currentDate);
+        renderPreviewSlot(nextSlot, next, currentTime, currentDate);
+
+        target.querySelectorAll('[data-preview-demo-time]').forEach(function(node) {
+            node.textContent = value ? value.replace('T', ' ') : '';
+        });
+    }
+
+    // Preview slots are marked for Mask Private Data without a key, so the mask identifies the value
+    // by data-private-value: the real value behind the text, which may be shortened or decorated.
+    // Pass an empty maskValue for generic labels that should never be masked.
+    function setMaskedText(node, text, maskValue) {
+        if (!node) {
+            return;
+        }
+
+        node.textContent = text || '';
+        node.setAttribute('data-private-value', (maskValue === undefined ? text : maskValue) || '');
+    }
+
+    function maskPrivateData(root) {
+        if (root && window.maskPrivateData && typeof window.maskPrivateData.process === 'function') {
+            window.maskPrivateData.process(root);
+        }
+    }
+
+    function isTodayCheckout(item, currentDate) {
+        return item
+            && item.getAttribute('data-timeline-kind') === 'checkout'
+            && currentDate
+            && item.getAttribute('data-date') === currentDate;
+    }
+
+    function findNextPreviewItem(items, startIndex, currentTime) {
+        for (var index = startIndex; index < items.length; index++) {
+            var itemTime = parseDateTime(items[index].getAttribute('data-datetime') || '');
+            if (currentTime && itemTime && itemTime > currentTime) {
+                return items[index];
+            }
+        }
+
+        return null;
+    }
+
+    function renderPreviewSlot(slot, source, currentTime, currentDate) {
+        if (!slot) {
+            return;
+        }
+
+        var title = slot.querySelector('[data-preview-title]');
+        var meta = slot.querySelector('[data-preview-meta]');
+        var previewLocation = slot.querySelector('[data-preview-location]');
+        var end = slot.querySelector('[data-preview-end]');
+        var countdown = slot.querySelector('[data-preview-countdown]');
+        var label = slot.querySelector('[data-preview-label]');
+        var isCurrentSlot = slot.getAttribute('data-preview-slot') === 'current';
+
+        if (!source) {
+            slot.hidden = true;
+            slot.removeAttribute('href');
+            if (label) {
+                label.textContent = slot.getAttribute('data-slot-label') || '';
+            }
+            if (title) {
+                setMaskedText(title, slot.getAttribute('data-empty-title') || 'No item', '');
+            }
+            if (meta) {
+                setMaskedText(meta, '');
+            }
+            if (previewLocation) {
+                setMaskedText(previewLocation, '');
+            }
+            if (end) {
+                setMaskedText(end, '');
+            }
+            if (countdown) {
+                countdown.textContent = '';
+            }
+            maskPrivateData(slot);
+            return;
+        }
+
+        slot.hidden = false;
+        slot.setAttribute('href', source.getAttribute('data-url') || '#');
+        if (title) {
+            setMaskedText(title, source.getAttribute('data-title') || 'Untitled item');
+        }
+        var location = source.getAttribute('data-location') || '';
+        var endLocation = source.getAttribute('data-end-location') || '';
+        var endDate = source.getAttribute('data-end-date') || '';
+        var endTime = source.getAttribute('data-end-time') || '';
+        var endTimeValue = getSourceEndTime(source);
+        var timelineKind = source.getAttribute('data-timeline-kind') || 'start';
+        var isCheckout = timelineKind === 'checkout';
+        var isLodging = source.getAttribute('data-type') === 'lodging' && !isCheckout;
+        var hasEnded = isCurrentSlot && currentTime && endTimeValue && endTimeValue <= currentTime;
+        var isTravelInProgress = isCurrentSlot && currentTime && endTimeValue > currentTime && endLocation && endLocation !== location;
+        var isLodgingInProgress = isCurrentSlot && currentTime && endTimeValue > currentTime && isLodging;
+
+        if (label) {
+            label.textContent = hasEnded
+                ? (slot.getAttribute('data-ended-label') || slot.getAttribute('data-slot-label') || '')
+                : (slot.getAttribute('data-slot-label') || '');
+        }
+        var dateTimeLabel = '';
+        if (meta) {
+            if (isTravelInProgress) {
+                setMaskedText(meta, [
+                    '→',
+                    formatRelativeDateTime(endDate, endTime, source.getAttribute('data-end-label') || '', currentDate),
+                    endLocation
+                ].filter(Boolean).join(' '));
+            } else if (isLodgingInProgress) {
+                setMaskedText(meta, '');
+            } else {
+                var locationLabel = location && endLocation && location !== endLocation
+                    ? location + ' → ' + endLocation
+                    : (location || endLocation);
+                var date = source.getAttribute('data-date') || '';
+                var timeLabel = source.getAttribute('data-time-label') || '';
+                dateTimeLabel = formatRelativeDateTime(
+                    date,
+                    timeLabel,
+                    source.getAttribute('data-date-time-label') || '',
+                    currentDate
+                );
+
+                setMaskedText(meta, [
+                    dateTimeLabel,
+                    isLodging ? '' : locationLabel
+                ].filter(Boolean).join(' '));
+            }
+        }
+        if (previewLocation) {
+            setMaskedText(previewLocation, isLodging ? (location || endLocation) : '');
+        }
+        if (end) {
+            var endLabel = formatRelativeDateTime(
+                endDate,
+                endTime,
+                source.getAttribute('data-end-label') || '',
+                currentDate
+            );
+            setMaskedText(end, endDate && !isTravelInProgress && !hasSameDayEndTimeInMeta(source, dateTimeLabel)
+                ? ['→', endLabel].filter(Boolean).join(' ')
+                : '');
+        }
+        if (countdown) {
+            var countdownTarget = isTravelInProgress || isLodgingInProgress ? endTimeValue : parseDateTime(source.getAttribute('data-datetime') || '');
+            countdown.textContent = currentTime && countdownTarget
+                ? formatDuration(countdownTarget - currentTime)
+                : '';
+        }
+        maskPrivateData(slot);
+    }
+
+    function positionMarker(target, value, currentTime) {
+        var marker = target.querySelector('.time-marker');
+        var markerLabel = target.querySelector('.time-marker-label');
+
+        if (!marker || !markerLabel) {
+            return false;
+        }
+
+        if (!currentTime) {
+            marker.style.display = 'none';
+            markerLabel.textContent = '';
+            return false;
+        }
+
+        var targetRect = target.getBoundingClientRect();
+        var dateValue = value ? value.slice(0, 10) : '';
+        var currentDay = getTimelineDay(target, dateValue);
+        var top = currentDay ? getTimeMarkerDayTop(currentDay, targetRect, currentTime) : null;
+
+        if (top === null) {
+            marker.style.display = 'none';
+            markerLabel.textContent = '';
+            return false;
+        }
+
+        marker.style.top = Math.max(0, top) + 'px';
+        marker.style.display = 'block';
+        markerLabel.textContent = value.slice(11, 16);
+        return true;
+    }
+
+    function hasExplicitItemTime(item) {
+        return !!(item && String(item.getAttribute('data-time') || '').trim().match(/^\d{1,2}:\d{2}$/));
+    }
+
+    function getItemTimeRange(item) {
+        if (!item) {
+            return null;
+        }
+
+        if (hasExplicitItemTime(item)) {
+            var itemDate = getItemDate(item);
+            var start = parseDateTime(item.getAttribute('data-datetime') || '');
+            var endDate = item.getAttribute('data-end-date') || itemDate;
+            var endTime = String(item.getAttribute('data-end-time') || '').trim();
+            var end = 0;
+
+            if (endDate && endTime.match(/^\d{1,2}:\d{2}$/)) {
+                end = parseDateTime(endDate + 'T' + endTime);
+            } else if (item.getAttribute('data-end-date')) {
+                end = parseDateTime(endDate + 'T23:59:59');
+            }
+
+            return start ? { start: start, end: end > start ? end : start } : null;
+        }
+
+        var date = getItemDate(item);
+        var start = date ? parseDateTime(date + 'T00:00') : 0;
+        var endDate = item.getAttribute('data-end-date') || date;
+        var end = endDate ? parseDateTime(endDate + 'T23:59:59') : 0;
+
+        return start && end ? { start: start, end: end } : null;
+    }
+
+    function getItemDate(item) {
+        if (!item) {
+            return '';
+        }
+
+        return item.getAttribute('data-date') || (item.getAttribute('data-datetime') || '').slice(0, 10);
+    }
+
+    function updateTimelineJumpControls(target, enabled) {
+        if (!target.id) {
+            return;
+        }
+
+        document.querySelectorAll('[data-timeline-now]').forEach(function(button) {
+            if (button.getAttribute('aria-controls') !== target.id) {
+                return;
+            }
+
+            button.disabled = !enabled;
+            var clock = button.querySelector('[data-timeline-clock]');
+            var markerLabel = target.querySelector('.time-marker-label');
+            if (clock) {
+                clock.textContent = enabled && markerLabel ? markerLabel.textContent : '';
+            }
+        });
+    }
+
+    function getScrollOffset() {
+        var viewportOffset = Math.round(window.innerHeight * 0.18);
+        return Math.max(72, Math.min(160, viewportOffset));
+    }
+
+    function getScrollBehavior() {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    }
+
+    function setTimelineDayExpanded(day, expanded) {
+        var content = day ? day.querySelector('.timeline-day-content') : null;
+        var button = day ? day.querySelector('[data-timeline-day-toggle]') : null;
+        var label = button ? button.querySelector('[data-timeline-day-toggle-label]') : null;
+
+        if (!content || !button) {
+            return;
+        }
+
+        content.hidden = !expanded;
+        button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        if (label) {
+            label.textContent = expanded
+                ? (button.getAttribute('data-collapse-label') || 'Collapse')
+                : (button.getAttribute('data-expand-label') || 'Expand');
+        }
+    }
+
+    function scrollToTimelineNow(target) {
+        var marker = target.querySelector('.time-marker');
+        var currentItem = target.querySelector('.timeline-item.current');
+        var currentDay = currentItem ? currentItem.closest('.timeline-day') : target.querySelector('.timeline-day.current');
+        var currentDayContent = currentDay ? currentDay.querySelector('.timeline-day-content') : null;
+        var currentDayWasCollapsed = !!(currentDayContent && currentDayContent.hidden);
+
+        if (currentDay) {
+            setTimelineDayExpanded(currentDay, true);
+        }
+
+        if (currentItem) {
+            var currentWrap = currentItem.closest('.timeline-item-wrap') || currentItem;
+            currentWrap.scrollIntoView({ behavior: getScrollBehavior(), block: 'start' });
+            return;
+        }
+        if (currentDayWasCollapsed && currentDay) {
+            currentDay.scrollIntoView({ behavior: getScrollBehavior(), block: 'start' });
+            return;
+        }
+
+        if (marker && marker.style.display !== 'none') {
+            window.scrollTo({
+                top: Math.max(0, marker.getBoundingClientRect().top + window.pageYOffset - getScrollOffset()),
+                behavior: getScrollBehavior()
+            });
+            return;
+        }
+    }
+
+    function initTimelineDayControls() {
+        document.querySelectorAll('[data-timeline-day-toggle]').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var day = button.closest('.timeline-day');
+                setTimelineDayExpanded(day, button.getAttribute('aria-expanded') !== 'true');
+            });
+        });
+    }
+
+    function initTimelineDayNavigation() {
+        document.querySelectorAll('[data-preview-slot]').forEach(function(link) {
+            link.addEventListener('click', function() {
+                var item = document.getElementById((link.getAttribute('href') || '').replace(/^#/, ''));
+                if (item) {
+                    setTimelineDayExpanded(item.closest('.timeline-day'), true);
+                }
+            });
+        });
+        document.querySelectorAll('.timeline-panel').forEach(function(panel) {
+            var links = Array.prototype.slice.call(panel.querySelectorAll('[data-timeline-day-link]'));
+            var days = Array.prototype.slice.call(panel.querySelectorAll('.timeline-day'));
+
+            function setActiveLink(date) {
+                links.forEach(function(link) {
+                    link.classList.toggle('is-active', link.getAttribute('data-timeline-day-link') === date);
+                });
+            }
+
+            links.forEach(function(link) {
+                link.addEventListener('click', function() {
+                    var day = document.getElementById((link.getAttribute('href') || '').replace(/^#/, ''));
+                    if (day) {
+                        setTimelineDayExpanded(day, true);
+                        setActiveLink(day.getAttribute('data-date') || '');
+                    }
+                });
+            });
+
+            if ('IntersectionObserver' in window && days.length) {
+                var observer = new IntersectionObserver(function(entries) {
+                    var visible = entries.filter(function(entry) {
+                        return entry.isIntersecting;
+                    }).sort(function(a, b) {
+                        return a.boundingClientRect.top - b.boundingClientRect.top;
+                    });
+
+                    if (visible[0]) {
+                        setActiveLink(visible[0].target.getAttribute('data-date') || '');
+                    }
+                }, { rootMargin: '-12% 0px -70% 0px', threshold: 0 });
+
+                days.forEach(function(day) {
+                    observer.observe(day);
+                });
+            }
+        });
+    }
+
+    function initTimelineJumpControls() {
+        document.querySelectorAll('[data-timeline-now]').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var targetId = button.getAttribute('aria-controls') || '';
+                var target = targetId ? document.getElementById(targetId) : null;
+
+                if (!target || button.disabled) {
+                    return;
+                }
+
+                scrollToTimelineNow(target);
+            });
+        });
+    }
+
+    function getTimelineDay(target, dateValue) {
+        if (!dateValue) {
+            return null;
+        }
+
+        var days = Array.prototype.slice.call(target.querySelectorAll('.timeline-day'));
+        return days.find(function(day) {
+            return day.getAttribute('data-date') === dateValue;
+        }) || null;
+    }
+
+    function getTimeMarkerDayTop(day, targetRect, currentTime) {
+        var date = day.getAttribute('data-date') || '';
+        var startValue = date ? parseDateTime(date + 'T00:00') : 0;
+        var endValue = date ? parseDateTime(date + 'T23:59:59') : 0;
+        var anchors = [];
+
+        if (!startValue || !endValue) {
+            return null;
+        }
+
+        anchors.push({
+            value: startValue,
+            top: getTimelineDayAnchorTop(day, targetRect)
+        });
+
+        Array.prototype.slice.call(day.querySelectorAll('.timeline-item')).forEach(function(item) {
+            var itemDate = getItemDate(item);
+            var itemTime = String(item.getAttribute('data-time') || '').trim();
+            var itemRect;
+            var itemValue;
+            var endDate;
+            var endTime;
+            var endValueForItem;
+
+            if (itemDate !== date || !itemTime.match(/^\d{1,2}:\d{2}$/)) {
+                return;
+            }
+
+            itemRect = (item.hidden ? item.closest('.timeline-item-wrap') || item : item).getBoundingClientRect();
+            itemValue = parseDateTime(date + 'T' + itemTime);
+            if (itemValue) {
+                anchors.push({
+                    value: itemValue,
+                    top: itemRect.top - targetRect.top
+                });
+            }
+
+            endDate = item.getAttribute('data-end-date') || '';
+            endTime = String(item.getAttribute('data-end-time') || '').trim();
+            if (endTime.match(/^\d{1,2}:\d{2}$/) && (!endDate || endDate === date)) {
+                endValueForItem = parseDateTime(date + 'T' + endTime);
+                if (endValueForItem && endValueForItem > itemValue) {
+                    anchors.push({
+                        value: endValueForItem,
+                        top: itemRect.bottom - targetRect.top
+                    });
+                }
+            }
+        });
+
+        anchors.push({
+            value: endValue,
+            top: getTimelineDayEndTop(day, targetRect)
+        });
+
+        anchors.sort(function(a, b) {
+            return a.value - b.value || a.top - b.top;
+        });
+
+        return interpolateTimeMarkerTop(anchors, currentTime);
+    }
+
+    function interpolateTimeMarkerTop(anchors, currentTime) {
+        var previous = anchors[0] || null;
+        var next = null;
+        var ratio;
+
+        if (!previous) {
+            return null;
+        }
+
+        for (var index = 1; index < anchors.length; index++) {
+            next = anchors[index];
+            if (currentTime <= next.value) {
+                break;
+            }
+            previous = next;
+            next = null;
+        }
+
+        if (!next) {
+            return previous.top;
+        }
+
+        if (next.value <= previous.value || next.top <= previous.top) {
+            return previous.top;
+        }
+
+        ratio = (currentTime - previous.value) / (next.value - previous.value);
+        ratio = Math.max(0, Math.min(1, ratio));
+
+        return previous.top + (next.top - previous.top) * ratio;
+    }
+
+    function getTimelineDayAnchorTop(day, targetRect) {
+        var heading = day.querySelector('.day-heading');
+        var rect = heading ? heading.getBoundingClientRect() : day.getBoundingClientRect();
+
+        return rect.top - targetRect.top + (heading ? 14 : 0);
+    }
+
+    function getTimelineDayEndTop(day, targetRect) {
+        var nextDay = getNextTimelineDay(day);
+
+        return nextDay ? nextDay.getBoundingClientRect().top - targetRect.top : day.getBoundingClientRect().bottom - targetRect.top;
+    }
+
+    function getNextTimelineDay(day) {
+        var next = day.nextElementSibling;
+
+        while (next && !next.classList.contains('timeline-day')) {
+            next = next.nextElementSibling;
+        }
+
+        return next || null;
+    }
+
+    function initControl(control) {
+        var input = control.querySelector('[data-demo-input]');
+        if (!input) {
+            return;
+        }
+
+        control.querySelectorAll('[data-demo-shift]').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var minutes = parseInt(button.getAttribute('data-demo-shift'), 10) || 0;
+                var current = input.value ? new Date(input.value) : new Date();
+                current.setMinutes(current.getMinutes() + minutes);
+                input.value = formatInputDate(current);
+                syncVisibleInputs(control);
+                updateControl(control);
+            });
+        });
+
+        var now = control.querySelector('[data-demo-now]');
+        if (now) {
+            now.addEventListener('click', function() {
+                input.value = formatInputDate(new Date());
+                syncVisibleInputs(control);
+                updateControl(control);
+            });
+        }
+
+        control.querySelectorAll('[data-demo-date], [data-demo-time]').forEach(function(field) {
+            field.addEventListener('change', function() {
+                updateControl(control);
+            });
+            field.addEventListener('blur', function() {
+                updateControl(control);
+            });
+        });
+
+        syncVisibleInputs(control);
+        updateControl(control);
+    }
+
+    function currentDateTimeValue(target) {
+        var seeded = getSeededCurrentDateTime(target);
+
+        return seeded || formatInputDate(new Date());
+    }
+
+    function getSeededCurrentDateTime(target) {
+        if (!target) {
+            return '';
+        }
+
+        var value = target.getAttribute('data-current-time-value') || '';
+        var captured = parseInt(target.getAttribute('data-current-time-captured') || '', 10);
+        var base = value ? new Date(value) : null;
+
+        if (!value || !captured || !base || isNaN(base.getTime())) {
+            return '';
+        }
+
+        return formatInputDate(new Date(base.getTime() + Math.max(0, Date.now() - captured * 1000)));
+    }
+
+    function updateStandalonePreviews() {
+        var controlledIds = {};
+        document.querySelectorAll('[data-demo-controls]').forEach(function(control) {
+            controlledIds[control.getAttribute('data-demo-controls')] = true;
+        });
+
+        document.querySelectorAll('[data-demo-preview]').forEach(function(target) {
+            var id = target.getAttribute('data-demo-target') || '';
+            if (!controlledIds[id]) {
+                var value = currentDateTimeValue(target);
+                var currentTime = parseDateTime(value);
+                updatePreviewTarget(target, value, currentTime);
+            }
+        });
+    }
+
+    function updateStandaloneTimelines() {
+        var controlledIds = {};
+        document.querySelectorAll('[data-demo-controls]').forEach(function(control) {
+            controlledIds[control.getAttribute('data-demo-controls')] = true;
+        });
+
+        document.querySelectorAll('.timeline').forEach(function(target) {
+            var id = target.getAttribute('data-demo-target') || '';
+            if (!controlledIds[id] && target.getAttribute('data-current-time') === '1') {
+                var value = currentDateTimeValue(target);
+                var currentTime = parseDateTime(value);
+                var dateValue = value ? value.slice(0, 10) : '';
+                updateTimelineTarget(target, value, dateValue, currentTime);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initTimelineJumpControls();
+        initTimelineDayControls();
+        initTimelineDayNavigation();
+        document.querySelectorAll('[data-demo-controls]').forEach(initControl);
+        updateStandaloneTimelines();
+        updateStandalonePreviews();
+        // Keep the time signal aligned when editors, disclosures, or breakpoints change the rows.
+        function refreshTimelineLayout() {
+            document.querySelectorAll('[data-demo-controls]').forEach(updateControl);
+            updateStandaloneTimelines();
+        }
+        if ('ResizeObserver' in window) {
+            var layoutObserver = new ResizeObserver(refreshTimelineLayout);
+            document.querySelectorAll('.timeline').forEach(function(target) {
+                layoutObserver.observe(target);
+            });
+        } else {
+            window.addEventListener('resize', refreshTimelineLayout);
+        }
+        window.setInterval(function() {
+            document.querySelectorAll('[data-demo-controls]').forEach(updateControl);
+            updateStandaloneTimelines();
+            updateStandalonePreviews();
+        }, 60000);
+    });
+}());

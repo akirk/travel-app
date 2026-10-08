@@ -1,0 +1,273 @@
+:root {
+    color-scheme: light dark;
+    /*
+     * Base UI colors reuse the current user's WordPress admin color scheme
+     * through the --wp-app-color-* tokens provided by the app framework.
+     * Status tones reuse the WordPress admin color palette.
+     */
+    --travel-app-color-success: #00a32a;
+    --travel-app-color-success-ink: #00710a;
+    --travel-app-color-warning: #dba617;
+    --travel-app-color-warning-ink: color-mix(in srgb, var(--travel-app-color-warning) 55%, #1d2327);
+    --travel-app-color-danger: #d63638;
+    --travel-app-color-danger-ink: #b32d2e;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --travel-app-color-success-ink: color-mix(in srgb, var(--travel-app-color-success) 65%, #fff);
+        --travel-app-color-warning-ink: color-mix(in srgb, var(--travel-app-color-warning) 65%, #fff);
+        --travel-app-color-danger-ink: color-mix(in srgb, var(--travel-app-color-danger) 65%, #fff);
+    }
+}
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    line-height: 1.5;
+    background: var(--wp-app-color-background);
+    color: var(--wp-app-color-text);
+}
+main { max-width: 1120px; margin: 0 auto; padding: 32px 18px 56px; }
+h1, h2, h3, p { margin-top: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.04; margin-bottom: 12px; letter-spacing: 0; }
+h2 { font-size: 1.05rem; margin-bottom: 12px; }
+h3 { font-size: 1rem; margin-bottom: 6px; }
+a { color: var(--wp-app-color-link); }
+.app-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; margin-bottom: 22px; }
+.lede { max-width: 680px; color: var(--wp-app-color-muted); font-size: 1.02rem; margin-bottom: 0; }
+.status-stack { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 4px 10px;
+    border: 1px solid var(--wp-app-color-border);
+    border-radius: 999px;
+    background: var(--wp-app-color-surface);
+    color: var(--wp-app-color-muted);
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+.status.available { color: var(--travel-app-color-success-ink); border-color: color-mix(in srgb, var(--travel-app-color-success) 32%, transparent); background: color-mix(in srgb, var(--travel-app-color-success) 8%, transparent); }
+.status.unavailable { color: var(--travel-app-color-warning-ink); border-color: color-mix(in srgb, var(--travel-app-color-warning) 28%, transparent); background: color-mix(in srgb, var(--travel-app-color-warning) 8%, transparent); }
+.notice {
+    margin-bottom: 18px;
+    border-radius: 6px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--travel-app-color-success) 32%, transparent);
+    background: color-mix(in srgb, var(--travel-app-color-success) 8%, transparent);
+}
+.notice.error { border-color: color-mix(in srgb, var(--travel-app-color-danger) 28%, transparent); background: color-mix(in srgb, var(--travel-app-color-danger) 8%, transparent); }
+.dashboard { display: grid; grid-template-columns: minmax(0, 1.35fr) 340px; gap: 22px; align-items: start; }
+.panel {
+    background: var(--wp-app-color-surface);
+    border: 1px solid var(--wp-app-color-border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 18px;
+}
+.import-panel input,
+.import-panel select,
+.import-panel textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--wp-app-color-border);
+    border-radius: 6px;
+    padding: 10px;
+    background: var(--wp-app-color-background);
+    color: var(--wp-app-color-text);
+    font: inherit;
+}
+.import-panel textarea {
+    min-height: 118px;
+    resize: vertical;
+}
+.quick-plan-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.quick-plan-fields .field-wide { grid-column: 1 / -1; }
+.quick-plan-match-list { display: grid; gap: 8px; margin: 4px 0; }
+.quick-plan-choice {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 10px;
+    border: 1px solid var(--wp-app-color-border);
+    border-radius: 8px;
+    background: var(--wp-app-color-background);
+    font-weight: 400;
+}
+.quick-plan-choice input[type="radio"] { width: auto; margin-top: 4px; }
+.quick-plan-choice input[type="text"] { margin-top: 6px; }
+.quick-plan-choice strong { display: block; overflow-wrap: anywhere; }
+.quick-plan-confirm { color: var(--wp-app-color-muted); font-size: 0.9rem; }
+.quick-plan-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.calendar-subscription {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--wp-app-color-border);
+}
+.calendar-subscription h3 { margin-bottom: 0; }
+.calendar-button {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    border: 1px solid var(--wp-app-color-border);
+    border-radius: 6px;
+    padding: 9px 12px;
+    background: transparent;
+    color: var(--wp-app-color-text);
+    font: inherit;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+}
+label { display: block; font-weight: 650; margin-bottom: 7px; }
+.drop-zone {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 10px;
+    border: 1px dashed var(--wp-app-color-border);
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--wp-app-color-background);
+    cursor: pointer;
+}
+.drop-zone.dragging {
+    border-color: var(--wp-app-color-link);
+    background: var(--wp-app-color-surface-alt);
+}
+.drop-zone input { position: absolute; opacity: 0; pointer-events: none; }
+.drop-title { font-weight: 700; }
+.drop-file-name, .hint { color: var(--wp-app-color-muted); font-size: 0.88rem; overflow-wrap: anywhere; }
+.demo-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 14px 0; }
+.demo-controls label { min-width: 190px; margin: 0; }
+button {
+    appearance: none;
+    border: 0;
+    border-radius: 6px;
+    background: var(--wp-app-color-primary);
+    color: var(--wp-app-color-on-primary);
+    font: inherit;
+    font-weight: 700;
+    padding: 9px 12px;
+    cursor: pointer;
+    min-height: 38px;
+    white-space: nowrap;
+}
+.ghost-button {
+    background: transparent;
+    color: var(--wp-app-color-text);
+    border: 1px solid var(--wp-app-color-border);
+}
+.trip-list { display: grid; gap: 10px; }
+.trip-card {
+    display: block;
+    border: 1px solid var(--wp-app-color-border);
+    border-radius: 8px;
+    padding: 14px;
+    background: var(--wp-app-color-background);
+    color: inherit;
+    text-decoration: none;
+}
+.trip-card:hover,
+.trip-card:focus,
+.trip-card:focus-visible,
+.trip-card:hover *,
+.trip-card:focus *,
+.trip-card:focus-visible * {
+    text-decoration: none;
+}
+.trip-card:hover {
+    border-color: var(--wp-app-color-link);
+    background: var(--wp-app-color-surface);
+}
+.trip-card:focus-visible {
+    outline: 2px solid var(--wp-app-color-link);
+    outline-offset: 2px;
+}
+.trip-card.highlight { outline: 2px solid var(--wp-app-color-link); outline-offset: 2px; }
+.trip-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--wp-app-color-muted); font-size: 0.88rem; }
+.current-card {
+    background: var(--wp-app-color-background);
+    border: 1px solid var(--wp-app-color-border);
+    border-radius: 8px;
+    padding: 16px;
+}
+.current-card h3 a {
+    color: inherit;
+    text-decoration: none;
+}
+.current-card h3 a:hover,
+.current-card h3 a:focus,
+.current-card h3 a:focus-visible {
+    color: var(--wp-app-color-link);
+    text-decoration: underline;
+}
+.mini-timeline {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 14px 0;
+}
+.mini-step {
+    display: block;
+    border-left: 3px solid var(--wp-app-color-border);
+    padding-left: 12px;
+    color: inherit;
+    text-decoration: none;
+}
+.mini-step:hover,
+.mini-step:focus,
+.mini-step:focus-visible,
+.mini-step:hover *,
+.mini-step:focus *,
+.mini-step:focus-visible * {
+    text-decoration: none;
+}
+.mini-step:hover { border-left-color: var(--wp-app-color-link); }
+.mini-step:focus-visible {
+    outline: 2px solid var(--wp-app-color-link);
+    outline-offset: 3px;
+}
+.mini-step.current { border-left-color: var(--wp-app-color-link); }
+.mini-label { color: var(--wp-app-color-muted); font-size: 0.78rem; text-transform: uppercase; }
+.mini-title { font-weight: 750; overflow-wrap: anywhere; }
+.mini-location {
+    color: var(--wp-app-color-muted);
+    overflow-wrap: anywhere;
+    font-size: 0.88rem;
+    line-height: 1.42;
+}
+.mini-countdown {
+    color: var(--wp-app-color-muted);
+    font-size: 0.82rem;
+    font-weight: 650;
+    margin-top: 2px;
+}
+.mini-step[hidden] { display: none; }
+.section-title { display: flex; align-items: baseline; gap: 12px; }
+.empty {
+    min-height: 130px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: var(--wp-app-color-muted);
+    border: 1px dashed var(--wp-app-color-border);
+    border-radius: 8px;
+    padding: 18px;
+}
+@media (max-width: 880px) {
+    .app-header, .dashboard, .mini-timeline, .quick-plan-fields { grid-template-columns: 1fr; }
+    .status-stack { justify-content: flex-start; }
+    .dashboard-import-confirm .trip-sections { order: 2; }
+    .dashboard-import-confirm .import-panel { order: 1; }
+    button { width: 100%; }
+}

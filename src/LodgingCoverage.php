@@ -1,6 +1,6 @@
 <?php
 
-namespace Traveler;
+namespace TravelApp;
 
 class LodgingCoverage {
     public static function analyze( array $trip_data, array $segments ): array {

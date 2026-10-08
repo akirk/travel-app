@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use Traveler\ShareTarget;
+use TravelApp\ShareTarget;
 
 final class ShareTargetTest extends TestCase {
     public function test_joins_title_text_and_file_contents(): void {
@@ -54,5 +54,20 @@ final class ShareTargetTest extends TestCase {
         self::assertFalse( ShareTarget::is_text_file( [ 'name' => 'ticket.pdf', 'type' => 'text/pdf' ] ) );
         self::assertFalse( ShareTarget::is_text_file( [ 'name' => 'photo.jpg', 'type' => 'image/jpeg' ] ) );
         self::assertFalse( ShareTarget::is_text_file( [] ) );
+    }
+
+    public function test_rejects_malformed_upload_metadata_without_warnings(): void {
+        self::assertFalse( ShareTarget::is_text_file( [ 'name' => [ 'trip.ics' ], 'type' => 'text/calendar' ] ) );
+        self::assertFalse( ShareTarget::is_text_file( [ 'name' => 'trip.ics', 'type' => [ 'text/calendar' ] ] ) );
+        self::assertFalse( ShareTarget::is_text_file( [ 'name' => 123, 'type' => 'text/calendar' ] ) );
+
+        $nested = ShareTarget::normalize_files( [
+            'name'     => [ [ 'trip.ics' ] ],
+            'type'     => [ 'text/calendar' ],
+            'tmp_name' => [ '/tmp/trip' ],
+            'error'    => [ 0 ],
+            'size'     => [ 10 ],
+        ] );
+        self::assertFalse( ShareTarget::is_text_file( $nested[0] ) );
     }
 }

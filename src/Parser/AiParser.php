@@ -1,6 +1,6 @@
 <?php
 
-namespace Traveler\Parser;
+namespace TravelApp\Parser;
 
 class AiParser {
     public static function is_available(): bool {
@@ -21,7 +21,7 @@ class AiParser {
 
     public function parse( string $text ) {
         if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
-            return new \WP_Error( 'ai_client_unavailable', __( 'WordPress AI Client is unavailable.', 'traveler' ) );
+            return new \WP_Error( 'ai_client_unavailable', __( 'WordPress AI Client is unavailable.', 'travel-app' ) );
         }
 
         $prompt = implode( "\n", [
@@ -56,12 +56,12 @@ class AiParser {
 
         $json = $this->extract_json_object( $text_result );
         if ( '' === $json ) {
-            return new \WP_Error( 'ai_invalid_json', __( 'The AI response did not include JSON.', 'traveler' ) );
+            return new \WP_Error( 'ai_invalid_json', __( 'The AI response did not include JSON.', 'travel-app' ) );
         }
 
         $data = json_decode( $json, true );
         if ( ! is_array( $data ) ) {
-            return new \WP_Error( 'ai_invalid_json', __( 'The AI response JSON could not be parsed.', 'traveler' ) );
+            return new \WP_Error( 'ai_invalid_json', __( 'The AI response JSON could not be parsed.', 'travel-app' ) );
         }
 
         $data['parser'] = 'wp-ai-client';
@@ -97,7 +97,7 @@ class AiParser {
             return $builder->generate_text();
         }
 
-        return new \WP_Error( 'ai_text_generation_unavailable', __( 'The AI connector does not support text generation.', 'traveler' ) );
+        return new \WP_Error( 'ai_text_generation_unavailable', __( 'The AI connector does not support text generation.', 'travel-app' ) );
     }
 
     private function extract_json_object( string $text ): string {

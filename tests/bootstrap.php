@@ -35,7 +35,7 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 }
 
 if ( ! function_exists( 'wp_trim_words' ) ) {
-    function wp_trim_words( string $text, int $num_words = 55, string $more = null ): string {
+    function wp_trim_words( string $text, int $num_words = 55, ?string $more = null ): string {
         $words = preg_split( '/\s+/', trim( $text ) );
         if ( ! is_array( $words ) ) {
             return '';

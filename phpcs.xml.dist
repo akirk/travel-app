@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<ruleset name="Travel App">
+	<description>PHPCS rules for Travel App's shipped plugin code.</description>
+
+	<file>travel-app.php</file>
+	<file>src</file>
+	<file>templates</file>
+
+	<exclude-pattern>vendor/*</exclude-pattern>
+	<exclude-pattern>tests/*</exclude-pattern>
+
+	<arg name="basepath" value="."/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="8"/>
+
+	<config name="testVersion" value="7.4-"/>
+
+	<rule ref="WordPress.Security"/>
+	<rule ref="WordPress.DB"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- Review-team concerns which are outside the Security and DB subsets. -->
+	<rule ref="Generic.PHP.Syntax"/>
+	<rule ref="WordPress.WP.Capabilities">
+		<properties>
+			<property name="custom_capabilities" type="array">
+				<element value="read_travel_app_trip"/>
+				<element value="edit_travel_app_trip"/>
+				<element value="delete_travel_app_trip"/>
+			</property>
+		</properties>
+	</rule>
+	<rule ref="WordPress.WP.DiscouragedConstants"/>
+	<rule ref="WordPress.WP.EnqueuedResources"/>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="travel-app"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

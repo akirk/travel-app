@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use Traveler\ItineraryItem;
-use Traveler\Trip;
+use TravelApp\ItineraryItem;
+use TravelApp\Trip;
 
 final class DomainSchemaTest extends TestCase {
     public function test_trip_schema_matches_public_properties(): void {
@@ -36,10 +36,13 @@ final class DomainSchemaTest extends TestCase {
     }
 
     public function test_itinerary_item_schema_matches_public_properties(): void {
-        $schema_fields = array_keys( ItineraryItem::schema()['properties'] );
+        $schema = ItineraryItem::schema()['properties'];
+        $schema_fields = array_keys( $schema );
         $property_fields = $this->public_property_names( ItineraryItem::class );
 
         $this->assert_same_fields( $property_fields, $schema_fields );
+        self::assertStringContainsString( 'travel-app/get-itinerary-item', $schema['id']['description'] );
+        self::assertStringNotContainsString( 'traveler/', $schema['id']['description'] );
     }
 
     public function test_itinerary_item_input_schema_uses_editable_public_properties(): void {

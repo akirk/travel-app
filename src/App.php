@@ -1,15 +1,17 @@
 <?php
 
-namespace Traveler;
+namespace TravelApp;
 
 use WpApp\WpApp;
 use WpApp\BaseApp;
 use WpApp\BaseStorage;
-use Traveler\Parser\GenericParser;
-use Traveler\Parser\IcsParser;
-use Traveler\Parser\QuickPlanParser;
+use TravelApp\Parser\GenericParser;
+use TravelApp\Parser\IcsParser;
+use TravelApp\Parser\QuickPlanParser;
 
 class App extends BaseApp {
+    private const SHARE_PAGE_VERSION = '3';
+
     private static $instance = null;
     private $url_preview_service = null;
 
@@ -39,37 +41,42 @@ class App extends BaseApp {
             // 'add_app_node'                 => false,
 
             // App identity
-            'app_name'   => 'Traveler',
+            'app_name'   => 'Travel App',
             // 'launcher'   => true,
             'app_icon'            => 'dashicons-location-alt',
-            'app_icon_background' => 'linear-gradient(135deg, #ee0979, #ff6a00)',
-            'app_icon_color'      => '#fff',
+            'app_icon_background' => 'linear-gradient(135deg, #72aee6, #2271b1)',
+            'app_icon_color'      => '#ffffff',
             'app_icon_shadow'     => true,
             // Owned content: REST reads are gated with the app's capability and
             // OpenStation keeps these menus out of its dock.
-            'post_types' => [ 'traveler_item', 'traveler_journal' ],
+            'post_types' => [ 'travel_app_item', 'travel_app_journal' ],
 
             // Progressive Web App support
             'pwa'        => $this->get_pwa_config(),
         ] );
 
+        add_filter( 'wp_app_init_travel-app', [ $this, 'register_themes' ] );
+        add_action( 'wp_app_masterbar_styles', [ $this, 'print_masterbar_contrast_styles' ] );
+        add_action( 'wp_app_load_theme_travel-app_default', [ $this, 'enqueue_assets' ] );
+        add_action( 'wp_app_load_theme_travel-app_command-ledger', [ $this, 'enqueue_command_ledger_assets' ] );
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
-        add_action( 'admin_post_traveler_import', [ $this, 'handle_import' ] );
-        add_action( 'admin_post_traveler_update_user_settings', [ $this, 'handle_update_user_settings' ] );
-        add_action( 'admin_post_traveler_update_trip', [ $this, 'handle_update_trip' ] );
-        add_action( 'admin_post_traveler_open_journal_entry', [ $this, 'handle_open_journal_entry' ] );
-        add_action( 'admin_post_traveler_prepare_journal_post', [ $this, 'handle_prepare_journal_post' ] );
-        add_action( 'admin_post_traveler_download_trip_html', [ $this, 'handle_download_trip_html' ] );
-        add_action( 'wp_ajax_traveler_generate_share_link', [ $this, 'handle_generate_share_link' ] );
-        add_action( 'wp_ajax_traveler_remove_share_link', [ $this, 'handle_remove_share_link' ] );
-        add_action( 'wp_ajax_traveler_clear_share_cache', [ $this, 'handle_clear_share_cache' ] );
-        add_action( 'admin_post_traveler_delete', [ $this, 'handle_delete' ] );
-        add_action( 'admin_post_traveler_update_segment', [ $this, 'handle_update_segment' ] );
-        add_action( 'admin_post_traveler_add_segment', [ $this, 'handle_add_segment' ] );
-        add_action( 'admin_post_traveler_delete_segment', [ $this, 'handle_delete_segment' ] );
-        add_action( 'admin_post_traveler_upload_item_attachment', [ $this, 'handle_upload_item_attachment' ] );
-        add_action( 'admin_post_traveler_delete_item_attachment', [ $this, 'handle_delete_item_attachment' ] );
+        add_action( 'admin_post_travel_app_import', [ $this, 'handle_import' ] );
+        add_action( 'admin_post_travel_app_update_user_settings', [ $this, 'handle_update_user_settings' ] );
+        add_action( 'admin_post_travel_app_update_trip', [ $this, 'handle_update_trip' ] );
+        add_action( 'admin_post_travel_app_open_journal_entry', [ $this, 'handle_open_journal_entry' ] );
+        add_action( 'admin_post_travel_app_prepare_journal_post', [ $this, 'handle_prepare_journal_post' ] );
+        add_action( 'admin_post_travel_app_download_trip_html', [ $this, 'handle_download_trip_html' ] );
+        add_action( 'wp_ajax_travel_app_generate_share_link', [ $this, 'handle_generate_share_link' ] );
+        add_action( 'wp_ajax_travel_app_remove_share_link', [ $this, 'handle_remove_share_link' ] );
+        add_action( 'wp_ajax_travel_app_clear_share_cache', [ $this, 'handle_clear_share_cache' ] );
+        add_action( 'wp_ajax_travel_app_cache_geocode', [ $this, 'handle_cache_geocode' ] );
+        add_action( 'admin_post_travel_app_delete', [ $this, 'handle_delete' ] );
+        add_action( 'admin_post_travel_app_update_segment', [ $this, 'handle_update_segment' ] );
+        add_action( 'admin_post_travel_app_add_segment', [ $this, 'handle_add_segment' ] );
+        add_action( 'admin_post_travel_app_delete_segment', [ $this, 'handle_delete_segment' ] );
+        add_action( 'admin_post_travel_app_upload_item_attachment', [ $this, 'handle_upload_item_attachment' ] );
+        add_action( 'admin_post_travel_app_delete_item_attachment', [ $this, 'handle_delete_item_attachment' ] );
         // add_action( 'wp_dashboard_setup', [ $this, 'register_dashboard_widgets' ] );
         add_action( 'wp_abilities_api_categories_init', [ $this, 'register_ability_category' ] );
         add_action( 'wp_abilities_api_init', [ $this, 'register_abilities' ] );
@@ -77,8 +84,7 @@ class App extends BaseApp {
         add_filter( 'ai_assistant_ability_instructions', [ $this, 'get_ai_assistant_ability_instructions' ], 10, 4 );
         add_filter( 'ai_assistant_welcome_tips', [ $this, 'register_ai_assistant_welcome_tips' ], 10, 2 );
         add_filter( 'map_meta_cap', [ $this, 'map_trip_meta_cap' ], 10, 4 );
-        add_filter( 'wp_app_pwa_manifest_traveler', [ $this, 'filter_pwa_manifest' ], 10, 2 );
-        add_action( 'wp_app_head', [ $this, 'enqueue_assets' ] );
+        add_filter( 'wp_app_pwa_manifest_travel-app', [ $this, 'filter_pwa_manifest' ], 10, 2 );
         add_action( 'template_redirect', [ $this, 'maybe_handle_share_target' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_user_calendar' ], 0 );
         add_action( 'template_redirect', [ $this, 'maybe_render_shared_calendar' ], 0 );
@@ -86,15 +92,79 @@ class App extends BaseApp {
     }
 
     protected function get_url_path(): string {
-        return 'traveler';
+        return 'travel-app';
     }
 
     protected function get_template_dir(): string {
-        return dirname( __DIR__ ) . '/templates';
+        return TRAVEL_APP_PLUGIN_DIR . 'templates';
+    }
+
+    public function register_themes( WpApp $app ): WpApp {
+        $app->register_theme(
+            'command-ledger',
+            __( 'Command Ledger', 'travel-app' ),
+            TRAVEL_APP_PLUGIN_DIR . 'themes/command-ledger/templates'
+        );
+
+        return $app;
+    }
+
+    public function get_route_param( string $key, string $default = '' ): string {
+        global $wp_app_route;
+
+        if ( isset( $wp_app_route['params'][ $key ] ) && is_scalar( $wp_app_route['params'][ $key ] ) ) {
+            return sanitize_text_field( (string) $wp_app_route['params'][ $key ] );
+        }
+
+        $value = get_query_var( $key, $default );
+
+        return is_scalar( $value ) ? sanitize_text_field( (string) $value ) : $default;
+    }
+
+    public function get_query_arg_absint( string $key, int $default = 0 ): int {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query state used for notices and routing.
+        return isset( $_GET[ $key ] ) ? absint( $_GET[ $key ] ) : $default;
+    }
+
+    public function get_query_arg_key( string $key, string $default = '' ): string {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query state used for notices and routing.
+        return isset( $_GET[ $key ] ) ? sanitize_key( wp_unslash( $_GET[ $key ] ) ) : $default;
+    }
+
+    public function get_query_arg_text( string $key, string $default = '' ): string {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query state used for notices and routing.
+        return isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : $default;
+    }
+
+    public function has_query_arg( string $key ): bool {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query state used for notices and routing.
+        return isset( $_GET[ $key ] );
+    }
+
+    private function render_template( string $template, array $context = [] ): void {
+        if ( 1 !== preg_match( '/\A[a-z0-9_-]+\.php\z/i', $template ) ) {
+            wp_die(
+                esc_html__( 'Template not found.', 'travel-app' ),
+                esc_html__( 'Template not found', 'travel-app' ),
+                [ 'response' => 500 ]
+            );
+        }
+
+        $template_file = $this->app->router()->locate_template( $template );
+        if ( ! is_readable( $template_file ) ) {
+            wp_die(
+                esc_html__( 'Template not found.', 'travel-app' ),
+                esc_html__( 'Template not found', 'travel-app' ),
+                [ 'response' => 500 ]
+            );
+        }
+
+        $travel_app_template_context = $context;
+        include $template_file;
     }
 
     private function get_pwa_config(): array {
-        $asset_base_url = plugins_url( 'assets/', dirname( __DIR__ ) . '/traveler.php' );
+        $asset_base_url = TRAVEL_APP_PLUGIN_URL . 'assets/';
         $asset_path = (string) wp_parse_url( $asset_base_url, PHP_URL_PATH );
         $upload_dir = wp_upload_dir();
         $upload_path = ! empty( $upload_dir['baseurl'] ) ? (string) wp_parse_url( (string) $upload_dir['baseurl'], PHP_URL_PATH ) : '';
@@ -106,74 +176,244 @@ class App extends BaseApp {
             'service_worker_path'              => 'service-worker.js',
             'scope'                            => home_url( '/' ),
             'service_worker_allowed'           => '/',
-            'background_color'                 => '#f8fafc',
-            'theme_color'                      => '#0b6bcb',
+            'background_color'                 => '#f6f7f7',
+            'theme_color'                      => '#2271b1',
             'icons'                            => [
                 [
-                    'src'   => plugins_url( 'assets/icon.svg', dirname( __DIR__ ) . '/traveler.php' ),
+                    'src'   => TRAVEL_APP_PLUGIN_URL . 'assets/icon.svg',
                     'sizes' => 'any',
                     'type'  => 'image/svg+xml',
                 ],
             ],
             'precache'                         => [
-                plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/traveler.php' ),
-                plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
+                TRAVEL_APP_PLUGIN_URL . 'assets/css/index.css',
+                TRAVEL_APP_PLUGIN_URL . 'assets/css/trip.css',
+                TRAVEL_APP_PLUGIN_URL . 'assets/js/index.js',
+                TRAVEL_APP_PLUGIN_URL . 'assets/js/trip.js',
+                TRAVEL_APP_PLUGIN_URL . 'assets/js/timeline-time.js',
+                TRAVEL_APP_PLUGIN_URL . 'assets/js/offline-sync.js',
             ],
-            'cache_name'                       => 'traveler-v8',
-            'cache_prefix'                     => 'traveler-',
+            'cache_name'                       => 'travel-app-v9',
+            'cache_prefix'                     => 'travel-app-',
             'cacheable_paths'                  => array_values( array_filter( [
                 $asset_path,
                 $upload_path,
             ] ) ),
-            'cacheable_search_params'          => [
-                'traveler_share=',
-            ],
-            'cache_message_type'               => 'traveler-cache-url',
-            'cache_status_message_type'        => 'traveler-cache-status',
-            'version_message_type'             => 'traveler-version',
-            'sync_tag'                         => 'traveler-sync',
-            'sync_message_type'                => 'traveler-sync',
+            'cache_message_type'               => 'travel-app-cache-url',
+            'cache_status_message_type'        => 'travel-app-cache-status',
+            'version_message_type'             => 'travel-app-version',
+            'sync_tag'                         => 'travel-app-sync',
+            'sync_message_type'                => 'travel-app-sync',
             'client_cache_selector'            => '[data-offline-cache-url]',
             'client_cache_url_attribute'       => 'data-offline-cache-url',
             'client_cache_available_attribute' => 'data-offline-available',
-            'client_cache_status_event'        => 'traveler-cache-status',
-            'client_version_event'             => 'traveler-version',
-            'client_sync_event'                => 'traveler-sync',
+            'client_cache_status_event'        => 'travel-app-cache-status',
+            'client_version_event'             => 'travel-app-version',
+            'client_sync_event'                => 'travel-app-sync',
             'head_tags'                        => false,
         ];
     }
 
     public function enqueue_assets(): void {
-        $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
-        $offline_script_path = dirname( __DIR__ ) . '/assets/js/offline-sync.js';
+        $this->enqueue_shared_assets( 'assets', 'travel-app' );
+    }
 
-        wp_enqueue_script(
-            'traveler-timeline-time',
-            plugins_url( 'assets/js/timeline-time.js', dirname( __DIR__ ) . '/traveler.php' ),
+    public function enqueue_command_ledger_assets(): void {
+        $this->enqueue_shared_assets( 'themes/command-ledger/assets', 'travel-app-command-ledger' );
+        add_action( 'wp_app_head', [ $this, 'print_command_ledger_palette_styles' ] );
+    }
+
+    /**
+     * Print the Command Ledger signal tokens derived from the admin color scheme.
+     */
+    public function print_command_ledger_palette_styles(): void {
+        $css = $this->get_command_ledger_palette_css();
+        if ( '' === $css ) {
+            return;
+        }
+
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Computed hex colors and fixed selectors.
+        echo '<style id="travel-app-command-ledger-palette">' . "\n" . $css . '</style>' . "\n";
+    }
+
+    /**
+     * Build Command Ledger signal tokens from the admin primary color.
+     *
+     * The admin primary is kept as the signal fill, while the text drawn on it
+     * and the signal used as text on light and dark ledger surfaces are pushed
+     * until they reach WCAG AA contrast. The light and dark surface lists must
+     * match the palettes in the Command Ledger stylesheets.
+     *
+     * @return string CSS custom properties block.
+     */
+    public function get_command_ledger_palette_css(): string {
+        $signal = $this->normalize_hex_color( $this->get_theme_color() );
+        if ( '' === $signal ) {
+            return '';
+        }
+
+        $light_surfaces = [ '#e9ece7', '#f7f8f5', '#ffffff', '#e4ece6' ];
+        $dark_surfaces  = [ '#0b1117', '#141d25', '#1b2630', '#1a2a26', '#101820', '#070b0f' ];
+
+        $on_signal = $this->get_contrast_ratio( '#101820', $signal ) >= $this->get_contrast_ratio( '#ffffff', $signal ) ? '#101820' : '#ffffff';
+        // Mid-tone primaries (e.g. the "Light" scheme orange) pass with neither label, so shift the fill instead.
+        $signal    = $this->get_contrast_adjusted_color( $signal, [ $on_signal ] );
+        // Hover and pressed fills move away from the label so it stays readable.
+        $away      = '#101820' === $on_signal ? '#ffffff' : '#000000';
+        $hover     = $this->mix_hex_colors( $signal, $away, 0.14 );
+        $active    = $this->mix_hex_colors( $signal, $away, 0.26 );
+
+        $tokens = [
+            '--ledger-signal'            => $signal,
+            '--ledger-signal-hover'      => $hover,
+            '--ledger-signal-active'     => $active,
+            '--ledger-on-signal'         => $this->get_contrast_adjusted_color( $on_signal, [ $signal, $hover, $active ] ),
+            '--ledger-signal-ink-light'  => $this->get_contrast_adjusted_color( $signal, $light_surfaces ),
+            '--ledger-signal-ink-dark'   => $this->get_contrast_adjusted_color( $signal, $dark_surfaces ),
+        ];
+
+        // html:root outranks the stylesheet defaults regardless of print order.
+        $css = "html:root {\n";
+        foreach ( $tokens as $property => $value ) {
+            $css .= "\t{$property}: {$value};\n";
+        }
+
+        return $css . "}\n";
+    }
+
+    private function enqueue_shared_assets( string $asset_root, string $handle_prefix ): void {
+        $asset_root = trim( $asset_root, '/' );
+        $script_path = TRAVEL_APP_PLUGIN_DIR . $asset_root . '/js/timeline-time.js';
+        $offline_script_path = TRAVEL_APP_PLUGIN_DIR . $asset_root . '/js/offline-sync.js';
+
+        // Register only on Travel App's scoped hooks, outside the dashboard.
+        $scope = $this->get_url_path();
+
+        wp_app_enqueue_script(
+            $handle_prefix . '-timeline-time',
+            TRAVEL_APP_PLUGIN_URL . $asset_root . '/js/timeline-time.js',
             [],
             file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
-            true
+            true,
+            $scope
         );
 
-        wp_enqueue_script(
-            'traveler-offline-sync',
-            plugins_url( 'assets/js/offline-sync.js', dirname( __DIR__ ) . '/traveler.php' ),
-            [],
-            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
-            true
-        );
-        wp_add_inline_script(
-            'traveler-offline-sync',
-            'window.travelerPwa=' . wp_json_encode( [
+        wp_app_add_inline_script(
+            $handle_prefix . '-offline-sync-data',
+            'window.travelAppPwa=' . wp_json_encode( [
                 'messages' => [
-                    'offlineQueued' => __( 'Saved offline. Changes will sync when you are back online.', 'traveler' ),
-                    'syncing'       => __( 'Syncing offline changes...', 'traveler' ),
-                    'synced'        => __( 'Offline changes synced.', 'traveler' ),
-                    'syncFailed'    => __( 'Some offline changes could not sync yet.', 'traveler' ),
+                    'offlineQueued' => __( 'Saved offline. Changes will sync when you are back online.', 'travel-app' ),
+                    'syncing'       => __( 'Syncing offline changes...', 'travel-app' ),
+                    'synced'        => __( 'Offline changes synced.', 'travel-app' ),
+                    'syncFailed'    => __( 'Some offline changes could not sync yet.', 'travel-app' ),
                 ],
             ] ) . ';',
-            'before'
+            true,
+            $scope
         );
+
+        wp_app_enqueue_script(
+            $handle_prefix . '-offline-sync',
+            TRAVEL_APP_PLUGIN_URL . $asset_root . '/js/offline-sync.js',
+            [],
+            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
+            true,
+            $scope
+        );
+    }
+
+    public function get_asset_url( string $path ): string {
+        return TRAVEL_APP_PLUGIN_URL . 'assets/' . ltrim( $path, '/' );
+    }
+
+    public function get_asset_version( string $path ): string {
+        $file = TRAVEL_APP_PLUGIN_DIR . 'assets/' . ltrim( $path, '/' );
+
+        return file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
+    }
+
+    public function print_static_trip_styles(): void {
+        $asset_root = 'command-ledger' === $this->app->get_selected_theme() ? 'themes/command-ledger/assets' : 'assets';
+        $css = $this->get_asset_contents( 'css/trip.css', $asset_root );
+        if ( '' === $css ) {
+            return;
+        }
+
+        /*
+         * The live pages receive the WordPress admin color scheme through
+         * wp_app_head(); the static download needs it inlined so the
+         * --wp-app-color-* custom properties resolve there as well.
+         */
+        if ( 'assets' === $asset_root && function_exists( 'wp_app_get_admin_color_scheme_css' ) ) {
+            $css = wp_app_get_admin_color_scheme_css() . $css;
+        } elseif ( 'assets' !== $asset_root ) {
+            $css .= $this->get_command_ledger_palette_css();
+        }
+
+        wp_register_style( 'travel-app-static-trip', false, [], $this->get_asset_version_from( 'css/trip.css', $asset_root ) );
+        wp_add_inline_style( 'travel-app-static-trip', $css );
+        wp_print_styles( 'travel-app-static-trip' );
+    }
+
+    private function get_asset_contents( string $path, string $asset_root = 'assets' ): string {
+        $file = TRAVEL_APP_PLUGIN_DIR . trim( $asset_root, '/' ) . '/' . ltrim( $path, '/' );
+
+        return is_readable( $file ) ? (string) file_get_contents( $file ) : '';
+    }
+
+    public function enqueue_template_assets( string $template, bool $script = false, string $data_object = '', array $data = [], string $scope = '' ): void {
+        $this->enqueue_template_assets_from( $template, 'assets', 'travel-app', $script, $data_object, $data, $scope );
+    }
+
+    public function enqueue_command_ledger_template_assets( string $template, bool $script = false, string $data_object = '', array $data = [], string $scope = '' ): void {
+        $this->enqueue_template_assets_from( $template, 'themes/command-ledger/assets', 'travel-app-command-ledger', $script, $data_object, $data, $scope );
+    }
+
+    private function enqueue_template_assets_from( string $template, string $asset_root, string $handle_prefix, bool $script, string $data_object, array $data, string $scope ): void {
+        $template = sanitize_key( $template );
+        $asset_root = trim( $asset_root, '/' );
+        if ( '' !== $data_object && 1 !== preg_match( '/\A[A-Za-z_$][A-Za-z0-9_$]*\z/', $data_object ) ) {
+            $data_object = '';
+        }
+
+        $scope = '' !== $scope ? $scope : $this->get_url_path();
+        $style_path = 'css/' . $template . '.css';
+
+        wp_app_enqueue_style(
+            $handle_prefix . '-' . $template,
+            TRAVEL_APP_PLUGIN_URL . $asset_root . '/' . $style_path,
+            [],
+            $this->get_asset_version_from( $style_path, $asset_root ),
+            $scope
+        );
+
+        if ( '' !== $data_object ) {
+            wp_app_add_inline_script(
+                $handle_prefix . '-' . $template . '-data',
+                'window.' . $data_object . '=' . wp_json_encode( $data ) . ';',
+                true,
+                $scope
+            );
+        }
+
+        if ( $script ) {
+            $script_path = 'js/' . $template . '.js';
+            $script_asset_root = file_exists( TRAVEL_APP_PLUGIN_DIR . $asset_root . '/' . $script_path ) ? $asset_root : 'assets';
+            wp_app_enqueue_script(
+                $handle_prefix . '-' . $template,
+                TRAVEL_APP_PLUGIN_URL . $script_asset_root . '/' . $script_path,
+                [],
+                $this->get_asset_version_from( $script_path, $script_asset_root ),
+                true,
+                $scope
+            );
+        }
+    }
+
+    private function get_asset_version_from( string $path, string $asset_root ): string {
+        $file = TRAVEL_APP_PLUGIN_DIR . trim( $asset_root, '/' ) . '/' . ltrim( $path, '/' );
+
+        return file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
     }
 
     public function get_manifest_url( int $trip_id = 0, string $share_token = '' ): string {
@@ -188,13 +428,233 @@ class App extends BaseApp {
         return $this->app->get_pwa_manifest_url( $args );
     }
 
+    /**
+     * Get the primary color of the current user's WordPress admin color scheme.
+     *
+     * Falls back to the default admin scheme blue.
+     *
+     * @return string Hex color value.
+     */
+    public function get_theme_color(): string {
+        if ( function_exists( 'wp_app_get_admin_color_scheme' ) ) {
+            $scheme = wp_app_get_admin_color_scheme();
+            if ( ! empty( $scheme['colors'][2] ) && is_string( $scheme['colors'][2] ) ) {
+                return $scheme['colors'][2];
+            }
+        }
+
+        return '#2271b1';
+    }
+
+    /**
+     * Keep the app admin bar readable on every admin color scheme.
+     *
+     * Core's admin bar stylesheet assumes a dark bar with light text while the
+     * app paints the bar background with the scheme's base color, so schemes
+     * such as "Light" end up with unreadable combinations. Recompute readable
+     * text and highlight tones against the actual scheme backgrounds and emit
+     * them inside the masterbar style block.
+     */
+    public function print_masterbar_contrast_styles(): void {
+        if ( ! function_exists( 'wp_app_get_admin_color_scheme' ) ) {
+            return;
+        }
+
+        $scheme = wp_app_get_admin_color_scheme();
+        $colors = isset( $scheme['colors'] ) && is_array( $scheme['colors'] ) ? array_values( $scheme['colors'] ) : [];
+        $icons  = isset( $scheme['icon_colors'] ) && is_array( $scheme['icon_colors'] ) ? $scheme['icon_colors'] : [];
+        if ( empty( $colors ) ) {
+            return;
+        }
+
+        $background = (string) $colors[0];
+        $subtle     = isset( $colors[1] ) ? (string) $colors[1] : $background;
+        $highlight  = isset( $colors[3] ) ? (string) $colors[3] : (string) ( $icons['focus'] ?? '#72aee6' );
+        $text       = $this->get_contrast_adjusted_color( (string) ( $icons['current'] ?? '#f0f0f1' ), [ $background ] );
+        $sub_text   = $this->get_contrast_adjusted_color( $text, [ $subtle ] );
+        $highlight  = $this->get_contrast_adjusted_color( $highlight, [ $background, $subtle ] );
+        $icon_color = 'color-mix(in srgb, ' . $text . ' 65%, transparent)';
+
+        // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Values are computed hex colors and fixed selectors.
+        echo ":root, body.wp-app-body {\n";
+        echo "\t--wp-app-masterbar-text: {$text};\n";
+        echo "\t--wp-app-masterbar-highlight: {$highlight};\n";
+        echo "}\n";
+        echo "#wpadminbar,\n#wpadminbar .ab-empty-item,\n#wpadminbar a.ab-item,\n#wpadminbar > #wp-toolbar span.ab-label,\n#wpadminbar > #wp-toolbar span.noticon {\n\tcolor: {$text};\n}\n";
+        echo "#wpadminbar #adminbarsearch:before,\n#wpadminbar .ab-icon:before,\n#wpadminbar .ab-item:before {\n\tcolor: {$icon_color};\n}\n";
+        echo "#wpadminbar .ab-submenu .ab-item,\n#wpadminbar .quicklinks .menupop ul li a,\n#wpadminbar .quicklinks .menupop ul li a strong,\n#wpadminbar .quicklinks .menupop.hover ul li a {\n\tcolor: {$sub_text};\n}\n";
+        echo "#wpadminbar li:hover .ab-icon:before,\n#wpadminbar li.hover .ab-icon:before,\n#wpadminbar li .ab-item:focus .ab-icon:before,\n#wpadminbar li:hover .ab-item:before,\n#wpadminbar li.hover .ab-item:before,\n#wpadminbar:not(.mobile) > #wp-toolbar li:hover span.ab-label,\n#wpadminbar:not(.mobile) > #wp-toolbar a:focus span.ab-label,\n#wpadminbar li.hover span.ab-label {\n\tcolor: {$highlight};\n}\n";
+        // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
+    }
+
+    /**
+     * Adjust a color toward white or black until it has enough contrast against
+     * every provided background, keeping the original color when it already
+     * passes.
+     *
+     * @param string $color       Hex color to verify.
+     * @param array  $backgrounds Hex colors the text will sit on.
+     * @param float  $min_ratio   Minimum WCAG contrast ratio to reach.
+     * @return string Hex color with sufficient contrast.
+     */
+    private function get_contrast_adjusted_color( string $color, array $backgrounds, float $min_ratio = 4.5 ): string {
+        $color = $this->normalize_hex_color( $color );
+        if ( '' === $color ) {
+            $color = '#f0f0f1';
+        }
+
+        $backgrounds = array_values( array_filter( array_map( [ $this, 'normalize_hex_color' ], $backgrounds ) ) );
+        if ( empty( $backgrounds ) ) {
+            return $color;
+        }
+
+        if ( $this->get_min_contrast_ratio( $color, $backgrounds ) >= $min_ratio ) {
+            return $color;
+        }
+
+        // Move toward white or black, whichever direction gains contrast first.
+        $targets = [ '#ffffff', '#000000' ];
+        if ( $this->get_min_contrast_ratio( '#000000', $backgrounds ) > $this->get_min_contrast_ratio( '#ffffff', $backgrounds ) ) {
+            $targets = array_reverse( $targets );
+        }
+
+        $best = $color;
+        foreach ( $targets as $target ) {
+            $candidate = $color;
+            for ( $i = 0; $i < 12; $i++ ) {
+                $candidate = $this->mix_hex_colors( $candidate, $target, 0.15 );
+                if ( $this->get_min_contrast_ratio( $candidate, $backgrounds ) >= $min_ratio ) {
+                    return $candidate;
+                }
+                if ( $this->get_min_contrast_ratio( $candidate, $backgrounds ) > $this->get_min_contrast_ratio( $best, $backgrounds ) ) {
+                    $best = $candidate;
+                }
+            }
+
+            // The pure target closes each direction and can pass on its own.
+            if ( $this->get_min_contrast_ratio( $target, $backgrounds ) >= $min_ratio ) {
+                return $target;
+            }
+            if ( $this->get_min_contrast_ratio( $target, $backgrounds ) > $this->get_min_contrast_ratio( $best, $backgrounds ) ) {
+                $best = $target;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Get the lowest WCAG contrast ratio between a color and a set of backgrounds.
+     *
+     * @param string $color       Hex color.
+     * @param array  $backgrounds Hex background colors.
+     * @return float Contrast ratio.
+     */
+    private function get_min_contrast_ratio( string $color, array $backgrounds ): float {
+        $ratio = PHP_FLOAT_MAX;
+        foreach ( $backgrounds as $background ) {
+            $ratio = min( $ratio, $this->get_contrast_ratio( $color, (string) $background ) );
+        }
+
+        return PHP_FLOAT_MAX === $ratio ? 0.0 : $ratio;
+    }
+
+    /**
+     * Get the WCAG contrast ratio between two hex colors.
+     *
+     * @param string $color_a Hex color.
+     * @param string $color_b Hex color.
+     * @return float Contrast ratio (1-21).
+     */
+    private function get_contrast_ratio( string $color_a, string $color_b ): float {
+        $lighter = max( $this->get_relative_luminance( $color_a ), $this->get_relative_luminance( $color_b ) );
+        $darker  = min( $this->get_relative_luminance( $color_a ), $this->get_relative_luminance( $color_b ) );
+
+        return ( $lighter + 0.05 ) / ( $darker + 0.05 );
+    }
+
+    /**
+     * Get the relative luminance of a hex color.
+     *
+     * @param string $color Hex color.
+     * @return float Relative luminance.
+     */
+    private function get_relative_luminance( string $color ): float {
+        $hex = $this->normalize_hex_color( $color );
+        if ( '' === $hex ) {
+            return 0.0;
+        }
+
+        $channels = [];
+        foreach ( [ 'r', 'g', 'b' ] as $index => $channel ) {
+            $value = hexdec( substr( $hex, 1 + ( $index * 2 ), 2 ) ) / 255;
+            $channels[ $channel ] = $value <= 0.04045 ? $value / 12.92 : pow( ( $value + 0.055 ) / 1.055, 2.4 );
+        }
+
+        return ( 0.2126 * $channels['r'] ) + ( 0.7152 * $channels['g'] ) + ( 0.0722 * $channels['b'] );
+    }
+
+    /**
+     * Mix two hex colors together.
+     *
+     * @param string $color_a Hex color.
+     * @param string $color_b Hex color.
+     * @param float  $weight  Weight of the second color (0-1).
+     * @return string Mixed hex color.
+     */
+    private function mix_hex_colors( string $color_a, string $color_b, float $weight ): string {
+        $a = $this->normalize_hex_color( $color_a );
+        $b = $this->normalize_hex_color( $color_b );
+        if ( '' === $a ) {
+            return $b;
+        }
+        if ( '' === $b ) {
+            return $a;
+        }
+
+        $mixed = '#';
+        foreach ( [ 1, 3, 5 ] as $offset ) {
+            $channel_a = hexdec( substr( $a, $offset, 2 ) );
+            $channel_b = hexdec( substr( $b, $offset, 2 ) );
+            $mixed    .= str_pad( dechex( (int) round( ( $channel_a * ( 1 - $weight ) ) + ( $channel_b * $weight ) ) ), 2, '0', STR_PAD_LEFT );
+        }
+
+        return $mixed;
+    }
+
+    /**
+     * Normalize a hex color to the #rrggbb form.
+     *
+     * @param string $color Hex color, with 3 or 6 digits.
+     * @return string Normalized color or empty string when invalid.
+     */
+    private function normalize_hex_color( string $color ): string {
+        $color = trim( $color );
+        if ( '' === $color ) {
+            return '';
+        }
+
+        if ( '#' !== $color[0] ) {
+            $color = '#' . $color;
+        }
+
+        if ( 4 === strlen( $color ) ) {
+            $color = '#' . $color[1] . $color[1] . $color[2] . $color[2] . $color[3] . $color[3];
+        }
+
+        return 1 === preg_match( '/\A#[0-9a-fA-F]{6}\z/', $color ) ? strtolower( $color ) : '';
+    }
+
     public function filter_pwa_manifest( array $manifest, array $config ): array {
-        $trip_id = isset( $_GET['trip_id'] ) ? absint( $_GET['trip_id'] ) : 0;
-        $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
-        $manifest['name'] = __( 'Travel Timeline', 'traveler' );
-        $manifest['short_name'] = __( 'Timeline', 'traveler' );
+        $trip_id = $this->get_query_arg_absint( 'trip_id' );
+        $token = $this->get_query_arg_text( 'token' );
+        $manifest['name'] = __( 'Travel Timeline', 'travel-app' );
+        $manifest['short_name'] = __( 'Timeline', 'travel-app' );
         $manifest['start_url'] = home_url( '/' . $this->get_url_path() . '/' );
         $manifest['scope'] = home_url( '/' );
+        // Match the browser UI to the user's WordPress admin color scheme.
+        $manifest['theme_color'] = $this->get_theme_color();
+        $manifest['background_color'] = '#f6f7f7';
         // Lets Android/Chromium users share an email body or a calendar file
         // straight into the import form from the OS share sheet.
         $manifest['share_target'] = [
@@ -223,10 +683,10 @@ class App extends BaseApp {
                 if ( '' !== $token ) {
                     $manifest['start_url'] = add_query_arg(
                         [
-                            'traveler_share' => $trip_id,
-                            'traveler_token' => $token,
+                            'token' => $token,
+                            'v'     => self::SHARE_PAGE_VERSION,
                         ],
-                        home_url( '/' )
+                        home_url( '/' . $this->get_url_path() . '/share/' . $trip_id . '/' )
                     );
                 }
             }
@@ -238,7 +698,7 @@ class App extends BaseApp {
     private function get_manifest_short_name( string $name ): string {
         $name = trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( $name ) ) );
         if ( '' === $name ) {
-            return __( 'Timeline', 'traveler' );
+            return __( 'Timeline', 'travel-app' );
         }
 
         if ( function_exists( 'mb_strlen' ) && function_exists( 'mb_substr' ) ) {
@@ -251,36 +711,36 @@ class App extends BaseApp {
     public function get_error_notice_message( string $error_code, string $fallback = '' ): string {
         $error_code = sanitize_key( $error_code );
         if ( '' === $error_code ) {
-            return '' !== $fallback ? $fallback : __( 'The requested change could not be saved.', 'traveler' );
+            return '' !== $fallback ? $fallback : __( 'The requested change could not be saved.', 'travel-app' );
         }
 
         $messages = [
-            'attachment_delete_failed' => __( 'The attachment could not be deleted.', 'traveler' ),
-            'attachment_missing'       => __( 'Choose a file to upload.', 'traveler' ),
-            'attachment_not_found'     => __( 'This attachment could not be found.', 'traveler' ),
-            'attachment_too_large'     => __( 'Attachments must be 15 MB or smaller.', 'traveler' ),
-            'attachment_upload_failed' => __( 'The attachment could not be uploaded.', 'traveler' ),
-            'delete_failed'            => __( 'The travel plan could not be deleted.', 'traveler' ),
-            'delete_forbidden'         => __( 'This travel plan cannot be deleted.', 'traveler' ),
-            'edit_forbidden'           => __( 'This travel plan cannot be edited.', 'traveler' ),
-            'empty'                    => __( 'Paste itinerary text or upload a file to import.', 'traveler' ),
-            'share_unsupported_file'   => __( 'Only calendar (.ics) and plain text files can be shared into Traveler.', 'traveler' ),
-            'empty_title'              => __( 'Travel plan title cannot be empty.', 'traveler' ),
-            'invalid_trip_owner'       => __( 'You cannot create travel plans for that user.', 'traveler' ),
-            'missing_itinerary_text'   => __( 'Paste itinerary text to import.', 'traveler' ),
-            'quick_plan_invalid'       => __( 'Review the parsed fields and choose where to save the item.', 'traveler' ),
-            'segment_delete_failed'    => __( 'This itinerary item could not be deleted.', 'traveler' ),
-            'segment_not_found'        => __( 'This itinerary item could not be found.', 'traveler' ),
-            'journal_create_failed'     => __( 'The journal entry could not be created.', 'traveler' ),
-            'journal_disabled'          => __( 'Travel journaling is disabled for this travel plan.', 'traveler' ),
-            'journal_invalid_date'      => __( 'Choose a valid day for the journal entry.', 'traveler' ),
-            'journal_not_found'         => __( 'This journal entry could not be found.', 'traveler' ),
-            'journal_post_failed'       => __( 'The journal post draft could not be prepared.', 'traveler' ),
-            'trip_not_found'           => __( 'This travel plan could not be found.', 'traveler' ),
-            'upload_failed'            => __( 'The itinerary file could not be uploaded.', 'traveler' ),
-            'upload_invalid'           => __( 'The itinerary file upload was invalid.', 'traveler' ),
-            'upload_read_failed'       => __( 'The itinerary file could not be read.', 'traveler' ),
-            'upload_too_large'         => __( 'The itinerary file is too large.', 'traveler' ),
+            'attachment_delete_failed' => __( 'The attachment could not be deleted.', 'travel-app' ),
+            'attachment_missing'       => __( 'Choose a file to upload.', 'travel-app' ),
+            'attachment_not_found'     => __( 'This attachment could not be found.', 'travel-app' ),
+            'attachment_too_large'     => __( 'Attachments must be 15 MB or smaller.', 'travel-app' ),
+            'attachment_upload_failed' => __( 'The attachment could not be uploaded.', 'travel-app' ),
+            'delete_failed'            => __( 'The travel plan could not be deleted.', 'travel-app' ),
+            'delete_forbidden'         => __( 'This travel plan cannot be deleted.', 'travel-app' ),
+            'edit_forbidden'           => __( 'This travel plan cannot be edited.', 'travel-app' ),
+            'empty'                    => __( 'Paste itinerary text or upload a file to import.', 'travel-app' ),
+            'share_unsupported_file'   => __( 'Only calendar (.ics) and plain text files can be shared into Travel App.', 'travel-app' ),
+            'empty_title'              => __( 'Travel plan title cannot be empty.', 'travel-app' ),
+            'invalid_trip_owner'       => __( 'You cannot create travel plans for that user.', 'travel-app' ),
+            'missing_itinerary_text'   => __( 'Paste itinerary text to import.', 'travel-app' ),
+            'quick_plan_invalid'       => __( 'Review the parsed fields and choose where to save the item.', 'travel-app' ),
+            'segment_delete_failed'    => __( 'This itinerary item could not be deleted.', 'travel-app' ),
+            'segment_not_found'        => __( 'This itinerary item could not be found.', 'travel-app' ),
+            'journal_create_failed'     => __( 'The journal entry could not be created.', 'travel-app' ),
+            'journal_disabled'          => __( 'Travel journaling is disabled for this travel plan.', 'travel-app' ),
+            'journal_invalid_date'      => __( 'Choose a valid day for the journal entry.', 'travel-app' ),
+            'journal_not_found'         => __( 'This journal entry could not be found.', 'travel-app' ),
+            'journal_post_failed'       => __( 'The journal post draft could not be prepared.', 'travel-app' ),
+            'trip_not_found'           => __( 'This travel plan could not be found.', 'travel-app' ),
+            'upload_failed'            => __( 'The itinerary file could not be uploaded.', 'travel-app' ),
+            'upload_invalid'           => __( 'The itinerary file upload was invalid.', 'travel-app' ),
+            'upload_read_failed'       => __( 'The itinerary file could not be read.', 'travel-app' ),
+            'upload_too_large'         => __( 'The itinerary file is too large.', 'travel-app' ),
         ];
 
         if ( isset( $messages[ $error_code ] ) ) {
@@ -288,21 +748,22 @@ class App extends BaseApp {
         }
 
         if ( '' === $fallback ) {
-            $fallback = __( 'The requested change could not be saved.', 'traveler' );
+            $fallback = __( 'The requested change could not be saved.', 'travel-app' );
         }
 
         return sprintf(
             /* translators: 1: generic error notice, 2: technical error code. */
-            __( '%1$s Error code: %2$s.', 'traveler' ),
+            __( '%1$s Error code: %2$s.', 'travel-app' ),
             $fallback,
             $error_code
         );
     }
 
     public function is_demo_mode_enabled(): bool {
-        $enabled = defined( 'TRAVELER_DEMO_MODE' ) && TRAVELER_DEMO_MODE;
+        $enabled = ( defined( 'TRAVEL_APP_DEMO_MODE' ) && TRAVEL_APP_DEMO_MODE )
+            || ( defined( 'TRAVELER_DEMO_MODE' ) && TRAVELER_DEMO_MODE );
 
-        return (bool) apply_filters( 'traveler_demo_mode_enabled', $enabled );
+        return (bool) apply_filters( 'travel_app_demo_mode_enabled', $enabled );
     }
 
     /**
@@ -347,11 +808,11 @@ class App extends BaseApp {
          *
          * If you do need custom tables:
          *
-         * class TravelerStorage extends BaseStorage {
+         * class TravelAppStorage extends BaseStorage {
          *     protected function get_schema() {
          *         $charset_collate = $this->wpdb->get_charset_collate();
          *         return [
-         *             "CREATE TABLE {$this->wpdb->prefix}traveler_items (
+         *             "CREATE TABLE {$this->wpdb->prefix}travel_app_items (
          *                 id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
          *                 user_id bigint(20) unsigned NOT NULL,
          *                 title varchar(255) NOT NULL,
@@ -363,7 +824,7 @@ class App extends BaseApp {
          *     }
          * }
          *
-         * Then in __construct(): $this->storage = new TravelerStorage();
+         * Then in __construct(): $this->storage = new TravelAppStorage();
          * And in activate():     $this->storage->create_tables();
          */
     }
@@ -388,7 +849,7 @@ class App extends BaseApp {
             );
         }
 
-        $this->app->add_menu_item( 'settings', __( 'Settings', 'traveler' ), home_url( '/' . $this->get_url_path() . '/settings/' ) );
+        $this->app->add_menu_item( 'settings', __( 'Settings', 'travel-app' ), home_url( '/' . $this->get_url_path() . '/settings/' ) );
     }
 
     private function get_masterbar_current_trip(): ?Trip {
@@ -417,7 +878,7 @@ class App extends BaseApp {
     }
 
     private function get_masterbar_trip_label( Trip $trip ): string {
-        $title = '' !== trim( $trip->title ) ? $trip->title : __( 'Travel Plan', 'traveler' );
+        $title = '' !== trim( $trip->title ) ? $trip->title : __( 'Travel Plan', 'travel-app' );
         $date = $trip->starts_at ? substr( $trip->starts_at, 5 ) : '';
         $label = '' !== $date ? $date . ' ' . $title : $title;
 
@@ -427,10 +888,10 @@ class App extends BaseApp {
     public function register_post_types(): void {
         $translate_labels = did_action( 'init' );
 
-        register_post_type( 'traveler_item', [
+        register_post_type( 'travel_app_item', [
             'labels'       => [
-                'name'          => $translate_labels ? __( 'Itinerary Items', 'traveler' ) : 'Itinerary Items',
-                'singular_name' => $translate_labels ? __( 'Itinerary Item', 'traveler' ) : 'Itinerary Item',
+                'name'          => $translate_labels ? __( 'Itinerary Items', 'travel-app' ) : 'Itinerary Items',
+                'singular_name' => $translate_labels ? __( 'Itinerary Item', 'travel-app' ) : 'Itinerary Item',
             ],
             'public'       => false,
             'show_ui'      => true,
@@ -439,15 +900,15 @@ class App extends BaseApp {
             'map_meta_cap' => true,
         ] );
 
-        register_post_type( 'traveler_journal', [
+        register_post_type( 'travel_app_journal', [
             'labels'       => [
-                'name'                     => $translate_labels ? __( 'Travel Journals', 'traveler' ) : 'Travel Journals',
-                'singular_name'            => $translate_labels ? __( 'Travel Journal', 'traveler' ) : 'Travel Journal',
-                'edit_item'                => $translate_labels ? __( 'Edit Travel Journal', 'traveler' ) : 'Edit Travel Journal',
-                'publish_item'             => $translate_labels ? __( 'Save Journal', 'traveler' ) : 'Save Journal',
-                'item_published'           => $translate_labels ? __( 'Journal saved.', 'traveler' ) : 'Journal saved.',
-                'item_published_privately' => $translate_labels ? __( 'Journal saved privately.', 'traveler' ) : 'Journal saved privately.',
-                'item_updated'             => $translate_labels ? __( 'Journal updated.', 'traveler' ) : 'Journal updated.',
+                'name'                     => $translate_labels ? __( 'Travel Journals', 'travel-app' ) : 'Travel Journals',
+                'singular_name'            => $translate_labels ? __( 'Travel Journal', 'travel-app' ) : 'Travel Journal',
+                'edit_item'                => $translate_labels ? __( 'Edit Travel Journal', 'travel-app' ) : 'Edit Travel Journal',
+                'publish_item'             => $translate_labels ? __( 'Save Journal', 'travel-app' ) : 'Save Journal',
+                'item_published'           => $translate_labels ? __( 'Journal saved.', 'travel-app' ) : 'Journal saved.',
+                'item_published_privately' => $translate_labels ? __( 'Journal saved privately.', 'travel-app' ) : 'Journal saved privately.',
+                'item_updated'             => $translate_labels ? __( 'Journal updated.', 'travel-app' ) : 'Journal updated.',
             ],
             'public'       => false,
             'show_ui'      => true,
@@ -462,10 +923,10 @@ class App extends BaseApp {
             return $result;
         }
 
-        if ( 0 === strpos( $request->get_route(), '/wp/v2/traveler_trip' ) ) {
+        if ( 0 === strpos( $request->get_route(), '/wp/v2/travel_app_trip' ) ) {
             return new \WP_Error(
                 'rest_login_required',
-                __( 'Authentication is required to read this data.', 'traveler' ),
+                __( 'Authentication is required to read this data.', 'travel-app' ),
                 [ 'status' => rest_authorization_required_code() ]
             );
         }
@@ -476,10 +937,10 @@ class App extends BaseApp {
     public function register_taxonomies(): void {
         $translate_labels = did_action( 'init' );
 
-        // traveler_trip is show_in_rest (needed for the editor), so core would
-        // serve trip names to anonymous callers over /wp/v2/traveler_trip.
+        // travel_app_trip is show_in_rest (needed for the editor), so core would
+        // serve trip names to anonymous callers over /wp/v2/travel_app_trip.
         // Gate it via wp-app's Access: single-trip reads are checked as
-        // read_traveler_trip WITH the trip id, so map_trip_meta_cap (owner,
+        // read_travel_app_trip WITH the trip id, so map_trip_meta_cap (owner,
         // editor, or valid share token) applies to REST too; the listing needs a
         // coarse cap (login). Older wp-app without Access -> request filter.
         $rest_gate = class_exists( '\\WpApp\\Rest\\Access' );
@@ -487,22 +948,22 @@ class App extends BaseApp {
             add_filter( 'rest_pre_dispatch', [ __CLASS__, 'require_login_for_rest' ], 10, 3 );
         }
 
-        register_taxonomy( 'traveler_trip', 'traveler_item', [
+        register_taxonomy( 'travel_app_trip', 'travel_app_item', [
             'labels'            => [
-                'name'          => $translate_labels ? __( 'Travel Plans', 'traveler' ) : 'Travel Plans',
-                'singular_name' => $translate_labels ? __( 'Travel Plan', 'traveler' ) : 'Travel Plan',
+                'name'          => $translate_labels ? __( 'Travel Plans', 'travel-app' ) : 'Travel Plans',
+                'singular_name' => $translate_labels ? __( 'Travel Plan', 'travel-app' ) : 'Travel Plan',
             ],
             'public'            => false,
             'hierarchical'      => false,
             'show_ui'           => true,
             'show_in_rest'      => true,
-            'rest_controller_class' => $rest_gate ? \WpApp\Rest\Access::protect_taxonomy( 'traveler_trip', 'read_traveler_trip', 'read' ) : null,
+            'rest_controller_class' => $rest_gate ? \WpApp\Rest\Access::protect_taxonomy( 'travel_app_trip', 'read_travel_app_trip', 'read' ) : null,
             'show_admin_column' => true,
         ] );
     }
 
     public function map_trip_meta_cap( array $caps, string $cap, int $user_id, array $args ): array {
-        if ( ! in_array( $cap, [ 'read_traveler_trip', 'edit_traveler_trip', 'delete_traveler_trip' ], true ) ) {
+        if ( ! in_array( $cap, [ 'read_travel_app_trip', 'edit_travel_app_trip', 'delete_travel_app_trip' ], true ) ) {
             return $caps;
         }
 
@@ -516,7 +977,7 @@ class App extends BaseApp {
             return [ 'do_not_allow' ];
         }
 
-        if ( 'read_traveler_trip' === $cap && $this->request_has_trip_share_token( $trip_id ) ) {
+        if ( 'read_travel_app_trip' === $cap && $this->request_has_trip_share_token( $trip_id ) ) {
             return [ 'exist' ];
         }
 
@@ -524,11 +985,11 @@ class App extends BaseApp {
             return [ 'read' ];
         }
 
-        if ( in_array( $cap, [ 'read_traveler_trip', 'edit_traveler_trip' ], true ) && $this->is_trip_editor( $trip_id, $user_id ) ) {
+        if ( in_array( $cap, [ 'read_travel_app_trip', 'edit_travel_app_trip' ], true ) && $this->is_trip_editor( $trip_id, $user_id ) ) {
             return [ 'read' ];
         }
 
-        if ( in_array( $cap, [ 'read_traveler_trip', 'edit_traveler_trip' ], true ) && $this->user_can_edit_trips_for_owner( $user_id, $trip->owner_id() ) ) {
+        if ( in_array( $cap, [ 'read_travel_app_trip', 'edit_travel_app_trip' ], true ) && $this->user_can_edit_trips_for_owner( $user_id, $trip->owner_id() ) ) {
             return [ 'read' ];
         }
 
@@ -537,11 +998,11 @@ class App extends BaseApp {
 
     public function get_delegation_capability_options(): array {
         return [
-            'read'              => __( 'Any logged-in user', 'traveler' ),
-            'edit_posts'        => __( 'Contributors and above', 'traveler' ),
-            'publish_posts'     => __( 'Authors and above', 'traveler' ),
-            'edit_others_posts' => __( 'Editors and above', 'traveler' ),
-            'manage_options'    => __( 'Administrators only', 'traveler' ),
+            'read'              => __( 'Any logged-in user', 'travel-app' ),
+            'edit_posts'        => __( 'Contributors and above', 'travel-app' ),
+            'publish_posts'     => __( 'Authors and above', 'travel-app' ),
+            'edit_others_posts' => __( 'Editors and above', 'travel-app' ),
+            'manage_options'    => __( 'Administrators only', 'travel-app' ),
         ];
     }
 
@@ -554,13 +1015,13 @@ class App extends BaseApp {
 
     public function get_delegated_trip_creation_capability( int $owner_user_id ): string {
         return $this->normalize_delegation_capability(
-            (string) get_user_meta( $owner_user_id, '_traveler_delegated_trip_creation_capability', true ),
+            (string) get_user_meta( $owner_user_id, '_travel_app_delegated_trip_creation_capability', true ),
             'edit_others_posts'
         );
     }
 
     public function get_global_trip_editor_capability( int $owner_user_id ): string {
-        $capability = sanitize_key( (string) get_user_meta( $owner_user_id, '_traveler_global_trip_editor_capability', true ) );
+        $capability = sanitize_key( (string) get_user_meta( $owner_user_id, '_travel_app_global_trip_editor_capability', true ) );
 
         if ( 'none' === $capability || '' === $capability ) {
             return 'none';
@@ -574,7 +1035,7 @@ class App extends BaseApp {
     }
 
     public function user_allows_delegated_trip_creation( int $owner_user_id, ?int $actor_user_id = null ): bool {
-        if ( $owner_user_id <= 0 || '1' !== (string) get_user_meta( $owner_user_id, '_traveler_allow_delegated_trip_creation', true ) ) {
+        if ( $owner_user_id <= 0 || '1' !== (string) get_user_meta( $owner_user_id, '_travel_app_allow_delegated_trip_creation', true ) ) {
             return false;
         }
 
@@ -599,8 +1060,18 @@ class App extends BaseApp {
             return [];
         }
 
+        $candidate_owner_ids = get_users( [
+            'fields'       => 'ids',
+            'exclude'      => [ $actor_user_id ],
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Global trip editor delegation is stored in user meta and filtered here to avoid scanning every user on the site.
+            'meta_key'     => '_travel_app_global_trip_editor_capability',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Excludes users who disabled global trip editing.
+            'meta_value'   => 'none',
+            'meta_compare' => '!=',
+        ] );
+
         $owner_ids = [];
-        foreach ( get_users( [ 'fields' => 'ids' ] ) as $owner_user_id ) {
+        foreach ( $candidate_owner_ids as $owner_user_id ) {
             $owner_user_id = (int) $owner_user_id;
             if ( $this->user_can_edit_trips_for_owner( $actor_user_id, $owner_user_id ) ) {
                 $owner_ids[] = $owner_user_id;
@@ -625,7 +1096,9 @@ class App extends BaseApp {
         $delegating_users = get_users( [
             'fields'     => 'all',
             'exclude'    => [ $actor_user_id ],
-            'meta_key'   => '_traveler_allow_delegated_trip_creation',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- User delegation is stored in user meta and filtered here to avoid scanning every user on normal imports.
+            'meta_key'   => '_travel_app_allow_delegated_trip_creation',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- See meta_key note above; this is a small settings lookup for eligible delegation owners.
             'meta_value' => '1',
             'orderby'    => 'display_name',
             'order'      => 'ASC',
@@ -642,7 +1115,8 @@ class App extends BaseApp {
 
     private function resolve_import_owner_id(): int {
         $actor_user_id = get_current_user_id();
-        $owner_user_id = isset( $_POST['traveler_owner_user_id'] ) ? absint( $_POST['traveler_owner_user_id'] ) : $actor_user_id;
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Called after travel_app_import nonce verification.
+        $owner_user_id = isset( $_POST['travel_app_owner_user_id'] ) ? absint( $_POST['travel_app_owner_user_id'] ) : $actor_user_id;
 
         if ( $owner_user_id === $actor_user_id ) {
             return $actor_user_id;
@@ -652,7 +1126,7 @@ class App extends BaseApp {
     }
 
     public function get_trip_editor_ids( int $trip_id ): array {
-        $raw_ids = get_term_meta( $trip_id, '_traveler_editor_user_ids', false );
+        $raw_ids = get_term_meta( $trip_id, '_travel_app_editor_user_ids', false );
         if ( 1 === count( $raw_ids ) && is_array( $raw_ids[0] ) ) {
             $raw_ids = $raw_ids[0];
         }
@@ -696,23 +1170,23 @@ class App extends BaseApp {
 
         return sprintf(
             /* translators: %s: travel plan owner display name. */
-            __( 'Traveller: %s', 'traveler' ),
-            '' !== $display_name ? $display_name : __( 'another user', 'traveler' )
+            __( 'Traveller: %s', 'travel-app' ),
+            '' !== $display_name ? $display_name : __( 'another user', 'travel-app' )
         );
     }
 
     private function update_trip_editors( int $trip_id, array $editor_ids ) {
         if ( ! $this->current_user_can_manage_trip_editors( $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
         $owner_id = Trip::get_owner_id( $trip_id );
         $editor_ids = array_values( array_diff( array_unique( array_filter( array_map( 'absint', $editor_ids ) ) ), [ $owner_id ] ) );
 
-        delete_term_meta( $trip_id, '_traveler_editor_user_ids' );
+        delete_term_meta( $trip_id, '_travel_app_editor_user_ids' );
         foreach ( $editor_ids as $editor_id ) {
             if ( get_user_by( 'id', $editor_id ) ) {
-                add_term_meta( $trip_id, '_traveler_editor_user_ids', $editor_id, false );
+                add_term_meta( $trip_id, '_travel_app_editor_user_ids', $editor_id, false );
             }
         }
 
@@ -720,14 +1194,19 @@ class App extends BaseApp {
     }
 
     private function request_has_trip_share_token( int $trip_id ): bool {
-        $shared_trip_id = isset( $_GET['traveler_share'] ) ? absint( $_GET['traveler_share'] ) : 0;
+        $shared_trip_id = $this->get_requested_shared_trip_id();
         if ( $shared_trip_id !== $trip_id ) {
             return false;
         }
 
-        $token = isset( $_GET['traveler_token'] ) ? sanitize_text_field( wp_unslash( $_GET['traveler_token'] ) ) : '';
+        $token = $this->get_query_arg_text( 'token' );
 
         return '' !== $this->get_trip_share_mode_by_token( $trip_id, $token );
+    }
+
+    private function get_requested_shared_trip_id(): int {
+        $request_path = (string) get_query_var( 'wp_app_request', '' );
+        return 1 === preg_match( '#\Ashare/([0-9]+)/?\z#', $request_path, $matches ) ? absint( $matches[1] ) : 0;
     }
 
     public function register_dashboard_widgets(): void {
@@ -736,8 +1215,8 @@ class App extends BaseApp {
          * wp_dashboard_setup.
          *
          * wp_add_dashboard_widget(
-         *     'traveler_dashboard',
-         *     'Traveler',
+         *     'travel_app_dashboard',
+         *     'Travel App',
          *     [ $this, 'render_dashboard_widget' ]
          * );
          */
@@ -745,7 +1224,7 @@ class App extends BaseApp {
 
     public function render_dashboard_widget(): void {
         /*
-         * echo esc_html__( 'Add your dashboard summary here.', 'traveler' );
+         * echo esc_html__( 'Add your dashboard summary here.', 'travel-app' );
          */
     }
 
@@ -754,9 +1233,9 @@ class App extends BaseApp {
             return;
         }
 
-        wp_register_ability_category( 'traveler', [
-            'label'       => __( 'Traveler', 'traveler' ),
-            'description' => __( 'Abilities for managing pasted travel itineraries.', 'traveler' ),
+        wp_register_ability_category( 'travel-app', [
+            'label'       => __( 'Travel App', 'travel-app' ),
+            'description' => __( 'Abilities for managing pasted travel itineraries.', 'travel-app' ),
         ] );
     }
 
@@ -765,10 +1244,10 @@ class App extends BaseApp {
             return;
         }
 
-        wp_register_ability( 'traveler/list-trips', [
-            'label'               => __( 'List Travel Plans', 'traveler' ),
+        wp_register_ability( 'travel-app/list-trips', [
+            'label'               => __( 'List Travel Plans', 'travel-app' ),
             'description'         => 'Returns the current user\'s saved travel plans with IDs, dates, and segment counts.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
@@ -787,7 +1266,7 @@ class App extends BaseApp {
                         'items' => [
                             'type'       => 'object',
                             'properties' => [
-                                'id'           => [ 'type' => 'integer', 'description' => 'Use with traveler/get-trip.' ],
+                                'id'           => [ 'type' => 'integer', 'description' => 'Use with travel-app/get-trip.' ],
                                 'title'        => [ 'type' => 'string' ],
                                 'starts_at'    => [ 'type' => 'string' ],
                                 'ends_at'      => [ 'type' => 'string' ],
@@ -812,10 +1291,10 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/import-itinerary', [
-            'label'               => __( 'Import Pasted Itinerary', 'traveler' ),
+        wp_register_ability( 'travel-app/import-itinerary', [
+            'label'               => __( 'Import Pasted Itinerary', 'travel-app' ),
             'description'         => 'Parses pasted booking confirmation text or itinerary email text and saves it as a structured travel plan for the current user.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
@@ -857,10 +1336,10 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/create-travel-plan', [
-            'label'               => __( 'Create Travel Plan', 'traveler' ),
-            'description'         => 'Creates a new, empty travel plan for the current user from a title and optional dates, without parsing any itinerary text. Add itinerary items afterwards with traveler/add-itinerary-item.',
-            'category'            => 'traveler',
+        wp_register_ability( 'travel-app/create-travel-plan', [
+            'label'               => __( 'Create Travel Plan', 'travel-app' ),
+            'description'         => 'Creates a new, empty travel plan for the current user from a title and optional dates, without parsing any itinerary text. Add itinerary items afterwards with travel-app/add-itinerary-item.',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
@@ -893,7 +1372,7 @@ class App extends BaseApp {
             },
             'meta'                => [
                 'annotations' => [
-                    'instructions' => 'Use this when the user wants a new trip but has no booking text to import. Do not invent dates; leave them out unless the user gave them. Return the Traveler URL afterwards.',
+                    'instructions' => 'Use this when the user wants a new trip but has no booking text to import. Do not invent dates; leave them out unless the user gave them. Return the Travel App URL afterwards.',
                     'readonly'     => false,
                     'destructive'  => false,
                     'idempotent'   => false,
@@ -901,16 +1380,16 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/get-trip', [
-            'label'               => __( 'Get Travel Plan', 'traveler' ),
+        wp_register_ability( 'travel-app/get-trip', [
+            'label'               => __( 'Get Travel Plan', 'travel-app' ),
             'description'         => 'Returns full details for one saved travel plan owned by the current user, including itinerary items, attachments, existing share links, and app URLs.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
                     'id' => [
                         'type'        => 'integer',
-                        'description' => 'Travel plan ID from traveler/list-trips.',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
                     ],
                 ],
                 'required'             => [ 'id' ],
@@ -946,20 +1425,20 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/get-itinerary-item', [
-            'label'               => __( 'Get Itinerary Item', 'traveler' ),
+        wp_register_ability( 'travel-app/get-itinerary-item', [
+            'label'               => __( 'Get Itinerary Item', 'travel-app' ),
             'description'         => 'Returns one structured itinerary item owned by the current user, including item URLs, attachments, and fields useful for cross-app handoff.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
                     'trip_id' => [
                         'type'        => 'integer',
-                        'description' => 'Travel plan ID from traveler/list-trips or traveler/get-trip.',
+                        'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
                     ],
                     'item_id' => [
                         'type'        => 'integer',
-                        'description' => 'Itinerary item ID from the trip segments returned by traveler/get-trip.',
+                        'description' => 'Itinerary item ID from the trip segments returned by travel-app/get-trip.',
                     ],
                 ],
                 'required'             => [ 'trip_id', 'item_id' ],
@@ -986,16 +1465,16 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/review-trip-fields', [
-            'label'               => __( 'Review Missing Itinerary Fields', 'traveler' ),
+        wp_register_ability( 'travel-app/review-trip-fields', [
+            'label'               => __( 'Review Missing Itinerary Fields', 'travel-app' ),
             'description'         => 'Reports blank itinerary fields for a saved travel plan, including parser error details when available.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
                     'id' => [
                         'type'        => 'integer',
-                        'description' => 'Travel plan ID from traveler/list-trips or traveler/get-trip.',
+                        'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
                     ],
                 ],
                 'required'             => [ 'id' ],
@@ -1018,7 +1497,7 @@ class App extends BaseApp {
             },
             'meta'                => [
                 'annotations' => [
-                    'instructions' => 'Report each missing field with the itinerary item it belongs to and the reason returned by the ability. Include the Traveler URL for review.',
+                    'instructions' => 'Report each missing field with the itinerary item it belongs to and the reason returned by the ability. Include the Travel App URL for review.',
                     'readonly'     => true,
                     'destructive'  => false,
                     'idempotent'   => true,
@@ -1026,16 +1505,16 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/update-travel-plan', [
-            'label'               => __( 'Rename Travel Plan', 'traveler' ),
+        wp_register_ability( 'travel-app/update-travel-plan', [
+            'label'               => __( 'Rename Travel Plan', 'travel-app' ),
             'description'         => 'Renames one travel plan owned by the current user.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
                     'id'    => [
                         'type'        => 'integer',
-                        'description' => 'Travel plan ID from traveler/list-trips.',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
                     ],
                     'title' => [
                         'type'        => 'string',
@@ -1058,7 +1537,7 @@ class App extends BaseApp {
             },
             'meta'                => [
                 'annotations' => [
-                    'instructions' => 'Use this when the user asks to rename or retitle a travel plan. Return the updated Traveler link.',
+                    'instructions' => 'Use this when the user asks to rename or retitle a travel plan. Return the updated Travel App link.',
                     'readonly'     => false,
                     'destructive'  => false,
                     'idempotent'   => true,
@@ -1066,10 +1545,10 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/add-itinerary-item', [
-            'label'               => __( 'Add Itinerary Item', 'traveler' ),
+        wp_register_ability( 'travel-app/add-itinerary-item', [
+            'label'               => __( 'Add Itinerary Item', 'travel-app' ),
             'description'         => 'Adds a flight, lodging, train, car, activity, or other itinerary item to an existing travel plan owned by the current user.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => $this->get_itinerary_item_ability_input_schema( true ),
             'output_schema'       => [
                 'type'       => 'object',
@@ -1095,10 +1574,10 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/update-itinerary-item', [
-            'label'               => __( 'Update Itinerary Item', 'traveler' ),
+        wp_register_ability( 'travel-app/update-itinerary-item', [
+            'label'               => __( 'Update Itinerary Item', 'travel-app' ),
             'description'         => 'Updates selected fields on one itinerary item owned by the current user. Omitted item fields keep their existing values.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => $this->get_itinerary_item_ability_input_schema( false ),
             'output_schema'       => [
                 'type'       => 'object',
@@ -1116,7 +1595,7 @@ class App extends BaseApp {
             },
             'meta'                => [
                 'annotations' => [
-                    'instructions' => 'Call traveler/get-trip first unless the item ID and existing item values are already known. Preserve fields the user did not ask to change.',
+                    'instructions' => 'Call travel-app/get-trip first unless the item ID and existing item values are already known. Preserve fields the user did not ask to change.',
                     'readonly'     => false,
                     'destructive'  => false,
                     'idempotent'   => true,
@@ -1124,20 +1603,20 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/delete-itinerary-item', [
-            'label'               => __( 'Delete Itinerary Item', 'traveler' ),
+        wp_register_ability( 'travel-app/delete-itinerary-item', [
+            'label'               => __( 'Delete Itinerary Item', 'travel-app' ),
             'description'         => 'Moves one itinerary item owned by the current user to the trash.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
                     'trip_id' => [
                         'type'        => 'integer',
-                        'description' => 'Travel plan ID from traveler/list-trips or traveler/get-trip.',
+                        'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
                     ],
                     'item_id' => [
                         'type'        => 'integer',
-                        'description' => 'Itinerary item ID from the trip segments returned by traveler/get-trip.',
+                        'description' => 'Itinerary item ID from the trip segments returned by travel-app/get-trip.',
                     ],
                 ],
                 'required'             => [ 'trip_id', 'item_id' ],
@@ -1165,16 +1644,16 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/create-share-link', [
-            'label'               => __( 'Create Travel Plan Share Link', 'traveler' ),
+        wp_register_ability( 'travel-app/create-share-link', [
+            'label'               => __( 'Create Travel Plan Share Link', 'travel-app' ),
             'description'         => 'Creates or returns an existing read-only timeline share link for one travel plan owned by the current user.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
                     'id'   => [
                         'type'        => 'integer',
-                        'description' => 'Travel plan ID from traveler/list-trips.',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
                     ],
                     'mode' => [
                         'type'        => 'string',
@@ -1208,16 +1687,16 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/remove-share-link', [
-            'label'               => __( 'Remove Travel Plan Share Link', 'traveler' ),
+        wp_register_ability( 'travel-app/remove-share-link', [
+            'label'               => __( 'Remove Travel Plan Share Link', 'travel-app' ),
             'description'         => 'Removes a read-only share link for one travel plan owned by the current user.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
                     'id'   => [
                         'type'        => 'integer',
-                        'description' => 'Travel plan ID from traveler/list-trips.',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
                     ],
                     'mode' => [
                         'type'        => 'string',
@@ -1251,16 +1730,16 @@ class App extends BaseApp {
             ],
         ] );
 
-        wp_register_ability( 'traveler/delete-travel-plan', [
-            'label'               => __( 'Delete Travel Plan', 'traveler' ),
+        wp_register_ability( 'travel-app/delete-travel-plan', [
+            'label'               => __( 'Delete Travel Plan', 'travel-app' ),
             'description'         => 'Deletes one saved travel plan owned by the current user and moves its itinerary items to the trash.',
-            'category'            => 'traveler',
+            'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
                     'id' => [
                         'type'        => 'integer',
-                        'description' => 'Travel plan ID from traveler/list-trips.',
+                        'description' => 'Travel plan ID from travel-app/list-trips.',
                     ],
                 ],
                 'required'             => [ 'id' ],
@@ -1291,7 +1770,7 @@ class App extends BaseApp {
     public function list_ability_items( $input ): array {
         $active = is_array( $input ) && array_key_exists( 'active', $input ) ? (bool) $input['active'] : null;
         $trips = array_map( static function( Trip $trip ): array {
-            return $trip->to_array();
+            return $trip->to_summary_array();
         }, Trip::for_current_user() );
 
         if ( null !== $active ) {
@@ -1311,7 +1790,7 @@ class App extends BaseApp {
             'properties'           => [
                 'trip_id' => [
                     'type'        => 'integer',
-                    'description' => 'Travel plan ID from traveler/list-trips or traveler/get-trip.',
+                    'description' => 'Travel plan ID from travel-app/list-trips or travel-app/get-trip.',
                 ],
                 'segment' => ItineraryItem::input_schema(),
             ],
@@ -1322,7 +1801,7 @@ class App extends BaseApp {
         if ( ! $creating ) {
             $schema['properties']['item_id'] = [
                 'type'        => 'integer',
-                'description' => 'Itinerary item ID from the trip segments returned by traveler/get-trip.',
+                'description' => 'Itinerary item ID from the trip segments returned by travel-app/get-trip.',
             ];
             $schema['required'] = [ 'trip_id', 'item_id', 'segment' ];
         }
@@ -1331,22 +1810,22 @@ class App extends BaseApp {
     }
 
     public function register_ai_assistant_ability_domains( array $domains ): array {
-        $domains['traveler'] = 'Traveler, itinerary, travel plans, trips, trip timeline, flights, lodging, hotels, trains, rental cars, activities, booking confirmations, reservations, travel organizer, share trip';
+        $domains['travel-app'] = 'Travel App, itinerary, travel plans, trips, trip timeline, flights, lodging, hotels, trains, rental cars, activities, booking confirmations, reservations, travel organizer, share trip';
         return $domains;
     }
 
     public function get_ai_assistant_ability_instructions( string $instructions, string $ability_id, $args, $result ): string {
-        if ( 'traveler/import-itinerary' === $ability_id && ! empty( $result['id'] ) ) {
-            $instructions = 'Tell the user the travel plan was saved. Summarize title, dates, and travel segments, then link to the Traveler URL if present. If missing_fields or parser_error is present, report which fields were not filled and why.';
-        } elseif ( 'traveler/create-travel-plan' === $ability_id && ! empty( $result['trip']['url'] ) ) {
-            $instructions = 'Tell the user the empty travel plan was created, include the Traveler URL, and offer to add itinerary items to it.';
-        } elseif ( in_array( $ability_id, [ 'traveler/add-itinerary-item', 'traveler/update-itinerary-item', 'traveler/delete-itinerary-item', 'traveler/update-travel-plan' ], true ) && ! empty( $result['trip']['url'] ) ) {
-            $instructions = 'Tell the user what changed and include the Traveler URL for review.';
-        } elseif ( 'traveler/create-share-link' === $ability_id && ! empty( $result['url'] ) ) {
+        if ( 'travel-app/import-itinerary' === $ability_id && ! empty( $result['id'] ) ) {
+            $instructions = 'Tell the user the travel plan was saved. Summarize title, dates, and travel segments, then link to the Travel App URL if present. If missing_fields or parser_error is present, report which fields were not filled and why.';
+        } elseif ( 'travel-app/create-travel-plan' === $ability_id && ! empty( $result['trip']['url'] ) ) {
+            $instructions = 'Tell the user the empty travel plan was created, include the Travel App URL, and offer to add itinerary items to it.';
+        } elseif ( in_array( $ability_id, [ 'travel-app/add-itinerary-item', 'travel-app/update-itinerary-item', 'travel-app/delete-itinerary-item', 'travel-app/update-travel-plan' ], true ) && ! empty( $result['trip']['url'] ) ) {
+            $instructions = 'Tell the user what changed and include the Travel App URL for review.';
+        } elseif ( 'travel-app/create-share-link' === $ability_id && ! empty( $result['url'] ) ) {
             $instructions = 'Tell the user the read-only travel timeline share link is ready and include the URL.';
-        } elseif ( 'traveler/get-trip' === $ability_id && ! empty( $result['id'] ) ) {
+        } elseif ( 'travel-app/get-trip' === $ability_id && ! empty( $result['id'] ) ) {
             $instructions = 'Summarize the travel plan by date. Use missing_fields and parser_error to mention which itinerary fields are blank and why.';
-        } elseif ( 'traveler/review-trip-fields' === $ability_id && ! empty( $result['id'] ) ) {
+        } elseif ( 'travel-app/review-trip-fields' === $ability_id && ! empty( $result['id'] ) ) {
             $instructions = 'Report each missing itinerary field with the item it belongs to and the reason returned by the ability. If no missing fields are returned, say the saved fields look complete.';
         }
 
@@ -1354,9 +1833,9 @@ class App extends BaseApp {
     }
 
     public function register_ai_assistant_welcome_tips( array $tips, array $context ): array {
-        $tips['traveler'] = [
-            __( 'Paste a booking confirmation and ask me to add it to Traveler.', 'traveler' ),
-            __( 'Ask me to summarize, update, or share one of your saved travel plans.', 'traveler' ),
+        $tips['travel-app'] = [
+            __( 'Paste a booking confirmation and ask me to add it to Travel App.', 'travel-app' ),
+            __( 'Ask me to summarize, update, or share one of your saved travel plans.', 'travel-app' ),
         ];
 
         return $tips;
@@ -1367,7 +1846,7 @@ class App extends BaseApp {
         $text  = isset( $input['itinerary_text'] ) ? (string) $input['itinerary_text'] : '';
 
         if ( '' === trim( $text ) ) {
-            return new \WP_Error( 'missing_itinerary_text', __( 'Paste itinerary text to import.', 'traveler' ) );
+            return new \WP_Error( 'missing_itinerary_text', __( 'Paste itinerary text to import.', 'travel-app' ) );
         }
 
         $parsed = $this->parse_itinerary_text( $text );
@@ -1386,14 +1865,14 @@ class App extends BaseApp {
         $title = sanitize_text_field( isset( $input['title'] ) ? (string) $input['title'] : '' );
 
         if ( '' === $title ) {
-            return new \WP_Error( 'missing_title', __( 'Enter a title for the travel plan.', 'traveler' ) );
+            return new \WP_Error( 'missing_title', __( 'Enter a title for the travel plan.', 'travel-app' ) );
         }
 
         $dates = [];
         foreach ( [ 'starts_at', 'ends_at' ] as $key ) {
             $value = isset( $input[ $key ] ) ? trim( (string) $input[ $key ] ) : '';
             if ( '' !== $value && ! $this->is_valid_ability_date( $value ) ) {
-                return new \WP_Error( 'invalid_date', __( 'Dates must be given as YYYY-MM-DD.', 'traveler' ) );
+                return new \WP_Error( 'invalid_date', __( 'Dates must be given as YYYY-MM-DD.', 'travel-app' ) );
             }
             $dates[ $key ] = $value;
         }
@@ -1407,7 +1886,7 @@ class App extends BaseApp {
         }
 
         if ( $dates['ends_at'] < $dates['starts_at'] ) {
-            return new \WP_Error( 'invalid_date_range', __( 'The end date must not be before the start date.', 'traveler' ) );
+            return new \WP_Error( 'invalid_date_range', __( 'The end date must not be before the start date.', 'travel-app' ) );
         }
 
         $trip_id = $this->save_trip( [
@@ -1442,8 +1921,8 @@ class App extends BaseApp {
         $trip_id = isset( $input['id'] ) ? absint( $input['id'] ) : 0;
         $term = Trip::get( $trip_id );
 
-        if ( ! $term || ! current_user_can( 'read_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'trip_not_found', __( 'This travel plan could not be found.', 'traveler' ) );
+        if ( ! $term || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'trip_not_found', __( 'This travel plan could not be found.', 'travel-app' ) );
         }
 
         return $term->to_ability_array( [ $this, 'get_trip_share_url' ] );
@@ -1457,7 +1936,7 @@ class App extends BaseApp {
         $segment = $item ? $item->to_array() : null;
 
         if ( ! $segment ) {
-            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'traveler' ) );
+            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
         }
 
         return [
@@ -1525,7 +2004,7 @@ class App extends BaseApp {
         $current = $current_item ? $current_item->to_array() : null;
 
         if ( ! $current ) {
-            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'traveler' ) );
+            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
         }
 
         $changes = isset( $input['segment'] ) && is_array( $input['segment'] ) ? $input['segment'] : [];
@@ -1569,10 +2048,9 @@ class App extends BaseApp {
         $token = $this->create_trip_share_token( $trip_id, $mode );
 
         if ( '' === $token ) {
-            return new \WP_Error( 'share_forbidden', __( 'This travel plan cannot be shared.', 'traveler' ) );
+            return new \WP_Error( 'share_forbidden', __( 'This travel plan cannot be shared.', 'travel-app' ) );
         }
 
-        $this->clear_trip_public_cache( $trip_id );
         $mode = $this->normalize_share_mode( $mode );
 
         return [
@@ -1587,12 +2065,11 @@ class App extends BaseApp {
         $trip_id = isset( $input['id'] ) ? absint( $input['id'] ) : 0;
         $mode = isset( $input['mode'] ) ? (string) $input['mode'] : 'fellow';
 
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'share_forbidden', __( 'This travel plan cannot be updated.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'share_forbidden', __( 'This travel plan cannot be updated.', 'travel-app' ) );
         }
 
         $mode = $this->normalize_share_mode( $mode );
-        $this->clear_trip_public_cache( $trip_id );
         delete_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ) );
 
         return [
@@ -1619,23 +2096,23 @@ class App extends BaseApp {
 
     public function handle_import(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to import travel plans.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to import travel plans.', 'travel-app' ), 403 );
         }
 
-        check_admin_referer( 'traveler_import' );
+        check_admin_referer( 'travel_app_import' );
 
         $import_trip_id = isset( $_POST['import_trip_id'] ) ? absint( $_POST['import_trip_id'] ) : 0;
         $redirect = $import_trip_id
             ? home_url( '/' . $this->get_url_path() . '/trip/' . $import_trip_id . '/' )
             : home_url( '/' . $this->get_url_path() . '/' );
-        if ( $import_trip_id && ! current_user_can( 'edit_traveler_trip', $import_trip_id ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', 'edit_forbidden', home_url( '/' . $this->get_url_path() . '/' ) ) );
+        if ( $import_trip_id && ! current_user_can( 'edit_travel_app_trip', $import_trip_id ) ) {
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'edit_forbidden', home_url( '/' . $this->get_url_path() . '/' ) ) );
             exit;
         }
 
         $owner_user_id = $import_trip_id ? Trip::get_owner_id( $import_trip_id ) : $this->resolve_import_owner_id();
         if ( $owner_user_id <= 0 ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', 'invalid_trip_owner', $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'invalid_trip_owner', $redirect ) );
             exit;
         }
 
@@ -1645,10 +2122,10 @@ class App extends BaseApp {
             $this->save_quick_plan_draft_submission( $draft_key, $target, $redirect, $owner_user_id );
         }
 
-        $text = isset( $_POST['itinerary_text'] ) ? (string) wp_unslash( $_POST['itinerary_text'] ) : '';
+        $text = isset( $_POST['itinerary_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['itinerary_text'] ) ) : '';
         $file_text = $this->get_uploaded_itinerary_text();
         if ( is_wp_error( $file_text ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $file_text->get_error_code() ), $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $file_text->get_error_code() ), $redirect ) );
             exit;
         }
 
@@ -1657,7 +2134,7 @@ class App extends BaseApp {
         }
 
         if ( '' === trim( $text ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', 'empty', $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'empty', $redirect ) );
             exit;
         }
 
@@ -1666,7 +2143,7 @@ class App extends BaseApp {
         if ( $import_trip_id ) {
             $segment = 1 === count( $parsed['segments'] ?? [] ) ? ( $parsed['segments'][0] ?? [] ) : [];
             if ( empty( $segment ) || empty( $segment['date'] ) ) {
-                wp_safe_redirect( add_query_arg( 'traveler_error', 'quick_plan_invalid', $redirect ) );
+                wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
                 exit;
             }
 
@@ -1707,7 +2184,7 @@ class App extends BaseApp {
                     $trip_id = $this->save_trip( $parsed, $text, $owner_user_id );
 
                     if ( is_wp_error( $trip_id ) ) {
-                        wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+                        wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
                         exit;
                     }
 
@@ -1719,7 +2196,7 @@ class App extends BaseApp {
         $trip_id = $this->save_trip( $parsed, $text, $owner_user_id );
 
         if ( is_wp_error( $trip_id ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
             exit;
         }
 
@@ -1729,29 +2206,29 @@ class App extends BaseApp {
 
     public function handle_update_user_settings(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to update Traveler settings.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to update Travel App settings.', 'travel-app' ), 403 );
         }
 
-        check_admin_referer( 'traveler_update_user_settings' );
+        check_admin_referer( 'travel_app_update_user_settings' );
 
         update_user_meta(
             get_current_user_id(),
-            '_traveler_allow_delegated_trip_creation',
+            '_travel_app_allow_delegated_trip_creation',
             isset( $_POST['allow_delegated_trip_creation'] ) ? '1' : '0'
         );
         update_user_meta(
             get_current_user_id(),
-            '_traveler_delegated_trip_creation_capability',
+            '_travel_app_delegated_trip_creation_capability',
             $this->normalize_delegation_capability(
-                isset( $_POST['delegated_trip_creation_capability'] ) ? (string) wp_unslash( $_POST['delegated_trip_creation_capability'] ) : 'edit_others_posts',
+                isset( $_POST['delegated_trip_creation_capability'] ) ? sanitize_key( wp_unslash( $_POST['delegated_trip_creation_capability'] ) ) : 'edit_others_posts',
                 'edit_others_posts'
             )
         );
         update_user_meta(
             get_current_user_id(),
-            '_traveler_global_trip_editor_capability',
+            '_travel_app_global_trip_editor_capability',
             $this->normalize_delegation_capability(
-                isset( $_POST['global_trip_editor_capability'] ) ? (string) wp_unslash( $_POST['global_trip_editor_capability'] ) : 'none',
+                isset( $_POST['global_trip_editor_capability'] ) ? sanitize_key( wp_unslash( $_POST['global_trip_editor_capability'] ) ) : 'none',
                 'none'
             )
         );
@@ -1768,25 +2245,27 @@ class App extends BaseApp {
     private function save_quick_plan_draft_submission( string $draft_key, string $target, string $redirect, int $owner_user_id ): void {
         $draft = $this->get_quick_plan_draft( $draft_key );
         if ( empty( $draft ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', 'quick_plan_invalid', $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
             exit;
         }
 
         $segment = ItineraryItem::from_request();
         if ( empty( $segment ) || empty( $segment['date'] ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', 'quick_plan_invalid', $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
             exit;
         }
 
         if ( 'existing' === $target ) {
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Called after travel_app_import nonce verification.
             $target = isset( $_POST['quick_plan_existing_trip'] ) ? (string) absint( $_POST['quick_plan_existing_trip'] ) : '';
             if ( '' === $target || '0' === $target ) {
-                wp_safe_redirect( add_query_arg( 'traveler_error', 'quick_plan_invalid', $redirect ) );
+                wp_safe_redirect( add_query_arg( 'travel_app_error', 'quick_plan_invalid', $redirect ) );
                 exit;
             }
         }
 
         if ( 'new' === $target || '' === $target ) {
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Called after travel_app_import nonce verification.
             $trip_title = isset( $_POST['quick_plan_trip_title'] ) ? sanitize_text_field( wp_unslash( $_POST['quick_plan_trip_title'] ) ) : '';
             $trip_id = $this->save_trip( [
                 'title'     => '' !== trim( $trip_title ) ? $trip_title : $this->get_quick_plan_trip_title( $segment ),
@@ -1806,12 +2285,12 @@ class App extends BaseApp {
         }
 
         if ( is_wp_error( $trip_id ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $trip_id->get_error_code() ), $redirect ) );
             exit;
         }
 
         if ( is_wp_error( $item_id ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $item_id->get_error_code() ), $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $item_id->get_error_code() ), $redirect ) );
             exit;
         }
 
@@ -1828,17 +2307,17 @@ class App extends BaseApp {
 
     public function handle_delete(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to delete travel plans.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to delete travel plans.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
-        check_admin_referer( 'traveler_delete_' . $trip_id );
+        check_admin_referer( 'travel_app_delete_' . $trip_id );
 
         $redirect = home_url( '/' . $this->get_url_path() . '/' );
         $deleted = $this->delete_user_trip( $trip_id );
 
         if ( is_wp_error( $deleted ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $deleted->get_error_code() ), $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $deleted->get_error_code() ), $redirect ) );
             exit;
         }
 
@@ -1847,36 +2326,31 @@ class App extends BaseApp {
     }
 
     public function maybe_render_shared_timeline(): void {
-        $trip_id = isset( $_GET['traveler_share'] ) ? absint( $_GET['traveler_share'] ) : 0;
-        $token = isset( $_GET['traveler_token'] ) ? sanitize_text_field( wp_unslash( $_GET['traveler_token'] ) ) : '';
+        $trip_id = $this->get_requested_shared_trip_id();
+        $token = $this->get_query_arg_text( 'token' );
 
         if ( $trip_id <= 0 || '' === $token ) {
             return;
         }
 
-        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-            define( 'DONOTCACHEPAGE', true );
-        }
+        nocache_headers();
 
-        global $wp_app_route;
-        $wp_app_route = [
-            'app_path' => $this->get_url_path(),
-            'pattern'  => 'share',
-            'template' => 'trip.php',
-            'params'   => [
-                'id'    => (string) $trip_id,
-                'token' => $token,
-            ],
-        ];
-
-        $traveler_shared_timeline = true;
-        include $this->get_template_dir() . '/trip.php';
+        $this->render_template(
+            'trip.php',
+            [
+                'trip_id'             => $trip_id,
+                'share_token'         => $token,
+                'is_shared_timeline'  => true,
+                'is_static_download'  => false,
+                'static_share_mode'   => '',
+            ]
+        );
         exit;
     }
 
     public function maybe_render_shared_calendar(): void {
-        $trip_id = isset( $_GET['traveler_calendar'] ) ? absint( $_GET['traveler_calendar'] ) : 0;
-        $token = isset( $_GET['traveler_token'] ) ? sanitize_text_field( wp_unslash( $_GET['traveler_token'] ) ) : '';
+        $trip_id = $this->get_query_arg_absint( 'travel_app_calendar' );
+        $token = $this->get_query_arg_text( 'travel_app_token' );
 
         if ( $trip_id <= 0 || '' === $token ) {
             return;
@@ -1885,8 +2359,8 @@ class App extends BaseApp {
         $mode = $this->get_trip_share_mode_by_token( $trip_id, $token );
         if ( '' === $mode ) {
             wp_die(
-                esc_html__( 'This calendar could not be found.', 'traveler' ),
-                esc_html__( 'Calendar not found', 'traveler' ),
+                esc_html__( 'This calendar could not be found.', 'travel-app' ),
+                esc_html__( 'Calendar not found', 'travel-app' ),
                 [ 'response' => 404 ]
             );
         }
@@ -1894,14 +2368,10 @@ class App extends BaseApp {
         $trip = Trip::get( $trip_id );
         if ( ! $trip ) {
             wp_die(
-                esc_html__( 'This travel plan could not be found.', 'traveler' ),
-                esc_html__( 'Travel plan not found', 'traveler' ),
+                esc_html__( 'This travel plan could not be found.', 'travel-app' ),
+                esc_html__( 'Travel plan not found', 'travel-app' ),
                 [ 'response' => 404 ]
             );
-        }
-
-        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-            define( 'DONOTCACHEPAGE', true );
         }
 
         $ics = $this->render_trip_ics( $trip_id, $mode );
@@ -1918,12 +2388,13 @@ class App extends BaseApp {
         header( 'Content-Disposition: inline; filename="' . $filename . '.ics"' );
         header( 'Content-Length: ' . strlen( $ics ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete iCalendar document; every field in it went through escape_ics_text().
         echo $ics;
         exit;
     }
 
     public function get_share_target_url(): string {
-        return add_query_arg( 'traveler_share_target', '1', home_url( '/' . $this->get_url_path() . '/' ) );
+        return add_query_arg( 'travel_app_share_target', '1', home_url( '/' . $this->get_url_path() . '/' ) );
     }
 
     /**
@@ -1932,7 +2403,7 @@ class App extends BaseApp {
      * so the user can review it before importing with the usual nonce check.
      */
     public function maybe_handle_share_target(): void {
-        if ( empty( $_GET['traveler_share_target'] ) ) {
+        if ( ! $this->has_query_arg( 'travel_app_share_target' ) ) {
             return;
         }
 
@@ -1943,7 +2414,8 @@ class App extends BaseApp {
             exit;
         }
 
-        if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+        $request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : '';
+        if ( 'POST' !== strtoupper( $request_method ) ) {
             wp_safe_redirect( $index_url );
             exit;
         }
@@ -1951,26 +2423,31 @@ class App extends BaseApp {
         // The share sheet cannot carry a nonce; nothing is saved here, the
         // text is only prefilled into the form the user still has to submit.
         $fields = [];
+        // phpcs:disable WordPress.Security.NonceVerification.Missing -- Web Share Target has no nonce; this only creates a short-lived prefill.
         foreach ( [ 'title', 'text', 'url' ] as $field ) {
-            $fields[ $field ] = isset( $_POST[ $field ] ) ? (string) wp_unslash( $_POST[ $field ] ) : '';
+            // Share targets cannot include a nonce; no trip is saved until the user submits the import form.
+            $fields[ $field ] = isset( $_POST[ $field ] ) && is_string( $_POST[ $field ] )
+                ? sanitize_textarea_field( wp_unslash( $_POST[ $field ] ) ) : '';
         }
+        // phpcs:enable WordPress.Security.NonceVerification.Missing
 
         $unsupported_file = false;
         $contents = [];
-        foreach ( ShareTarget::normalize_files( $_FILES['files'] ?? null ) as $file ) {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Upload metadata is validated by read_uploaded_text_file().
+        foreach ( ShareTarget::normalize_files( isset( $_FILES['files'] ) && is_array( $_FILES['files'] ) ? $_FILES['files'] : null ) as $file ) {
             if ( ! ShareTarget::is_text_file( $file ) ) {
                 $unsupported_file = true;
                 continue;
             }
             $file_text = $this->read_uploaded_text_file( $file );
             if ( ! is_wp_error( $file_text ) ) {
-                $contents[] = $file_text;
+                $contents[] = sanitize_textarea_field( $file_text );
             }
         }
 
         $text = ShareTarget::build_text( $fields, $contents );
         if ( '' === $text ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', $unsupported_file ? 'share_unsupported_file' : 'empty', $index_url ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', $unsupported_file ? 'share_unsupported_file' : 'empty', $index_url ) );
             exit;
         }
 
@@ -1998,12 +2475,12 @@ class App extends BaseApp {
     }
 
     private function get_share_target_transient_name( string $key ): string {
-        return 'traveler_shared_' . get_current_user_id() . '_' . sanitize_key( $key );
+        return 'travel_app_shared_' . get_current_user_id() . '_' . sanitize_key( $key );
     }
 
     public function maybe_render_user_calendar(): void {
-        $user_id = isset( $_GET['traveler_trips_calendar'] ) ? absint( $_GET['traveler_trips_calendar'] ) : 0;
-        $token = isset( $_GET['traveler_token'] ) ? sanitize_text_field( wp_unslash( $_GET['traveler_token'] ) ) : '';
+        $user_id = $this->get_query_arg_absint( 'travel_app_trips_calendar' );
+        $token = $this->get_query_arg_text( 'travel_app_token' );
 
         if ( $user_id <= 0 || '' === $token ) {
             return;
@@ -2011,14 +2488,10 @@ class App extends BaseApp {
 
         if ( ! $this->user_calendar_token_matches( $user_id, $token ) ) {
             wp_die(
-                esc_html__( 'This calendar could not be found.', 'traveler' ),
-                esc_html__( 'Calendar not found', 'traveler' ),
+                esc_html__( 'This calendar could not be found.', 'travel-app' ),
+                esc_html__( 'Calendar not found', 'travel-app' ),
                 [ 'response' => 404 ]
             );
-        }
-
-        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-            define( 'DONOTCACHEPAGE', true );
         }
 
         $user = get_user_by( 'id', $user_id );
@@ -2026,10 +2499,10 @@ class App extends BaseApp {
         $calendar_name = '' !== $display_name
             ? sprintf(
                 /* translators: %s: user display name. */
-                __( '%s Travel Plans', 'traveler' ),
+                __( '%s Travel Plans', 'travel-app' ),
                 $display_name
             )
-            : __( 'Travel Plans', 'traveler' );
+            : __( 'Travel Plans', 'travel-app' );
         $ics = $this->render_user_trips_ics( $user_id, $calendar_name );
 
         nocache_headers();
@@ -2037,17 +2510,18 @@ class App extends BaseApp {
         header( 'Content-Disposition: inline; filename="travel-plans.ics"' );
         header( 'Content-Length: ' . strlen( $ics ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete iCalendar document; every field in it went through escape_ics_text().
         echo $ics;
         exit;
     }
 
     public function handle_update_trip(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to edit travel plans.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to edit travel plans.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
-        check_admin_referer( 'traveler_update_trip_' . $trip_id );
+        check_admin_referer( 'travel_app_update_trip_' . $trip_id );
 
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
         $title = isset( $_POST['trip_title'] ) ? sanitize_text_field( wp_unslash( $_POST['trip_title'] ) ) : '';
@@ -2075,7 +2549,7 @@ class App extends BaseApp {
         }
 
         if ( is_wp_error( $updated ) ) {
-            $redirect = add_query_arg( 'traveler_error', rawurlencode( $updated->get_error_code() ), $redirect );
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $updated->get_error_code() ), $redirect );
         } else {
             $redirect = add_query_arg( 'trip_updated', rawurlencode( (string) $trip_id ), $redirect );
         }
@@ -2086,24 +2560,24 @@ class App extends BaseApp {
 
     public function handle_open_journal_entry(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to edit travel journals.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to edit travel journals.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
-        check_admin_referer( 'traveler_open_journal_entry_' . $trip_id );
+        check_admin_referer( 'travel_app_open_journal_entry_' . $trip_id );
 
         $date = isset( $_POST['journal_date'] ) ? sanitize_text_field( wp_unslash( $_POST['journal_date'] ) ) : '';
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
         $journal_id = $this->get_or_create_journal_entry( $trip_id, $date );
 
         if ( is_wp_error( $journal_id ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $journal_id->get_error_code() ), $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $journal_id->get_error_code() ), $redirect ) );
             exit;
         }
 
         $edit_link = get_edit_post_link( (int) $journal_id, 'raw' );
         if ( ! $edit_link ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', 'journal_create_failed', $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'journal_create_failed', $redirect ) );
             exit;
         }
 
@@ -2112,28 +2586,30 @@ class App extends BaseApp {
     }
 
     public function get_journal_entries_for_trip( int $trip_id ): array {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             return [];
         }
 
         $entries = [];
         $journal_ids = get_posts( [
-            'post_type'      => 'traveler_journal',
+            'post_type'      => 'travel_app_journal',
             'post_status'    => [ 'draft', 'private', 'publish', 'future', 'pending' ],
             'author'         => get_current_user_id(),
             'fields'         => 'ids',
             'posts_per_page' => -1,
-            'meta_key'       => '_traveler_trip_id',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Journal entries are related to trips through post meta so they remain normal WordPress posts.
+            'meta_key'       => '_travel_app_trip_id',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- The matching meta value is required to load entries for a single trip.
             'meta_value'     => (string) $trip_id,
         ] );
 
         foreach ( $journal_ids as $journal_id ) {
-            $date = (string) get_post_meta( (int) $journal_id, '_traveler_date', true );
+            $date = (string) get_post_meta( (int) $journal_id, '_travel_app_date', true );
             if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
                 continue;
             }
 
-            $post_id = absint( get_post_meta( (int) $journal_id, '_traveler_published_post_id', true ) );
+            $post_id = absint( get_post_meta( (int) $journal_id, '_travel_app_published_post_id', true ) );
 
             $entries[ $date ] = [
                 'id'      => (int) $journal_id,
@@ -2146,24 +2622,24 @@ class App extends BaseApp {
 
     public function handle_prepare_journal_post(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to prepare travel journal posts.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to prepare travel journal posts.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         $journal_id = isset( $_POST['journal_id'] ) ? absint( $_POST['journal_id'] ) : 0;
-        check_admin_referer( 'traveler_prepare_journal_post_' . $trip_id . '_' . $journal_id );
+        check_admin_referer( 'travel_app_prepare_journal_post_' . $trip_id . '_' . $journal_id );
 
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
         $post_id = $this->prepare_journal_post_draft( $trip_id, $journal_id );
 
         if ( is_wp_error( $post_id ) ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', rawurlencode( $post_id->get_error_code() ), $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', rawurlencode( $post_id->get_error_code() ), $redirect ) );
             exit;
         }
 
         $edit_link = get_edit_post_link( (int) $post_id, 'raw' );
         if ( ! $edit_link ) {
-            wp_safe_redirect( add_query_arg( 'traveler_error', 'journal_post_failed', $redirect ) );
+            wp_safe_redirect( add_query_arg( 'travel_app_error', 'journal_post_failed', $redirect ) );
             exit;
         }
 
@@ -2173,17 +2649,17 @@ class App extends BaseApp {
 
     public function handle_download_trip_html(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to download travel plans.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to download travel plans.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_GET['trip_id'] ) ? absint( $_GET['trip_id'] ) : 0;
-        check_admin_referer( 'traveler_download_trip_html_' . $trip_id );
+        check_admin_referer( 'travel_app_download_trip_html_' . $trip_id );
 
         $trip = Trip::get( $trip_id );
-        if ( ! $trip || ! current_user_can( 'read_traveler_trip', $trip_id ) ) {
+        if ( ! $trip || ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
             wp_die(
-                esc_html__( 'This travel plan could not be found.', 'traveler' ),
-                esc_html__( 'Travel plan not found', 'traveler' ),
+                esc_html__( 'This travel plan could not be found.', 'travel-app' ),
+                esc_html__( 'Travel plan not found', 'travel-app' ),
                 [ 'response' => 404 ]
             );
         }
@@ -2204,70 +2680,120 @@ class App extends BaseApp {
         header( 'Content-Disposition: attachment; filename="' . $filename . '.html"' );
         header( 'Content-Length: ' . strlen( $html ) );
 
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A complete HTML document rendered by the trip template, which escapes at each point of output.
         echo $html;
         exit;
     }
 
     public function handle_generate_share_link(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_send_json_error( [ 'message' => __( 'You must be logged in to share travel plans.', 'traveler' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to share travel plans.', 'travel-app' ) ], 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         $mode = isset( $_POST['share_mode'] ) ? sanitize_key( wp_unslash( $_POST['share_mode'] ) ) : 'fellow';
-        check_ajax_referer( 'traveler_share_link_' . $trip_id, 'nonce' );
+        check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
 
         if ( '' === $this->create_trip_share_token( $trip_id, $mode ) ) {
-            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be shared.', 'traveler' ) ], 404 );
+            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be shared.', 'travel-app' ) ], 404 );
         }
-
-        $this->clear_trip_public_cache( $trip_id );
 
         wp_send_json_success( [
             'mode'         => $this->normalize_share_mode( $mode ),
             'url'          => $this->get_trip_share_url( $trip_id, $mode ),
             'calendar_url' => $this->get_trip_calendar_url( $trip_id, $mode ),
-            'message'      => __( 'Read-only timeline share link generated.', 'traveler' ),
+            'message'      => __( 'Read-only timeline share link generated.', 'travel-app' ),
         ] );
     }
 
     public function handle_remove_share_link(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_send_json_error( [ 'message' => __( 'You must be logged in to update travel plan sharing.', 'traveler' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to update travel plan sharing.', 'travel-app' ) ], 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         $mode = isset( $_POST['share_mode'] ) ? sanitize_key( wp_unslash( $_POST['share_mode'] ) ) : 'fellow';
-        check_ajax_referer( 'traveler_share_link_' . $trip_id, 'nonce' );
+        check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
 
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be updated.', 'traveler' ) ], 404 );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be updated.', 'travel-app' ) ], 404 );
         }
 
-        $this->clear_trip_public_cache( $trip_id );
         delete_term_meta( $trip_id, $this->get_trip_share_token_meta_key( $mode ) );
 
         wp_send_json_success( [
             'mode'         => $this->normalize_share_mode( $mode ),
             'url'          => '',
             'calendar_url' => '',
-            'message'      => __( 'Read-only timeline share link removed.', 'traveler' ),
+            'message'      => __( 'Read-only timeline share link removed.', 'travel-app' ),
         ] );
+    }
+
+    /**
+     * Stores the coordinates a route map looked up on Nominatim, so the next
+     * visit - on any device - can draw the map without geocoding again.
+     */
+    public function handle_cache_geocode(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to store map coordinates.', 'travel-app' ) ], 403 );
+        }
+
+        check_ajax_referer( 'travel_app_geocode', 'nonce' );
+
+        $raw_payload = isset( $_POST['locations'] ) ? sanitize_textarea_field( wp_unslash( $_POST['locations'] ) ) : '';
+        $payload = $this->sanitize_geocode_payload_json( $raw_payload );
+        if ( ! is_array( $payload ) ) {
+            wp_send_json_error( [ 'message' => __( 'No coordinates were submitted.', 'travel-app' ) ], 400 );
+        }
+
+        $stored = 0;
+        foreach ( $payload as $location => $candidates ) {
+            $location = sanitize_text_field( (string) $location );
+            if ( '' === $location || ! is_array( $candidates ) ) {
+                continue;
+            }
+
+            GeocodeCache::remember( $location, $candidates );
+            ++$stored;
+        }
+
+        wp_send_json_success( [ 'stored' => $stored ] );
+    }
+
+    private function sanitize_geocode_payload_json( string $raw_payload ): ?array {
+        if ( '' === $raw_payload || strlen( $raw_payload ) > 200000 ) {
+            return null;
+        }
+
+        $payload = json_decode( $raw_payload, true );
+        if ( ! is_array( $payload ) ) {
+            return null;
+        }
+
+        $clean = [];
+        foreach ( $payload as $location => $candidates ) {
+            $location = sanitize_text_field( (string) $location );
+            if ( '' === $location || ! is_array( $candidates ) ) {
+                continue;
+            }
+
+            $clean[ $location ] = GeocodeCache::sanitize_candidates( $candidates );
+        }
+
+        return $clean;
     }
 
     public function handle_clear_share_cache(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_send_json_error( [ 'message' => __( 'You must be logged in to refresh shared travel plans.', 'traveler' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'You must be logged in to refresh shared travel plans.', 'travel-app' ) ], 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
-        check_ajax_referer( 'traveler_share_link_' . $trip_id, 'nonce' );
+        check_ajax_referer( 'travel_app_share_link_' . $trip_id, 'nonce' );
 
-        if ( ! current_user_can( 'read_traveler_trip', $trip_id ) ) {
-            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be refreshed.', 'traveler' ) ], 404 );
+        if ( ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'This travel plan cannot be refreshed.', 'travel-app' ) ], 404 );
         }
-
-        $this->clear_trip_public_cache( $trip_id );
 
         wp_send_json_success( [
             'urls'    => [
@@ -2278,25 +2804,25 @@ class App extends BaseApp {
                 'fellow' => $this->get_trip_calendar_url( $trip_id, 'fellow' ),
                 'public' => $this->get_trip_calendar_url( $trip_id, 'public' ),
             ],
-            'message' => __( 'Read-only timeline cache refreshed.', 'traveler' ),
+            'message' => __( 'Read-only timeline cache refreshed.', 'travel-app' ),
         ] );
     }
 
     public function handle_update_segment(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to edit itinerary items.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to edit itinerary items.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         $index = isset( $_POST['segment_index'] ) ? absint( $_POST['segment_index'] ) : 0;
-        check_admin_referer( 'traveler_update_segment_' . $trip_id . '_' . $index );
+        check_admin_referer( 'travel_app_update_segment_' . $trip_id . '_' . $index );
 
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' ) . '#segment-' . $index;
         $segment = ItineraryItem::from_request();
 
         $updated = $this->update_user_trip_segment( $trip_id, $index, $segment );
         if ( is_wp_error( $updated ) ) {
-            $redirect = add_query_arg( 'traveler_error', rawurlencode( $updated->get_error_code() ), $redirect );
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $updated->get_error_code() ), $redirect );
         } else {
             $redirect = add_query_arg(
                 'updated',
@@ -2311,18 +2837,18 @@ class App extends BaseApp {
 
     public function handle_add_segment(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to add itinerary items.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to add itinerary items.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
-        check_admin_referer( 'traveler_add_segment_' . $trip_id );
+        check_admin_referer( 'travel_app_add_segment_' . $trip_id );
 
         $segment = ItineraryItem::from_request();
         $added_item_id = $this->add_user_trip_segment( $trip_id, $segment );
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
 
         if ( is_wp_error( $added_item_id ) ) {
-            $redirect = add_query_arg( 'traveler_error', rawurlencode( $added_item_id->get_error_code() ), $redirect );
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $added_item_id->get_error_code() ), $redirect );
         } else {
             $redirect = add_query_arg( 'updated', rawurlencode( (string) $added_item_id ), $redirect . '#segment-' . $added_item_id );
         }
@@ -2333,18 +2859,18 @@ class App extends BaseApp {
 
     public function handle_delete_segment(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to delete itinerary items.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to delete itinerary items.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         $index = isset( $_POST['segment_index'] ) ? absint( $_POST['segment_index'] ) : 0;
-        check_admin_referer( 'traveler_delete_segment_' . $trip_id . '_' . $index );
+        check_admin_referer( 'travel_app_delete_segment_' . $trip_id . '_' . $index );
 
         $deleted = $this->delete_user_trip_segment( $trip_id, $index );
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' );
 
         if ( is_wp_error( $deleted ) ) {
-            $redirect = add_query_arg( 'traveler_error', rawurlencode( $deleted->get_error_code() ), $redirect );
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $deleted->get_error_code() ), $redirect );
         } else {
             $redirect = add_query_arg( 'item_deleted', rawurlencode( (string) $index ), $redirect );
         }
@@ -2355,18 +2881,18 @@ class App extends BaseApp {
 
     public function handle_upload_item_attachment(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to upload itinerary item attachments.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to upload itinerary item attachments.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         $index = isset( $_POST['segment_index'] ) ? absint( $_POST['segment_index'] ) : 0;
-        check_admin_referer( 'traveler_upload_item_attachment_' . $trip_id . '_' . $index );
+        check_admin_referer( 'travel_app_upload_item_attachment_' . $trip_id . '_' . $index );
 
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' ) . '#segment-' . $index;
         $uploaded = $this->upload_user_trip_item_attachments( $trip_id, $index );
 
         if ( is_wp_error( $uploaded ) ) {
-            $redirect = add_query_arg( 'traveler_error', rawurlencode( $uploaded->get_error_code() ), $redirect );
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $uploaded->get_error_code() ), $redirect );
         } else {
             $redirect = add_query_arg( 'attachment_uploaded', rawurlencode( (string) $uploaded ), $redirect );
         }
@@ -2377,19 +2903,19 @@ class App extends BaseApp {
 
     public function handle_delete_item_attachment(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'You must be logged in to delete itinerary item attachments.', 'traveler' ), 403 );
+            wp_die( esc_html__( 'You must be logged in to delete itinerary item attachments.', 'travel-app' ), 403 );
         }
 
         $trip_id = isset( $_POST['trip_id'] ) ? absint( $_POST['trip_id'] ) : 0;
         $index = isset( $_POST['segment_index'] ) ? absint( $_POST['segment_index'] ) : 0;
         $attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
-        check_admin_referer( 'traveler_delete_item_attachment_' . $trip_id . '_' . $index . '_' . $attachment_id );
+        check_admin_referer( 'travel_app_delete_item_attachment_' . $trip_id . '_' . $index . '_' . $attachment_id );
 
         $redirect = home_url( '/' . $this->get_url_path() . '/trip/' . $trip_id . '/' ) . '#segment-' . $index;
         $deleted = $this->delete_user_trip_item_attachment( $trip_id, $index, $attachment_id );
 
         if ( is_wp_error( $deleted ) ) {
-            $redirect = add_query_arg( 'traveler_error', rawurlencode( $deleted->get_error_code() ), $redirect );
+            $redirect = add_query_arg( 'travel_app_error', rawurlencode( $deleted->get_error_code() ), $redirect );
         } else {
             $redirect = add_query_arg( 'attachment_deleted', rawurlencode( (string) $attachment_id ), $redirect );
         }
@@ -2401,11 +2927,9 @@ class App extends BaseApp {
     private function delete_user_trip( int $trip_id ) {
         $term = Trip::get( $trip_id );
 
-        if ( ! $term || ! current_user_can( 'delete_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'delete_forbidden', __( 'This travel plan cannot be deleted.', 'traveler' ) );
+        if ( ! $term || ! current_user_can( 'delete_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'delete_forbidden', __( 'This travel plan cannot be deleted.', 'travel-app' ) );
         }
-
-        $this->clear_trip_public_cache( $trip_id );
 
         foreach ( ItineraryItem::get_for_trip( $trip_id ) as $item ) {
             wp_trash_post( $item->id );
@@ -2415,9 +2939,9 @@ class App extends BaseApp {
             wp_trash_post( $journal_id );
         }
 
-        $deleted = wp_delete_term( $trip_id, 'traveler_trip' );
+        $deleted = wp_delete_term( $trip_id, 'travel_app_trip' );
         if ( ! $deleted || is_wp_error( $deleted ) ) {
-            return new \WP_Error( 'delete_failed', __( 'The travel plan could not be deleted.', 'traveler' ) );
+            return new \WP_Error( 'delete_failed', __( 'The travel plan could not be deleted.', 'travel-app' ) );
         }
 
         return true;
@@ -2425,80 +2949,78 @@ class App extends BaseApp {
 
     private function get_journal_entry_ids_for_trip( int $trip_id ): array {
         return array_map( 'intval', get_posts( [
-            'post_type'      => 'traveler_journal',
+            'post_type'      => 'travel_app_journal',
             'post_status'    => 'any',
             'fields'         => 'ids',
             'posts_per_page' => -1,
-            'meta_key'       => '_traveler_trip_id',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Journal entries are related to trips through post meta so they remain normal WordPress posts.
+            'meta_key'       => '_travel_app_trip_id',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- The matching meta value is required to load entries for a single trip.
             'meta_value'     => (string) $trip_id,
         ] ) );
     }
 
     private function update_user_trip_now_next_visibility( int $trip_id, bool $show_now_next ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
-        update_term_meta( $trip_id, '_traveler_show_now_next', $show_now_next ? '1' : '0' );
-        $this->clear_trip_public_cache( $trip_id );
-
+        update_term_meta( $trip_id, '_travel_app_show_now_next', $show_now_next ? '1' : '0' );
         return true;
     }
 
     private function update_user_trip_journal_visibility( int $trip_id, bool $journal_enabled ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
-        update_term_meta( $trip_id, '_traveler_journal_enabled', $journal_enabled ? '1' : '0' );
-        $this->clear_trip_public_cache( $trip_id );
-
+        update_term_meta( $trip_id, '_travel_app_journal_enabled', $journal_enabled ? '1' : '0' );
         return true;
     }
 
     private function update_user_trip_journal_publishing_defaults( int $trip_id, int $category_id, string $tags ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
         if ( $category_id > 0 && ! term_exists( $category_id, 'category' ) ) {
             $category_id = 0;
         }
 
-        update_term_meta( $trip_id, '_traveler_journal_category_id', $category_id );
-        update_term_meta( $trip_id, '_traveler_journal_tags', $this->normalize_journal_tag_list( $tags ) );
+        update_term_meta( $trip_id, '_travel_app_journal_category_id', $category_id );
+        update_term_meta( $trip_id, '_travel_app_journal_tags', $this->normalize_journal_tag_list( $tags ) );
 
         return true;
     }
 
     private function prepare_journal_post_draft( int $trip_id, int $journal_id ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
         $journal = get_post( $journal_id );
-        if ( ! $journal || 'traveler_journal' !== $journal->post_type || (int) $journal->post_author !== get_current_user_id() ) {
-            return new \WP_Error( 'journal_not_found', __( 'This journal entry could not be found.', 'traveler' ) );
+        if ( ! $journal || 'travel_app_journal' !== $journal->post_type || (int) $journal->post_author !== get_current_user_id() ) {
+            return new \WP_Error( 'journal_not_found', __( 'This journal entry could not be found.', 'travel-app' ) );
         }
 
-        if ( $trip_id !== absint( get_post_meta( $journal_id, '_traveler_trip_id', true ) ) ) {
-            return new \WP_Error( 'journal_not_found', __( 'This journal entry could not be found.', 'traveler' ) );
+        if ( $trip_id !== absint( get_post_meta( $journal_id, '_travel_app_trip_id', true ) ) ) {
+            return new \WP_Error( 'journal_not_found', __( 'This journal entry could not be found.', 'travel-app' ) );
         }
 
         if ( ! current_user_can( 'edit_posts' ) ) {
-            return new \WP_Error( 'journal_post_failed', __( 'The journal post draft could not be prepared.', 'traveler' ) );
+            return new \WP_Error( 'journal_post_failed', __( 'The journal post draft could not be prepared.', 'travel-app' ) );
         }
 
-        $post_id = absint( get_post_meta( $journal_id, '_traveler_published_post_id', true ) );
+        $post_id = absint( get_post_meta( $journal_id, '_travel_app_published_post_id', true ) );
         $existing_post = $post_id > 0 ? get_post( $post_id ) : null;
         if ( ! $existing_post || 'post' !== $existing_post->post_type || (int) $existing_post->post_author !== get_current_user_id() ) {
             $post_id = 0;
         } elseif ( ! current_user_can( 'edit_post', $post_id ) ) {
-            return new \WP_Error( 'journal_post_failed', __( 'The journal post draft could not be prepared.', 'traveler' ) );
+            return new \WP_Error( 'journal_post_failed', __( 'The journal post draft could not be prepared.', 'travel-app' ) );
         } elseif ( 'trash' === $existing_post->post_status ) {
             $untrashed_post = wp_untrash_post( $post_id );
             if ( ! $untrashed_post ) {
-                return new \WP_Error( 'journal_post_failed', __( 'The journal post draft could not be prepared.', 'traveler' ) );
+                return new \WP_Error( 'journal_post_failed', __( 'The journal post draft could not be prepared.', 'travel-app' ) );
             }
         }
 
@@ -2518,55 +3040,56 @@ class App extends BaseApp {
         }
 
         if ( is_wp_error( $updated_post_id ) || ! $updated_post_id ) {
-            return new \WP_Error( 'journal_post_failed', __( 'The journal post draft could not be prepared.', 'traveler' ) );
+            return new \WP_Error( 'journal_post_failed', __( 'The journal post draft could not be prepared.', 'travel-app' ) );
         }
 
         $post_id = (int) $updated_post_id;
-        $date = (string) get_post_meta( $journal_id, '_traveler_date', true );
-        $category_id = absint( get_term_meta( $trip_id, '_traveler_journal_category_id', true ) );
+        $date = (string) get_post_meta( $journal_id, '_travel_app_date', true );
+        $category_id = absint( get_term_meta( $trip_id, '_travel_app_journal_category_id', true ) );
         if ( $category_id > 0 && term_exists( $category_id, 'category' ) ) {
             wp_set_post_categories( $post_id, [ $category_id ], true );
         }
 
-        $tags = (string) get_term_meta( $trip_id, '_traveler_journal_tags', true );
+        $tags = (string) get_term_meta( $trip_id, '_travel_app_journal_tags', true );
         if ( '' !== $tags ) {
             wp_set_post_tags( $post_id, $tags, true );
         }
 
-        update_post_meta( $journal_id, '_traveler_published_post_id', $post_id );
-        update_post_meta( $post_id, '_traveler_source_journal_id', $journal_id );
-        update_post_meta( $post_id, '_traveler_trip_id', $trip_id );
-        update_post_meta( $post_id, '_traveler_date', $date );
+        update_post_meta( $journal_id, '_travel_app_published_post_id', $post_id );
+        update_post_meta( $post_id, '_travel_app_source_journal_id', $journal_id );
+        update_post_meta( $post_id, '_travel_app_trip_id', $trip_id );
+        update_post_meta( $post_id, '_travel_app_date', $date );
 
         return $post_id;
     }
 
     private function get_or_create_journal_entry( int $trip_id, string $date ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
-        if ( '1' !== (string) get_term_meta( $trip_id, '_traveler_journal_enabled', true ) ) {
-            return new \WP_Error( 'journal_disabled', __( 'Travel journaling is disabled for this travel plan.', 'traveler' ) );
+        if ( '1' !== (string) get_term_meta( $trip_id, '_travel_app_journal_enabled', true ) ) {
+            return new \WP_Error( 'journal_disabled', __( 'Travel journaling is disabled for this travel plan.', 'travel-app' ) );
         }
 
         if ( 1 !== preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
-            return new \WP_Error( 'journal_invalid_date', __( 'Choose a valid day for the journal entry.', 'traveler' ) );
+            return new \WP_Error( 'journal_invalid_date', __( 'Choose a valid day for the journal entry.', 'travel-app' ) );
         }
 
         $existing = get_posts( [
-            'post_type'      => 'traveler_journal',
+            'post_type'      => 'travel_app_journal',
             'post_status'    => [ 'draft', 'private', 'publish', 'future', 'pending' ],
             'author'         => get_current_user_id(),
             'fields'         => 'ids',
             'posts_per_page' => 1,
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Journal entries are related to trips through post meta and date through post meta.
             'meta_query'     => [
                 [
-                    'key'   => '_traveler_trip_id',
+                    'key'   => '_travel_app_trip_id',
                     'value' => (string) $trip_id,
                 ],
                 [
-                    'key'   => '_traveler_date',
+                    'key'   => '_travel_app_date',
                     'value' => $date,
                 ],
             ],
@@ -2578,16 +3101,16 @@ class App extends BaseApp {
 
         $trip = Trip::get( $trip_id );
         if ( ! $trip ) {
-            return new \WP_Error( 'trip_not_found', __( 'This travel plan could not be found.', 'traveler' ) );
+            return new \WP_Error( 'trip_not_found', __( 'This travel plan could not be found.', 'travel-app' ) );
         }
 
         $journal_id = wp_insert_post( [
-            'post_type'    => 'traveler_journal',
+            'post_type'    => 'travel_app_journal',
             'post_status'  => 'draft',
             'post_author'  => get_current_user_id(),
             'post_title'   => sprintf(
                 /* translators: 1: trip title, 2: journal date. */
-                __( '%1$s Journal: %2$s', 'traveler' ),
+                __( '%1$s Journal: %2$s', 'travel-app' ),
                 $trip->title,
                 $this->format_date_label( $date )
             ),
@@ -2595,11 +3118,11 @@ class App extends BaseApp {
         ], true );
 
         if ( is_wp_error( $journal_id ) ) {
-            return new \WP_Error( 'journal_create_failed', __( 'The journal entry could not be created.', 'traveler' ) );
+            return new \WP_Error( 'journal_create_failed', __( 'The journal entry could not be created.', 'travel-app' ) );
         }
 
-        update_post_meta( (int) $journal_id, '_traveler_trip_id', $trip_id );
-        update_post_meta( (int) $journal_id, '_traveler_date', $date );
+        update_post_meta( (int) $journal_id, '_travel_app_trip_id', $trip_id );
+        update_post_meta( (int) $journal_id, '_travel_app_date', $date );
 
         return (int) $journal_id;
     }
@@ -2622,7 +3145,7 @@ class App extends BaseApp {
             ] ) ) );
 
             if ( '' === $title ) {
-                $title = __( 'Untitled item', 'traveler' );
+                $title = __( 'Untitled item', 'travel-app' );
             }
 
             $blocks[] = '<!-- wp:heading {"level":2} -->' . "\n"
@@ -2632,7 +3155,7 @@ class App extends BaseApp {
 
         if ( empty( $blocks ) ) {
             $blocks[] = '<!-- wp:paragraph -->' . "\n"
-                . '<p>' . esc_html__( 'Journal notes for this day.', 'traveler' ) . '</p>' . "\n"
+                . '<p>' . esc_html__( 'Journal notes for this day.', 'travel-app' ) . '</p>' . "\n"
                 . '<!-- /wp:paragraph -->';
         }
 
@@ -2657,14 +3180,14 @@ class App extends BaseApp {
 
     private function update_user_trip_title( int $trip_id, string $title ) {
         if ( '' === trim( $title ) ) {
-            return new \WP_Error( 'empty_title', __( 'Travel plan title cannot be empty.', 'traveler' ) );
+            return new \WP_Error( 'empty_title', __( 'Travel plan title cannot be empty.', 'travel-app' ) );
         }
 
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
-        $updated = wp_update_term( $trip_id, 'traveler_trip', [
+        $updated = wp_update_term( $trip_id, 'travel_app_trip', [
             'name' => $title,
         ] );
 
@@ -2672,25 +3195,23 @@ class App extends BaseApp {
             return $updated;
         }
 
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
     }
 
     private function update_user_trip_segment( int $trip_id, int $index, array $segment ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
         $item = ItineraryItem::get_user_item( $trip_id, $index );
         if ( ! $item ) {
-            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'traveler' ) );
+            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
         }
 
         $segment = ItineraryItem::normalize( $segment );
         $updated = wp_update_post( [
             'ID'           => $item->id,
-            'post_title'   => $segment['title'] ?: __( 'Untitled item', 'traveler' ),
+            'post_title'   => $segment['title'] ?: __( 'Untitled item', 'travel-app' ),
             'post_content' => $segment['details'],
         ], true );
 
@@ -2700,14 +3221,12 @@ class App extends BaseApp {
 
         $this->update_item_meta( $item->id, $segment );
         $this->update_trip_bounds_from_items( $trip_id );
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
     }
 
     private function add_user_trip_segment( int $trip_id, array $segment ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
         $item_id = $this->create_trip_item( $trip_id, $segment );
@@ -2716,49 +3235,47 @@ class App extends BaseApp {
         }
 
         $this->update_trip_bounds_from_items( $trip_id );
-        $this->clear_trip_public_cache( $trip_id );
-
         return $item_id;
     }
 
     private function delete_user_trip_segment( int $trip_id, int $index ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
         $item = ItineraryItem::get_user_item( $trip_id, $index );
         if ( ! $item ) {
-            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'traveler' ) );
+            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
         }
 
         $deleted = wp_trash_post( $item->id );
         if ( ! $deleted ) {
-            return new \WP_Error( 'segment_delete_failed', __( 'This itinerary item could not be deleted.', 'traveler' ) );
+            return new \WP_Error( 'segment_delete_failed', __( 'This itinerary item could not be deleted.', 'travel-app' ) );
         }
 
         $this->update_trip_bounds_from_items( $trip_id );
-        $this->clear_trip_public_cache( $trip_id );
-
         return true;
     }
 
     private function upload_user_trip_item_attachments( int $trip_id, int $index ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
         $item = ItineraryItem::get_user_item( $trip_id, $index );
         if ( ! $item ) {
-            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'traveler' ) );
+            return new \WP_Error( 'segment_not_found', __( 'This itinerary item could not be found.', 'travel-app' ) );
         }
 
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Called after travel_app_upload_item_attachment nonce verification.
         if ( empty( $_FILES['item_attachment'] ) || ! is_array( $_FILES['item_attachment'] ) ) {
-            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'traveler' ) );
+            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'travel-app' ) );
         }
 
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- File array is validated by WordPress media handling below.
         $files = $this->normalize_uploaded_files( $_FILES['item_attachment'] );
         if ( empty( $files ) ) {
-            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'traveler' ) );
+            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'travel-app' ) );
         }
 
         require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -2766,6 +3283,7 @@ class App extends BaseApp {
         require_once ABSPATH . 'wp-admin/includes/media.php';
 
         $uploaded = 0;
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Preserved so media_handle_sideload() receives the original upload structure.
         $original_file = $_FILES['item_attachment'];
 
         foreach ( $files as $file ) {
@@ -2776,13 +3294,13 @@ class App extends BaseApp {
 
             if ( UPLOAD_ERR_OK !== $error ) {
                 $_FILES['item_attachment'] = $original_file;
-                return new \WP_Error( 'attachment_upload_failed', __( 'The attachment could not be uploaded.', 'traveler' ) );
+                return new \WP_Error( 'attachment_upload_failed', __( 'The attachment could not be uploaded.', 'travel-app' ) );
             }
 
             $size = isset( $file['size'] ) ? (int) $file['size'] : 0;
             if ( $size > 15 * 1024 * 1024 ) {
                 $_FILES['item_attachment'] = $original_file;
-                return new \WP_Error( 'attachment_too_large', __( 'Attachments must be 15 MB or smaller.', 'traveler' ) );
+                return new \WP_Error( 'attachment_too_large', __( 'Attachments must be 15 MB or smaller.', 'travel-app' ) );
             }
 
             $_FILES['item_attachment'] = $file;
@@ -2803,85 +3321,28 @@ class App extends BaseApp {
         $_FILES['item_attachment'] = $original_file;
 
         if ( 0 === $uploaded ) {
-            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'traveler' ) );
+            return new \WP_Error( 'attachment_missing', __( 'Choose a file to upload.', 'travel-app' ) );
         }
-
-        $this->clear_trip_public_cache( $trip_id );
 
         return $uploaded;
     }
 
     private function delete_user_trip_item_attachment( int $trip_id, int $index, int $attachment_id ) {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
-            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'traveler' ) );
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
+            return new \WP_Error( 'edit_forbidden', __( 'This travel plan cannot be edited.', 'travel-app' ) );
         }
 
         $attachment = ItineraryItem::get_user_attachment( $trip_id, $index, $attachment_id );
         if ( ! $attachment ) {
-            return new \WP_Error( 'attachment_not_found', __( 'This attachment could not be found.', 'traveler' ) );
+            return new \WP_Error( 'attachment_not_found', __( 'This attachment could not be found.', 'travel-app' ) );
         }
 
         $deleted = wp_delete_attachment( $attachment->ID );
         if ( ! $deleted ) {
-            return new \WP_Error( 'attachment_delete_failed', __( 'This attachment could not be deleted.', 'traveler' ) );
+            return new \WP_Error( 'attachment_delete_failed', __( 'This attachment could not be deleted.', 'travel-app' ) );
         }
-
-        $this->clear_trip_public_cache( $trip_id );
 
         return true;
-    }
-
-    private function clear_trip_public_cache( int $trip_id ): void {
-        if ( $trip_id <= 0 ) {
-            return;
-        }
-
-        $has_share_token = '' !== (string) get_term_meta( $trip_id, '_traveler_share_token', true )
-            || '' !== (string) get_term_meta( $trip_id, '_traveler_public_share_token', true );
-        if ( ! $has_share_token ) {
-            return;
-        }
-
-        if ( ! $this->load_wp_super_cache_functions() ) {
-            return;
-        }
-
-        if ( function_exists( 'wp_cache_clear_cache' ) ) {
-            wp_cache_clear_cache( get_current_blog_id() );
-            return;
-        }
-
-        if ( function_exists( 'wp_cache_clean_cache' ) ) {
-            global $file_prefix;
-            wp_cache_clean_cache( isset( $file_prefix ) ? (string) $file_prefix : 'wp-cache-' );
-        }
-    }
-
-    private function load_wp_super_cache_functions(): bool {
-        if ( function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' ) ) {
-            return true;
-        }
-
-        $config_file = WP_CONTENT_DIR . '/wp-cache-config.php';
-        if ( is_readable( $config_file ) ) {
-            require_once $config_file;
-        }
-
-        $phase2_file = WP_CONTENT_DIR . '/plugins/wp-super-cache/wp-cache-phase2.php';
-        if ( is_readable( $phase2_file ) ) {
-            require_once $phase2_file;
-        }
-
-        if ( function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' ) ) {
-            return true;
-        }
-
-        $plugin_file = WP_CONTENT_DIR . '/plugins/wp-super-cache/wp-cache.php';
-        if ( ! function_exists( 'wp_cache_clean_cache' ) && is_readable( $plugin_file ) ) {
-            require_once $plugin_file;
-        }
-
-        return function_exists( 'wp_cache_clear_cache' ) || function_exists( 'wp_cache_clean_cache' );
     }
 
     private function normalize_uploaded_files( array $file ): array {
@@ -2905,26 +3366,27 @@ class App extends BaseApp {
 
     private function update_trip_bounds_from_items( int $trip_id ): void {
         $dates = [];
-        foreach ( ItineraryItem::get_for_trip( $trip_id ) as $item ) {
-            $segment = $item->to_array();
-            if ( ! empty( $segment['date'] ) ) {
-                $dates[] = (string) $segment['date'];
+        foreach ( ItineraryItem::get_for_trip( $trip_id, null, false ) as $item ) {
+            if ( '' !== $item->date ) {
+                $dates[] = $item->date;
             }
-            if ( ! empty( $segment['end_date'] ) ) {
-                $dates[] = (string) $segment['end_date'];
+            if ( '' !== $item->end_date ) {
+                $dates[] = $item->end_date;
             }
         }
 
         sort( $dates );
-        update_term_meta( $trip_id, '_traveler_starts_at', $dates[0] ?? '' );
-        update_term_meta( $trip_id, '_traveler_ends_at', $dates ? end( $dates ) : '' );
+        update_term_meta( $trip_id, '_travel_app_starts_at', $dates[0] ?? '' );
+        update_term_meta( $trip_id, '_travel_app_ends_at', $dates ? end( $dates ) : '' );
     }
 
     private function get_uploaded_itinerary_text() {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Called after travel_app_import nonce verification.
         if ( empty( $_FILES['itinerary_file'] ) || ! is_array( $_FILES['itinerary_file'] ) ) {
             return '';
         }
 
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- File contents are type-checked and sanitized by read_uploaded_text_file().
         return $this->read_uploaded_text_file( $_FILES['itinerary_file'] );
     }
 
@@ -2941,25 +3403,32 @@ class App extends BaseApp {
         }
 
         if ( UPLOAD_ERR_OK !== $error ) {
-            return new \WP_Error( 'upload_failed', __( 'The itinerary file could not be uploaded.', 'traveler' ) );
+            return new \WP_Error( 'upload_failed', __( 'The itinerary file could not be uploaded.', 'travel-app' ) );
         }
 
-        $tmp_name = isset( $file['tmp_name'] ) ? (string) $file['tmp_name'] : '';
+        $tmp_name = isset( $file['tmp_name'] ) && is_string( $file['tmp_name'] ) ? $file['tmp_name'] : '';
         if ( '' === $tmp_name || ! is_uploaded_file( $tmp_name ) ) {
-            return new \WP_Error( 'upload_invalid', __( 'The itinerary file upload was invalid.', 'traveler' ) );
+            return new \WP_Error( 'upload_invalid', __( 'The itinerary file upload was invalid.', 'travel-app' ) );
         }
 
-        $size = isset( $file['size'] ) ? (int) $file['size'] : 0;
-        if ( $size > 2 * 1024 * 1024 ) {
-            return new \WP_Error( 'upload_too_large', __( 'The itinerary file is too large.', 'traveler' ) );
+        $size = isset( $file['size'] ) && is_numeric( $file['size'] ) ? (int) $file['size'] : 0;
+        $actual_size = filesize( $tmp_name );
+        if ( $size > 2 * 1024 * 1024 || false === $actual_size || $actual_size > 2 * 1024 * 1024 ) {
+            return new \WP_Error( 'upload_too_large', __( 'The itinerary file is too large.', 'travel-app' ) );
+        }
+
+        $name = isset( $file['name'] ) && is_string( $file['name'] ) ? $file['name'] : '';
+        $extension = strtolower( pathinfo( $name, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $extension, [ 'ics', 'txt', 'ical', 'ifb', 'icalendar' ], true ) ) {
+            return new \WP_Error( 'upload_invalid', __( 'The itinerary file upload was invalid.', 'travel-app' ) );
         }
 
         $contents = file_get_contents( $tmp_name );
         if ( false === $contents ) {
-            return new \WP_Error( 'upload_read_failed', __( 'The itinerary file could not be read.', 'traveler' ) );
+            return new \WP_Error( 'upload_read_failed', __( 'The itinerary file could not be read.', 'travel-app' ) );
         }
 
-        return (string) $contents;
+        return sanitize_textarea_field( $contents );
     }
 
     public function get_trip_share_url( int $trip_id, string $mode = 'fellow' ): string {
@@ -2970,10 +3439,10 @@ class App extends BaseApp {
 
         return add_query_arg(
             [
-                'traveler_share' => $trip_id,
-                'traveler_token' => $token,
+                'token' => $token,
+                'v'     => self::SHARE_PAGE_VERSION,
             ],
-            home_url( '/' )
+            home_url( '/' . $this->get_url_path() . '/share/' . $trip_id . '/' )
         );
     }
 
@@ -2985,8 +3454,8 @@ class App extends BaseApp {
 
         return add_query_arg(
             [
-                'traveler_calendar' => $trip_id,
-                'traveler_token'    => $token,
+                'travel_app_calendar' => $trip_id,
+                'travel_app_token'    => $token,
             ],
             home_url( '/' )
         );
@@ -3008,8 +3477,8 @@ class App extends BaseApp {
 
         return add_query_arg(
             [
-                'traveler_trips_calendar' => $user_id,
-                'traveler_token'          => $token,
+                'travel_app_trips_calendar' => $user_id,
+                'travel_app_token'          => $token,
             ],
             home_url( '/' )
         );
@@ -3038,41 +3507,24 @@ class App extends BaseApp {
         $mode = $this->normalize_share_mode( $mode );
 
         return wp_nonce_url(
-            admin_url( 'admin-post.php?action=traveler_download_trip_html&trip_id=' . $trip_id . '&share_mode=' . $mode ),
-            'traveler_download_trip_html_' . $trip_id
+            admin_url( 'admin-post.php?action=travel_app_download_trip_html&trip_id=' . $trip_id . '&share_mode=' . $mode ),
+            'travel_app_download_trip_html_' . $trip_id
         );
     }
 
-    public function get_static_timeline_script(): string {
-        $script_path = dirname( __DIR__ ) . '/assets/js/timeline-time.js';
-
-        return is_readable( $script_path ) ? (string) file_get_contents( $script_path ) : '';
-    }
-
     private function render_static_trip_html( int $trip_id, string $mode = 'fellow' ): string {
-        global $wp_app_route;
-
-        $previous_route = $wp_app_route ?? null;
-        $wp_app_route = [
-            'app_path' => $this->get_url_path(),
-            'pattern'  => 'trip/{id}',
-            'template' => 'trip.php',
-            'params'   => [
-                'id' => (string) $trip_id,
-            ],
-        ];
-
-        $traveler_static_download = true;
-        $traveler_static_share_mode = $this->normalize_share_mode( $mode );
         ob_start();
-        include $this->get_template_dir() . '/trip.php';
+        $this->render_template(
+            'trip.php',
+            [
+                'trip_id'             => $trip_id,
+                'share_token'         => '',
+                'is_shared_timeline'  => false,
+                'is_static_download'  => true,
+                'static_share_mode'   => $this->normalize_share_mode( $mode ),
+            ]
+        );
         $html = (string) ob_get_clean();
-
-        if ( null === $previous_route ) {
-            unset( $wp_app_route );
-        } else {
-            $wp_app_route = $previous_route;
-        }
 
         return $html;
     }
@@ -3086,7 +3538,7 @@ class App extends BaseApp {
         $mode = $this->normalize_share_mode( $mode );
         $segments_user_id = Trip::get_owner_id( $trip_id );
         $trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
-        $calendar_name = (string) ( $trip_data['title'] ?? __( 'Travel Plan', 'traveler' ) );
+        $calendar_name = (string) ( $trip_data['title'] ?? __( 'Travel Plan', 'travel-app' ) );
 
         return $this->render_trips_ics( [ $trip_data ], $calendar_name, $mode, false );
     }
@@ -3104,10 +3556,10 @@ class App extends BaseApp {
         $lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//Traveler//Traveler//EN',
+            'PRODID:-//Travel App//Travel App//EN',
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
-            'X-WR-CALNAME:' . $this->escape_ics_text( '' !== trim( $calendar_name ) ? $calendar_name : __( 'Travel Plans', 'traveler' ) ),
+            'X-WR-CALNAME:' . $this->escape_ics_text( '' !== trim( $calendar_name ) ? $calendar_name : __( 'Travel Plans', 'travel-app' ) ),
         ];
 
         foreach ( $trips as $trip_data ) {
@@ -3127,7 +3579,7 @@ class App extends BaseApp {
                     continue;
                 }
 
-                $uid_source = home_url( '/traveler/trip/' . $trip_id . '/#segment-' . (int) ( $segment['id'] ?? 0 ) );
+                $uid_source = home_url( '/travel-app/trip/' . $trip_id . '/#segment-' . (int) ( $segment['id'] ?? 0 ) );
                 $is_fellow_share = 'fellow' === $mode;
                 $is_transport_segment = $this->is_transport_segment( $segment );
                 $description_parts = $is_fellow_share ? array_filter( [
@@ -3142,13 +3594,13 @@ class App extends BaseApp {
                     $location = $end_location;
                 }
 
-                $summary = (string) ( $segment['title'] ?? __( 'Untitled item', 'traveler' ) );
+                $summary = (string) ( $segment['title'] ?? __( 'Untitled item', 'travel-app' ) );
                 if ( $include_trip_title && '' !== $trip_title ) {
                     $summary = $trip_title . ': ' . $summary;
                 }
 
                 $lines[] = 'BEGIN:VEVENT';
-                $lines[] = 'UID:' . $this->escape_ics_text( md5( $uid_source ) . '@traveler' );
+                $lines[] = 'UID:' . $this->escape_ics_text( md5( $uid_source ) . '@travel-app' );
                 $lines[] = 'DTSTAMP:' . gmdate( 'Ymd\THis\Z' );
                 $lines[] = 'SUMMARY:' . $this->escape_ics_text( $summary );
                 foreach ( $event_times as $event_time_line ) {
@@ -3292,7 +3744,7 @@ class App extends BaseApp {
     }
 
     private function get_trip_share_token( int $trip_id, string $mode = 'fellow' ): string {
-        if ( ! current_user_can( 'read_traveler_trip', $trip_id ) ) {
+        if ( ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
             return '';
         }
 
@@ -3300,7 +3752,7 @@ class App extends BaseApp {
     }
 
     private function create_trip_share_token( int $trip_id, string $mode = 'fellow' ): string {
-        if ( ! current_user_can( 'edit_traveler_trip', $trip_id ) ) {
+        if ( ! current_user_can( 'edit_travel_app_trip', $trip_id ) ) {
             return '';
         }
 
@@ -3321,11 +3773,11 @@ class App extends BaseApp {
     }
 
     private function get_trip_share_token_meta_key( string $mode ): string {
-        return 'public' === $this->normalize_share_mode( $mode ) ? '_traveler_public_share_token' : '_traveler_share_token';
+        return 'public' === $this->normalize_share_mode( $mode ) ? '_travel_app_public_share_token' : '_travel_app_share_token';
     }
 
     private function get_user_calendar_token( int $user_id ): string {
-        return (string) get_user_meta( $user_id, '_traveler_calendar_token', true );
+        return (string) get_user_meta( $user_id, '_travel_app_calendar_token', true );
     }
 
     private function create_user_calendar_token( int $user_id ): string {
@@ -3339,7 +3791,7 @@ class App extends BaseApp {
         }
 
         $token = wp_generate_password( 32, false, false );
-        update_user_meta( $user_id, '_traveler_calendar_token', $token );
+        update_user_meta( $user_id, '_travel_app_calendar_token', $token );
 
         return $token;
     }
@@ -3402,11 +3854,6 @@ class App extends BaseApp {
         $format = (string) get_option( 'date_format' );
         if ( '' === $format ) {
             $format = 'F j, Y';
-        }
-
-        $localized_default_format = _x( 'F j, Y', 'date format' );
-        if ( 'F j, Y' === $format && 'F j, Y' !== $localized_default_format ) {
-            $format = $localized_default_format;
         }
 
         if ( ! $include_year ) {
@@ -3480,11 +3927,19 @@ class App extends BaseApp {
 
         $date_diff = (int) $start_date->diff( $end_date )->format( '%a' );
         if ( 'lodging' === ( $segment['type'] ?? '' ) ) {
-            return sprintf( _n( '1 night', '%d nights', $date_diff, 'traveler' ), $date_diff );
+            return sprintf(
+                /* translators: %d: number of nights. */
+                _n( '%d night', '%d nights', $date_diff, 'travel-app' ),
+                $date_diff
+            );
         }
 
         $days = $date_diff + 1;
-        return sprintf( _n( '1 day', '%d days', $days, 'traveler' ), $days );
+        return sprintf(
+            /* translators: %d: number of days. */
+            _n( '%d day', '%d days', $days, 'travel-app' ),
+            $days
+        );
     }
 
     public function get_segment_date_range_label( array $segment, bool $include_duration = true ): string {
@@ -3537,15 +3992,31 @@ class App extends BaseApp {
 
         if ( $start_date > $today_date ) {
             $days = (int) $today_date->diff( $start_date )->format( '%a' );
-            return sprintf( _n( 'Starts tomorrow', 'Starts in %d days', $days, 'traveler' ), $days );
+            if ( 1 === $days ) {
+                return __( 'Starts tomorrow', 'travel-app' );
+            }
+
+            return sprintf(
+                /* translators: %d: number of days until the travel plan starts. */
+                _n( 'Starts in %d day', 'Starts in %d days', $days, 'travel-app' ),
+                $days
+            );
         }
 
         if ( $end_date && $end_date < $today_date ) {
             $days = (int) $end_date->diff( $today_date )->format( '%a' );
-            return sprintf( _n( 'Ended yesterday', 'Ended %d days ago', $days, 'traveler' ), $days );
+            if ( 1 === $days ) {
+                return __( 'Ended yesterday', 'travel-app' );
+            }
+
+            return sprintf(
+                /* translators: %d: number of days since the travel plan ended. */
+                _n( 'Ended %d day ago', 'Ended %d days ago', $days, 'travel-app' ),
+                $days
+            );
         }
 
-        return __( 'Active now', 'traveler' );
+        return __( 'Active now', 'travel-app' );
     }
 
     private function get_trip_duration_label( array $trip_data ): string {
@@ -3563,7 +4034,11 @@ class App extends BaseApp {
         }
 
         $days = (int) $start_date->diff( $end_date )->format( '%a' ) + 1;
-        return sprintf( _n( '1 day', '%d days', $days, 'traveler' ), $days );
+        return sprintf(
+            /* translators: %d: number of days. */
+            _n( '%d day', '%d days', $days, 'travel-app' ),
+            $days
+        );
     }
 
     public function parse_itinerary_text( string $text ): array {
@@ -3669,7 +4144,7 @@ class App extends BaseApp {
     }
 
     private function get_quick_plan_transient_name( string $key ): string {
-        return 'traveler_quick_plan_' . get_current_user_id() . '_' . sanitize_key( $key );
+        return 'travel_app_quick_plan_' . get_current_user_id() . '_' . sanitize_key( $key );
     }
 
     private function get_quick_plan_trip_title( array $segment ): string {
@@ -3680,14 +4155,14 @@ class App extends BaseApp {
             return $location;
         }
 
-        return __( 'Quick Travel Plan', 'traveler' );
+        return __( 'Quick Travel Plan', 'travel-app' );
     }
 
     private function normalize_trip_data( array $data ): array {
         $segments = isset( $data['segments'] ) && is_array( $data['segments'] ) ? $data['segments'] : [];
 
         return [
-            'title'       => sanitize_text_field( (string) ( $data['title'] ?? __( 'Imported Travel Plan', 'traveler' ) ) ),
+            'title'       => sanitize_text_field( (string) ( $data['title'] ?? __( 'Imported Travel Plan', 'travel-app' ) ) ),
             'starts_at'   => sanitize_text_field( (string) ( $data['starts_at'] ?? '' ) ),
             'ends_at'     => sanitize_text_field( (string) ( $data['ends_at'] ?? '' ) ),
             'segments'    => array_values( array_map( [ $this, 'normalize_imported_segment' ], $segments ) ),
@@ -3763,10 +4238,10 @@ class App extends BaseApp {
         $segment = ItineraryItem::normalize( $segment );
 
         $item_id = wp_insert_post( [
-            'post_type'    => 'traveler_item',
+            'post_type'    => 'travel_app_item',
             'post_status'  => 'private',
             'post_author'  => get_current_user_id(),
-            'post_title'   => $segment['title'] ?: __( 'Untitled item', 'traveler' ),
+            'post_title'   => $segment['title'] ?: __( 'Untitled item', 'travel-app' ),
             'post_content' => $segment['details'],
         ], true );
 
@@ -3774,34 +4249,34 @@ class App extends BaseApp {
             return $item_id;
         }
 
-        $term_result = wp_set_object_terms( $item_id, [ $trip_id ], 'traveler_trip', false );
+        $term_result = wp_set_object_terms( $item_id, [ $trip_id ], 'travel_app_trip', false );
         if ( is_wp_error( $term_result ) ) {
             wp_trash_post( $item_id );
             return $term_result;
         }
 
         $this->update_item_meta( (int) $item_id, $segment );
-        update_post_meta( (int) $item_id, '_traveler_owner_user_id', Trip::get_owner_id( $trip_id ) );
-        update_post_meta( (int) $item_id, '_traveler_created_by_user_id', get_current_user_id() );
+        update_post_meta( (int) $item_id, '_travel_app_owner_user_id', Trip::get_owner_id( $trip_id ) );
+        update_post_meta( (int) $item_id, '_travel_app_created_by_user_id', get_current_user_id() );
 
         return (int) $item_id;
     }
 
     private function update_item_meta( int $item_id, array $segment ): void {
-        $previous_url = (string) get_post_meta( $item_id, '_traveler_url', true );
+        $previous_url = (string) get_post_meta( $item_id, '_travel_app_url', true );
 
-        update_post_meta( $item_id, '_traveler_type', $segment['type'] );
-        update_post_meta( $item_id, '_traveler_date', $segment['date'] );
-        update_post_meta( $item_id, '_traveler_end_date', $segment['end_date'] );
-        update_post_meta( $item_id, '_traveler_time', $segment['time'] );
-        update_post_meta( $item_id, '_traveler_end_time', $segment['end_time'] );
-        update_post_meta( $item_id, '_traveler_starts_at_utc', $segment['starts_at_utc'] );
-        update_post_meta( $item_id, '_traveler_ends_at_utc', $segment['ends_at_utc'] );
-        update_post_meta( $item_id, '_traveler_timezone', $segment['timezone'] );
-        update_post_meta( $item_id, '_traveler_location', $segment['location'] );
-        update_post_meta( $item_id, '_traveler_end_location', $segment['end_location'] );
-        update_post_meta( $item_id, '_traveler_url', $segment['url'] );
-        update_post_meta( $item_id, '_traveler_sort', $segment['starts_at_utc'] ?: trim( $segment['date'] . ' ' . $segment['time'] ) );
+        update_post_meta( $item_id, '_travel_app_type', $segment['type'] );
+        update_post_meta( $item_id, '_travel_app_date', $segment['date'] );
+        update_post_meta( $item_id, '_travel_app_end_date', $segment['end_date'] );
+        update_post_meta( $item_id, '_travel_app_time', $segment['time'] );
+        update_post_meta( $item_id, '_travel_app_end_time', $segment['end_time'] );
+        update_post_meta( $item_id, '_travel_app_starts_at_utc', $segment['starts_at_utc'] );
+        update_post_meta( $item_id, '_travel_app_ends_at_utc', $segment['ends_at_utc'] );
+        update_post_meta( $item_id, '_travel_app_timezone', $segment['timezone'] );
+        update_post_meta( $item_id, '_travel_app_location', $segment['location'] );
+        update_post_meta( $item_id, '_travel_app_end_location', $segment['end_location'] );
+        update_post_meta( $item_id, '_travel_app_url', $segment['url'] );
+        update_post_meta( $item_id, '_travel_app_sort', $segment['starts_at_utc'] ?: trim( $segment['date'] . ' ' . $segment['time'] ) );
 
         $this->get_url_preview_service()->sync_item_preview( $item_id, $segment, $previous_url );
     }
@@ -3809,9 +4284,9 @@ class App extends BaseApp {
     private function save_trip( array $parsed, string $source_text, ?int $owner_user_id = null ) {
         $owner_user_id = $owner_user_id ?: get_current_user_id();
         $actor_user_id = get_current_user_id();
-        $title = $parsed['title'] ?: __( 'Imported Travel Plan', 'traveler' );
+        $title = $parsed['title'] ?: __( 'Imported Travel Plan', 'travel-app' );
 
-        $trip = wp_insert_term( $title, 'traveler_trip', [
+        $trip = wp_insert_term( $title, 'travel_app_trip', [
             'slug' => sanitize_title( $title . '-' . $owner_user_id . '-' . time() ),
         ] );
 
@@ -3820,16 +4295,16 @@ class App extends BaseApp {
         }
 
         $trip_id = (int) $trip['term_id'];
-        update_term_meta( $trip_id, '_traveler_user_id', $owner_user_id );
-        update_term_meta( $trip_id, '_traveler_created_by_user_id', $actor_user_id );
-        update_term_meta( $trip_id, '_traveler_starts_at', $parsed['starts_at'] );
-        update_term_meta( $trip_id, '_traveler_ends_at', $parsed['ends_at'] );
-        update_term_meta( $trip_id, '_traveler_parser', $parsed['parser'] );
-        update_term_meta( $trip_id, '_traveler_parser_error', $parsed['parser_error'] ?? [] );
-        update_term_meta( $trip_id, '_traveler_source_text', $source_text );
+        update_term_meta( $trip_id, '_travel_app_user_id', $owner_user_id );
+        update_term_meta( $trip_id, '_travel_app_created_by_user_id', $actor_user_id );
+        update_term_meta( $trip_id, '_travel_app_starts_at', $parsed['starts_at'] );
+        update_term_meta( $trip_id, '_travel_app_ends_at', $parsed['ends_at'] );
+        update_term_meta( $trip_id, '_travel_app_parser', $parsed['parser'] );
+        update_term_meta( $trip_id, '_travel_app_parser_error', $parsed['parser_error'] ?? [] );
+        update_term_meta( $trip_id, '_travel_app_source_text', $source_text );
 
         if ( $owner_user_id !== $actor_user_id ) {
-            add_term_meta( $trip_id, '_traveler_editor_user_ids', $actor_user_id, false );
+            add_term_meta( $trip_id, '_travel_app_editor_user_ids', $actor_user_id, false );
         }
 
         $created_items = [];
@@ -3839,7 +4314,7 @@ class App extends BaseApp {
                 foreach ( $created_items as $created_item_id ) {
                     wp_trash_post( $created_item_id );
                 }
-                wp_delete_term( $trip_id, 'traveler_trip' );
+                wp_delete_term( $trip_id, 'travel_app_trip' );
                 return $item_id;
             }
             $created_items[] = $item_id;
@@ -3855,34 +4330,41 @@ class App extends BaseApp {
     public function activate(): void {
         $this->register_post_types();
         $this->register_taxonomies();
-        $this->migrate_from_travel_app();
+        $this->migrate_from_traveler();
         flush_rewrite_rules();
     }
 
     /**
-     * Rename data stored under the plugin's former "travel_app" keys.
+     * Rename data stored under the plugin's former "traveler" keys.
      *
      * Post types, the trip taxonomy, post/term/user meta keys, and the
-     * travel_app_trip capabilities in roles and per-user capability lists are
-     * rewritten in place to their "traveler" equivalents. Safe to run
+     * traveler_trip capabilities in roles and per-user capability lists are
+     * rewritten in place to their "travel_app" equivalents. Safe to run
      * repeatedly: each statement only touches rows still using an old key.
      */
-    public function migrate_from_travel_app(): void {
+    public function migrate_from_traveler(): void {
         global $wpdb;
 
-        $wpdb->query( "UPDATE {$wpdb->posts} SET post_type = 'traveler_item' WHERE post_type = 'travel_app_item'" );
-        $wpdb->query( "UPDATE {$wpdb->posts} SET post_type = 'traveler_journal' WHERE post_type = 'travel_app_journal'" );
-        $wpdb->query( "UPDATE {$wpdb->term_taxonomy} SET taxonomy = 'traveler_trip' WHERE taxonomy = 'travel_app_trip'" );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time activation migration updates legacy plugin records in place.
+        $wpdb->query( "UPDATE {$wpdb->posts} SET post_type = 'travel_app_item' WHERE post_type = 'traveler_item'" );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time activation migration updates legacy plugin records in place.
+        $wpdb->query( "UPDATE {$wpdb->posts} SET post_type = 'travel_app_journal' WHERE post_type = 'traveler_journal'" );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time activation migration updates legacy taxonomy rows in place.
+        $wpdb->query( "UPDATE {$wpdb->term_taxonomy} SET taxonomy = 'travel_app_trip' WHERE taxonomy = 'traveler_trip'" );
 
         foreach ( [ $wpdb->postmeta, $wpdb->termmeta, $wpdb->usermeta ] as $table ) {
-            $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( '_traveler_', SUBSTRING( meta_key, 13 ) ) WHERE meta_key LIKE '\\_travel\\_app\\_%'" );
-            $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( 'traveler_', SUBSTRING( meta_key, 12 ) ) WHERE meta_key LIKE 'travel\\_app\\_%'" );
+            // The table names come from $wpdb, never from a request, and there is
+            // nothing else to interpolate, so there is no placeholder to use here.
+            // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
+            $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( '_travel_app_', SUBSTRING( meta_key, 11 ) ) WHERE meta_key LIKE '\\_traveler\\_%'" );
+            $wpdb->query( "UPDATE {$table} SET meta_key = CONCAT( 'travel_app_', SUBSTRING( meta_key, 10 ) ) WHERE meta_key LIKE 'traveler\\_%'" );
+            // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
         }
 
         $cap_map = [
-            'read_travel_app_trip'   => 'read_traveler_trip',
-            'edit_travel_app_trip'   => 'edit_traveler_trip',
-            'delete_travel_app_trip' => 'delete_traveler_trip',
+            'read_traveler_trip'   => 'read_travel_app_trip',
+            'edit_traveler_trip'   => 'edit_travel_app_trip',
+            'delete_traveler_trip' => 'delete_travel_app_trip',
         ];
 
         $roles = wp_roles();
@@ -3895,10 +4377,11 @@ class App extends BaseApp {
             }
         }
 
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time activation migration finds users with legacy per-user capabilities.
         $user_ids = $wpdb->get_col( $wpdb->prepare(
             "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value LIKE %s",
             $wpdb->get_blog_prefix() . 'capabilities',
-            '%travel_app_trip%'
+            '%traveler_trip%'
         ) );
         foreach ( $user_ids as $user_id ) {
             $user = get_user_by( 'id', (int) $user_id );

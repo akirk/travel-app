@@ -1,6 +1,6 @@
 <?php
 
-namespace Traveler\Parser;
+namespace TravelApp\Parser;
 
 class QuickPlanParser {
     public function looks_like_quick_plan( string $text ): bool {

@@ -31,7 +31,7 @@ There are lots of other small features:
 - delegate another user on your site to create or edit trips on your behalf.
 
 As every WP App, Travel App comes with support for the Abilities API by providing all
-the abilities necessary to use the app with an AI. 
+the abilities necessary to use the app with an AI.
 
 If WordPress has AI Connectors configured, it will use them to better parse your pasted
 booking confirmations.

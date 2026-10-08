@@ -1,21 +1,23 @@
 :root {
     color-scheme: light dark;
-    --wp-app-color-background: #f8fafc;
-    --wp-app-color-surface: #fff;
-    --wp-app-color-text: #17202a;
-    --wp-app-color-muted: #5f6b7a;
-    --wp-app-color-border: #d8dee8;
-    --wp-app-color-link: #0b6bcb;
+    /*
+     * Base UI colors reuse the current user's WordPress admin color scheme
+     * through the --wp-app-color-* tokens provided by the app framework.
+     * Status tones reuse the WordPress admin color palette.
+     */
+    --travel-app-color-success: #00a32a;
+    --travel-app-color-success-ink: #00710a;
+    --travel-app-color-warning: #dba617;
+    --travel-app-color-warning-ink: color-mix(in srgb, var(--travel-app-color-warning) 55%, #1d2327);
+    --travel-app-color-danger: #d63638;
+    --travel-app-color-danger-ink: #b32d2e;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --wp-app-color-background: #111418;
-        --wp-app-color-surface: #191e24;
-        --wp-app-color-text: #f1f5f9;
-        --wp-app-color-muted: #a7b0bd;
-        --wp-app-color-border: #303844;
-        --wp-app-color-link: #7ab7ff;
+        --travel-app-color-success-ink: color-mix(in srgb, var(--travel-app-color-success) 65%, #fff);
+        --travel-app-color-warning-ink: color-mix(in srgb, var(--travel-app-color-warning) 65%, #fff);
+        --travel-app-color-danger-ink: color-mix(in srgb, var(--travel-app-color-danger) 65%, #fff);
     }
 }
 body {
@@ -60,8 +62,8 @@ button {
     padding: 8px 12px;
     border-radius: 6px;
     border: 1px solid transparent;
-    background: var(--wp-app-color-link);
-    color: #fff;
+    background: var(--wp-app-color-primary);
+    color: var(--wp-app-color-on-primary);
     font: inherit;
     font-weight: 700;
     cursor: pointer;
@@ -142,8 +144,8 @@ button {
     align-items: center;
 }
 .share-actions .copied {
-    border-color: rgba(15, 107, 66, 0.42);
-    color: #0f6b42;
+    border-color: color-mix(in srgb, var(--travel-app-color-success) 42%, transparent);
+    color: var(--travel-app-color-success-ink);
 }
 .panel {
     background: var(--wp-app-color-surface);
@@ -156,20 +158,20 @@ button {
     margin-bottom: 18px;
     border-radius: 6px;
     padding: 12px 14px;
-    border: 1px solid rgba(15, 107, 66, 0.32);
-    background: rgba(15, 107, 66, 0.08);
+    border: 1px solid color-mix(in srgb, var(--travel-app-color-success) 32%, transparent);
+    background: color-mix(in srgb, var(--travel-app-color-success) 8%, transparent);
 }
-.notice.error { border-color: rgba(138, 75, 8, 0.28); background: rgba(138, 75, 8, 0.08); }
+.notice.error { border-color: color-mix(in srgb, var(--travel-app-color-danger) 28%, transparent); background: color-mix(in srgb, var(--travel-app-color-danger) 8%, transparent); }
 .offline-status[hidden] { display: none; }
 .offline-status {
     margin-bottom: 18px;
     border-radius: 6px;
     padding: 10px 12px;
-    border: 1px solid rgba(11, 107, 203, 0.28);
-    background: rgba(11, 107, 203, 0.08);
+    border: 1px solid color-mix(in srgb, var(--wp-app-color-primary) 28%, transparent);
+    background: color-mix(in srgb, var(--wp-app-color-primary) 8%, transparent);
     color: var(--wp-app-color-text);
 }
-.offline-status.error { border-color: rgba(138, 75, 8, 0.28); background: rgba(138, 75, 8, 0.08); }
+.offline-status.error { border-color: color-mix(in srgb, var(--travel-app-color-danger) 28%, transparent); background: color-mix(in srgb, var(--travel-app-color-danger) 8%, transparent); }
 .offline-panel {
     margin-top: 28px;
     padding-top: 18px;
@@ -249,8 +251,8 @@ button {
     transform: translateX(-100%);
     padding: 2px 6px;
     border-radius: 999px;
-    background: var(--wp-app-color-link);
-    color: #fff;
+    background: var(--wp-app-color-primary);
+    color: var(--wp-app-color-on-primary);
     font-size: 0.76rem;
     font-weight: 750;
     line-height: 1.2;
@@ -463,7 +465,7 @@ button {
 }
 .attachment-offline-indicator {
     flex: 0 0 auto;
-    color: #237a3b;
+    color: var(--travel-app-color-success-ink);
     font-weight: 900;
     line-height: 1;
 }
@@ -613,7 +615,7 @@ button {
     appearance: none;
     background: transparent;
     border: 0;
-    color: #9f1f1f;
+    color: var(--travel-app-color-danger-ink);
     cursor: pointer;
     font: inherit;
     font-weight: 650;
@@ -623,7 +625,7 @@ button {
 }
 .delete-item-link:hover,
 .delete-item-link:focus-visible {
-    color: #7f1717;
+    color: color-mix(in srgb, var(--travel-app-color-danger-ink) 80%, #000);
 }
 .timeline-edit-panel .form-actions {
     justify-content: space-between;
@@ -651,11 +653,11 @@ button {
     text-decoration: none;
 }
 .lodging-checker-icon {
-    color: #9a6700;
+    color: var(--travel-app-color-warning-ink);
     font-weight: 800;
 }
 .lodging-checker.covered .lodging-checker-icon {
-    color: #238636;
+    color: var(--travel-app-color-success-ink);
 }
 button.lodging-checker {
     cursor: pointer;
@@ -665,13 +667,13 @@ button.lodging-checker {
     gap: 10px;
     margin: -4px 0 14px;
     padding: 12px;
-    border: 1px solid rgba(198, 139, 0, 0.32);
+    border: 1px solid color-mix(in srgb, var(--travel-app-color-warning) 32%, transparent);
     border-radius: 8px;
-    background: rgba(198, 139, 0, 0.08);
+    background: color-mix(in srgb, var(--travel-app-color-warning) 8%, transparent);
 }
 .lodging-checker-box.covered {
-    border-color: rgba(35, 134, 54, 0.28);
-    background: rgba(35, 134, 54, 0.08);
+    border-color: color-mix(in srgb, var(--travel-app-color-success) 28%, transparent);
+    background: color-mix(in srgb, var(--travel-app-color-success) 8%, transparent);
 }
 .lodging-checker-box[hidden] {
     display: none;
@@ -692,7 +694,7 @@ button.lodging-checker {
     gap: 10px;
     align-items: center;
     padding: 8px 0;
-    border-top: 1px solid rgba(198, 139, 0, 0.22);
+    border-top: 1px solid color-mix(in srgb, var(--travel-app-color-warning) 22%, transparent);
 }
 .lodging-checker-night label {
     display: inline-flex;
@@ -716,7 +718,7 @@ button.lodging-checker {
     font-weight: 700;
 }
 .lodging-checker-night-status .lodging-checker-icon {
-    color: #238636;
+    color: var(--travel-app-color-success-ink);
 }
 .lodging-checker-brief {
     color: var(--wp-app-color-muted);
@@ -890,8 +892,8 @@ details.item summary::-webkit-details-marker { display: none; }
 }
 .delete-button {
     background: transparent;
-    color: #9f1f1f;
-    border-color: rgba(159, 31, 31, 0.36);
+    color: var(--travel-app-color-danger-ink);
+    border-color: color-mix(in srgb, var(--travel-app-color-danger) 36%, transparent);
 }
 .empty { color: var(--wp-app-color-muted); }
 @media (max-width: 680px) {

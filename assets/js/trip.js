@@ -46,23 +46,33 @@
             return;
         }
 
-        button.addEventListener('click', function() {
+        function openAddItemForm(focusTitle) {
             var titleInput = form.querySelector('input[name="segment_title"]');
-            var isHidden = form.hasAttribute('hidden');
+            form.removeAttribute('hidden');
+            button.setAttribute('aria-expanded', 'true');
 
-            if (isHidden) {
-                form.removeAttribute('hidden');
-                button.setAttribute('aria-expanded', 'true');
+            if (focusTitle && titleInput) {
+                titleInput.focus();
+            }
+        }
 
-                if (titleInput) {
-                    titleInput.focus();
-                }
-
+        button.addEventListener('click', function() {
+            if (form.hasAttribute('hidden')) {
+                openAddItemForm(true);
                 return;
             }
 
             form.setAttribute('hidden', '');
             button.setAttribute('aria-expanded', 'false');
+        });
+
+        window.addEventListener('toolactivated', function(event) {
+            if (event.toolName !== 'prepareTravelItem' || !form.querySelector('form[toolname="prepareTravelItem"]')) {
+                return;
+            }
+
+            openAddItemForm(false);
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
 
         document.querySelectorAll('[data-lodging-prefill]').forEach(function(prefillButton) {

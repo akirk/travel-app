@@ -284,7 +284,7 @@ class App extends BaseApp {
     private function enqueue_shared_assets( string $asset_root, string $handle_prefix ): void {
         $asset_root = trim( $asset_root, '/' );
         $script_path = TRAVEL_APP_PLUGIN_DIR . $asset_root . '/js/timeline-time.js';
-        $offline_script_path = TRAVEL_APP_PLUGIN_DIR . $asset_root . '/js/offline-sync.js';
+        $offline_script_path = TRAVEL_APP_PLUGIN_DIR . 'assets/js/offline-sync.js';
 
         // Register only on Travel App's scoped hooks, outside the dashboard.
         $scope = $this->get_url_path();
@@ -314,7 +314,7 @@ class App extends BaseApp {
 
         wp_app_enqueue_script(
             $handle_prefix . '-offline-sync',
-            TRAVEL_APP_PLUGIN_URL . $asset_root . '/js/offline-sync.js',
+            TRAVEL_APP_PLUGIN_URL . 'assets/js/offline-sync.js',
             [],
             file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
             true,

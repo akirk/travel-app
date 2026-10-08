@@ -3,6 +3,7 @@
     var messages = config.messages || {};
     var dbName = 'travel-app-offline';
     var storeName = 'mutations';
+    var queueFlush = null;
     var offlineState = {
         connection: navigator.onLine ? 'Online' : 'Offline',
         worker: 'Checking',
@@ -236,7 +237,7 @@
         });
     }
 
-    function flushQueue() {
+    function replayQueue() {
         if (!navigator.onLine) {
             return Promise.resolve(false);
         }
@@ -270,6 +271,33 @@
             setStatus(messages.syncFailed || 'Some offline changes could not sync yet.', true);
             return false;
         });
+    }
+
+    function flushQueue() {
+        if (queueFlush) {
+            return queueFlush;
+        }
+
+        if (!navigator.onLine) {
+            return Promise.resolve(false);
+        }
+
+        // Read the queue inside the lock so another tab can finish deleting items first.
+        queueFlush = Promise.resolve().then(function() {
+            if (navigator.locks && navigator.locks.request) {
+                return navigator.locks.request(dbName + '-sync', replayQueue);
+            }
+
+            return replayQueue();
+        }).catch(function() {
+            setStatus(messages.syncFailed || 'Some offline changes could not sync yet.', true);
+            return false;
+        }).then(function(result) {
+            queueFlush = null;
+            return result;
+        });
+
+        return queueFlush;
     }
 
     function bindPwaRuntime() {

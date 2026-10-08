@@ -1,11 +1,11 @@
 # Travel App
 
 - Contributors: akirk
-- Tags: itinerary, trip-planner, wpapp
+- Tags: itinerary, trip-planner, wpapps
 - Requires at least: 6.0
 - Requires PHP: 7.4
 - Tested up to: 7.1
-- Stable tag: 1.0.0
+- Stable tag: 1.1.0
 - License: GPL-2.0-or-later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,6 +85,23 @@ visits do not query it again.
 3. A trip's day-by-day timeline, with lodging coverage and itinerary items grouped by day.
 
 ## Changelog
+
+### 1.1.0
+
+- Add the Command Ledger theme and a WebMCP-enabled Add Item form.
+- Improve offline status feedback, cache timeline assets, and prevent duplicate
+  changes when queued edits sync after reconnecting.
+- Add delegated trip creation and editing, with faster trip summaries and user lookup.
+- Publish travel journal entries as blog post drafts and subscribe to all trips
+  in one calendar feed.
+- Add route playback, cached geocoding and a map link from the trip timeline.
+- Import shared booking confirmations through the PWA Web Share Target and
+  improve import review and itinerary editing.
+- Add a create-travel-plan ability and improve AI provider detection.
+- Fix shared timeline pages and styles in self-contained HTML exports.
+- Improve privacy, access checks and WordPress.org review compliance; bundle
+  Leaflet locally.
+- Update Playground demos, plugin icons, screenshots and documentation.
 
 ### 1.0.0
 

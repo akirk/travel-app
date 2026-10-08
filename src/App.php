@@ -293,7 +293,7 @@ class App extends BaseApp {
             $handle_prefix . '-timeline-time',
             TRAVEL_APP_PLUGIN_URL . 'assets/js/timeline-time.js',
             [],
-            file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0',
+            file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.1.0',
             true,
             $scope
         );
@@ -316,7 +316,7 @@ class App extends BaseApp {
             $handle_prefix . '-offline-sync',
             TRAVEL_APP_PLUGIN_URL . 'assets/js/offline-sync.js',
             [],
-            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.0.0',
+            file_exists( $offline_script_path ) ? (string) filemtime( $offline_script_path ) : '1.1.0',
             true,
             $scope
         );
@@ -329,7 +329,7 @@ class App extends BaseApp {
     public function get_asset_version( string $path ): string {
         $file = TRAVEL_APP_PLUGIN_DIR . 'assets/' . ltrim( $path, '/' );
 
-        return file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
+        return file_exists( $file ) ? (string) filemtime( $file ) : '1.1.0';
     }
 
     public function print_static_trip_styles(): void {
@@ -413,7 +413,7 @@ class App extends BaseApp {
     private function get_asset_version_from( string $path, string $asset_root ): string {
         $file = TRAVEL_APP_PLUGIN_DIR . trim( $asset_root, '/' ) . '/' . ltrim( $path, '/' );
 
-        return file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
+        return file_exists( $file ) ? (string) filemtime( $file ) : '1.1.0';
     }
 
     public function get_manifest_url( int $trip_id = 0, string $share_token = '' ): string {

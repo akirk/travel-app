@@ -59,3 +59,19 @@ jobs:
 
       - name: Run tests
         run: composer test
+
+  offline-sync:
+    name: Offline queue replay tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run offline queue replay tests
+        run: node --test tests/OfflineSyncTest.cjs

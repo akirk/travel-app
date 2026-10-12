@@ -71,9 +71,18 @@ $travel_app->enqueue_template_assets( 'settings' );
                 <div class="setting-field">
                     <label for="menu_title_format"><?php esc_html_e( 'Trip title format', 'travel-app' ); ?></label>
                     <select id="menu_title_format" name="menu_title_format">
-                        <option value="title_dates" <?php selected( $menu_preferences['format'], 'title_dates' ); ?>><?php echo esc_html( sprintf( __( 'Title followed by dates (%s)', 'travel-app' ), trim( $example_title . ' ' . $example_dates ) ) ); ?></option>
-                        <option value="title" <?php selected( $menu_preferences['format'], 'title' ); ?>><?php echo esc_html( sprintf( __( 'Title only (%s)', 'travel-app' ), $example_title ) ); ?></option>
-                        <option value="dates_title" <?php selected( $menu_preferences['format'], 'dates_title' ); ?>><?php echo esc_html( sprintf( __( 'Dates followed by title (%s)', 'travel-app' ), trim( $example_dates . ' ' . $example_title ) ) ); ?></option>
+                        <option value="title_dates" <?php selected( $menu_preferences['format'], 'title_dates' ); ?>><?php
+                            /* translators: %s: Example trip title and date range. */
+                            echo esc_html( sprintf( __( 'Title followed by dates (%s)', 'travel-app' ), trim( $example_title . ' ' . $example_dates ) ) );
+                        ?></option>
+                        <option value="title" <?php selected( $menu_preferences['format'], 'title' ); ?>><?php
+                            /* translators: %s: Example trip title. */
+                            echo esc_html( sprintf( __( 'Title only (%s)', 'travel-app' ), $example_title ) );
+                        ?></option>
+                        <option value="dates_title" <?php selected( $menu_preferences['format'], 'dates_title' ); ?>><?php
+                            /* translators: %s: Example trip title and date range. */
+                            echo esc_html( sprintf( __( 'Dates followed by title (%s)', 'travel-app' ), trim( $example_dates . ' ' . $example_title ) ) );
+                        ?></option>
                     </select>
                 </div>
                 <h2 id="delegation-settings-heading"><?php esc_html_e( 'Delegation', 'travel-app' ); ?></h2>

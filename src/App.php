@@ -840,8 +840,7 @@ class App extends BaseApp {
     }
 
     protected function setup_menu(): void {
-        $current_trip = $this->get_masterbar_current_trip();
-        if ( $current_trip ) {
+        foreach ( $this->get_masterbar_trips() as $current_trip ) {
             $this->app->add_menu_item(
                 'trip-' . $current_trip->id,
                 $this->get_masterbar_trip_label( $current_trip ),
@@ -852,37 +851,66 @@ class App extends BaseApp {
         $this->app->add_menu_item( 'settings', __( 'Settings', 'travel-app' ), home_url( '/' . $this->get_url_path() . '/settings/' ) );
     }
 
-    private function get_masterbar_current_trip(): ?Trip {
+    public function get_menu_preferences(): array {
+        $saved = get_user_meta( get_current_user_id(), '_travel_app_menu_preferences', true );
+        return array_merge( [
+            'active' => true,
+            'last' => false,
+            'upcoming' => false,
+            'format' => 'title_dates',
+        ], is_array( $saved ) ? $saved : [] );
+    }
+
+    private function get_masterbar_trips(): array {
         if ( ! is_user_logged_in() ) {
-            return null;
+            return [];
         }
 
+        $preferences = $this->get_menu_preferences();
         $today = current_time( 'Y-m-d' );
-        $current_trips = array_values( array_filter( Trip::for_current_user(), static function( Trip $trip ) use ( $today ): bool {
-            return $trip->starts_at && $trip->starts_at <= $today && ( '' === $trip->ends_at || $trip->ends_at >= $today );
-        } ) );
-
-        if ( empty( $current_trips ) ) {
-            return null;
-        }
-
-        usort( $current_trips, static function( Trip $a, Trip $b ): int {
-            if ( $a->starts_at !== $b->starts_at ) {
-                return strcmp( $a->starts_at, $b->starts_at );
+        $selected = [];
+        $last_trip = null;
+        foreach ( Trip::for_current_user() as $trip ) {
+            if ( '' === $trip->starts_at ) {
+                continue;
             }
-
-            return strcmp( $a->title, $b->title );
+            if ( $trip->starts_at > $today ) {
+                if ( $preferences['upcoming'] ) {
+                    $selected[] = $trip;
+                }
+            } elseif ( '' === $trip->ends_at || $trip->ends_at >= $today ) {
+                if ( $preferences['active'] ) {
+                    $selected[] = $trip;
+                }
+            } elseif ( null === $last_trip || $trip->ends_at > $last_trip->ends_at || ( $trip->ends_at === $last_trip->ends_at && $trip->starts_at > $last_trip->starts_at ) ) {
+                $last_trip = $trip;
+            }
+        }
+        if ( $preferences['last'] && $last_trip ) {
+            $selected[] = $last_trip;
+        }
+        usort( $selected, static function( Trip $a, Trip $b ): int {
+            return strcmp( $a->starts_at, $b->starts_at ) ?: strcmp( $a->title, $b->title );
         } );
-
-        return $current_trips[0];
+        return $selected;
     }
 
     private function get_masterbar_trip_label( Trip $trip ): string {
         $title = '' !== trim( $trip->title ) ? $trip->title : __( 'Travel Plan', 'travel-app' );
-        $date = $trip->starts_at ? substr( $trip->starts_at, 5 ) : '';
-        $label = '' !== $date ? $date . ' ' . $title : $title;
+        $format = $this->get_menu_preferences()['format'];
+        if ( 'title' === $format || '' === $trip->starts_at ) {
+            return $title;
+        }
 
-        return strlen( $label ) > 38 ? rtrim( substr( $label, 0, 35 ) ) . '...' : $label;
+        $start = new \DateTimeImmutable( $trip->starts_at );
+        $date = wp_date( 'M j', $start->getTimestamp() );
+        if ( '' !== $trip->ends_at && $trip->ends_at !== $trip->starts_at ) {
+            $end = new \DateTimeImmutable( $trip->ends_at );
+            $end_format = $start->format( 'Y-m' ) === $end->format( 'Y-m' ) ? 'j' : 'M j';
+            $date .= '-' . wp_date( $end_format, $end->getTimestamp() );
+        }
+
+        return 'dates_title' === $format ? $date . ' ' . $title : $title . ' ' . $date;
     }
 
     public function register_post_types(): void {
@@ -2210,6 +2238,14 @@ class App extends BaseApp {
         }
 
         check_admin_referer( 'travel_app_update_user_settings' );
+
+        $menu_format = isset( $_POST['menu_title_format'] ) ? sanitize_key( wp_unslash( $_POST['menu_title_format'] ) ) : 'title_dates';
+        update_user_meta( get_current_user_id(), '_travel_app_menu_preferences', [
+            'active' => isset( $_POST['menu_active_trips'] ),
+            'last' => isset( $_POST['menu_last_trip'] ),
+            'upcoming' => isset( $_POST['menu_upcoming_trips'] ),
+            'format' => in_array( $menu_format, [ 'title', 'title_dates', 'dates_title' ], true ) ? $menu_format : 'title_dates',
+        ] );
 
         update_user_meta(
             get_current_user_id(),

@@ -45,7 +45,7 @@ function database() {
     };
 }
 
-function browser(script, indexedDB, fetch, locks) {
+function browser(script, indexedDB, fetch, locks, pageDocument) {
     const events = {};
     const window = {
         indexedDB, isSecureContext: true, location: {reload() {}}, setTimeout() {},
@@ -55,7 +55,7 @@ function browser(script, indexedDB, fetch, locks) {
         onLine: true, locks,
         serviceWorker: {controller: {}, addEventListener() {}}
     };
-    const document = {querySelectorAll() {return [];}, addEventListener() {}};
+    const document = pageDocument || {querySelectorAll() {return [];}, addEventListener() {}};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', script), 'utf8'), {
         window, navigator, document, fetch, Promise, URLSearchParams
     });
@@ -63,6 +63,53 @@ function browser(script, indexedDB, fetch, locks) {
 }
 
 for (const script of scripts) {
+    test(script + ': editing reads trip data from template content and populates the form', () => {
+        let edit;
+        let focused = false;
+        const fields = Object.fromEntries([
+            'trip_id', 'segment_index', '_wpnonce', 'segment_title', 'segment_details'
+        ].map(name => [name, {value: ''}]));
+        fields.segment_title.focus = () => {focused = true;};
+        fields.segment_title.select = () => {};
+        const form = {elements: fields, hasAttribute() {return false;}, setAttribute() {}};
+        const view = {hidden: false};
+        const panel = {
+            hidden: true,
+            appendChild() {},
+            querySelector(selector) {return selector === 'form[data-offline-sync]' ? form : null;},
+            closest() {return {querySelector() {return view;}};},
+            scrollIntoView() {}
+        };
+        const button = {
+            getAttribute() {return 'edit-segment-42';},
+            addEventListener(name, callback) {edit = callback;}
+        };
+        const source = {textContent: '', content: {textContent: JSON.stringify({
+            id: 93912, segments: [{id: 42, title: 'Train & hotel', details: 'A < B', edit_nonce: 'edit-42'}]
+        })}};
+        const document = {
+            querySelectorAll(selector) {return selector === '[data-inline-edit-toggle]' ? [button] : [];},
+            addEventListener() {},
+            getElementById(id) {
+                return {
+                    'travel-app-trip-data': source,
+                    'segment-edit-template': {content: {cloneNode() {return {};}}},
+                    'edit-segment-42': panel
+                }[id];
+            }
+        };
+        browser(script, undefined, undefined, undefined, document);
+        edit();
+        assert.equal(panel.hidden, false);
+        assert.equal(view.hidden, true);
+        assert.equal(fields.trip_id.value, '93912');
+        assert.equal(fields.segment_index.value, '42');
+        assert.equal(fields._wpnonce.value, 'edit-42');
+        assert.equal(fields.segment_title.value, 'Train & hotel');
+        assert.equal(fields.segment_details.value, 'A < B');
+        assert.equal(focused, true);
+    });
+
     test(script + ': overlapping triggers submit an item once without Web Locks', async () => {
         const db = database();
         let finish;

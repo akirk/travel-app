@@ -442,12 +442,13 @@
 
     function getTripData() {
         var source = document.getElementById('travel-app-trip-data');
-        if (!source || !source.textContent) {
+        var content = source && (source.content || source);
+        if (!content || !content.textContent) {
             return null;
         }
 
         try {
-            return JSON.parse(source.textContent);
+            return JSON.parse(content.textContent);
         } catch (error) {
             return null;
         }

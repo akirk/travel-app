@@ -433,7 +433,7 @@
         var targetRect = target.getBoundingClientRect();
         var dateValue = value ? value.slice(0, 10) : '';
         var currentDay = getTimelineDay(target, dateValue);
-        var top = currentDay ? getTimeMarkerDayTop(currentDay, targetRect, currentTime) : null;
+        var top = currentDay ? getTimeMarkerDayTop(currentDay, target, targetRect, currentTime) : null;
 
         if (top === null) {
             marker.style.display = 'none';
@@ -678,7 +678,7 @@
         }) || null;
     }
 
-    function getTimeMarkerDayTop(day, targetRect, currentTime) {
+    function getTimeMarkerDayTop(day, target, targetRect, currentTime) {
         var date = day.getAttribute('data-date') || '';
         var startValue = date ? parseDateTime(date + 'T00:00') : 0;
         var endValue = date ? parseDateTime(date + 'T23:59:59') : 0;

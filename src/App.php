@@ -2371,6 +2371,16 @@ class App extends BaseApp {
 
         nocache_headers();
 
+        // Shared routes render before the theme hooks and have no app asset scope.
+        wp_app_enqueue_script(
+            'travel-app-shared-timeline-time',
+            $this->get_asset_url( 'js/timeline-time.js' ),
+            [],
+            $this->get_asset_version( 'js/timeline-time.js' ),
+            true,
+            'global'
+        );
+
         $this->render_template(
             'trip.php',
             [
@@ -3477,6 +3487,7 @@ class App extends BaseApp {
             [
                 'token' => $token,
                 'v'     => self::SHARE_PAGE_VERSION,
+                'wp_app_theme' => $this->app->get_selected_theme(),
             ],
             home_url( '/' . $this->get_url_path() . '/share/' . $trip_id . '/' )
         );

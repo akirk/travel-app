@@ -88,6 +88,35 @@ class LodgingCoverage {
             }
         }
 
+        // A hotel's opening time is a window, rather than a scheduled arrival.
+        // Keep it behind same-day inbound travel without changing the booking.
+        foreach ( $timeline_segments as &$entry ) {
+            if ( 'lodging' !== ( $entry['type'] ?? '' ) || isset( $entry['_timeline_kind'] ) ) {
+                continue;
+            }
+
+            foreach ( $segments as $travel ) {
+                if ( ! in_array( $travel['type'] ?? '', [ 'flight', 'train' ], true ) ) {
+                    continue;
+                }
+
+                $arrival_date = (string) ( $travel['end_date'] ?? '' );
+                $arrival_time = (string) ( $travel['end_time'] ?? '' );
+                if ( '' === $arrival_date || '' === $arrival_time || $arrival_date !== ( $entry['date'] ?? '' ) ) {
+                    continue;
+                }
+
+                $arrival = $arrival_date . ' ' . $arrival_time;
+                $departure = trim( (string) ( $travel['date'] ?? '' ) . ' ' . (string) ( $travel['time'] ?? '' ) );
+                $after_travel = max( $arrival, $departure );
+                if ( $after_travel >= $entry['_sort'] ) {
+                    $entry['_sort'] = $after_travel . ' lodging';
+                    $entry['_timeline_time'] = substr( $after_travel, 11, 5 );
+                }
+            }
+        }
+        unset( $entry );
+
         usort( $timeline_segments, static function( array $a, array $b ): int {
             return strcmp( (string) ( $a['_sort'] ?? '' ), (string) ( $b['_sort'] ?? '' ) );
         } );

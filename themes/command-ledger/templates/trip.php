@@ -353,7 +353,7 @@ if ( ! $is_static_download ) {
                             $step_end_time = (string) ( $step['end_time'] ?? '' );
                             $step_end_date = (string) ( $step['end_date'] ?? '' );
                             $step_effective_end_date = '' !== $step_end_date ? $step_end_date : ( '' !== $step_end_time ? $step_date : '' );
-                            $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['time'] ?? '' ) ?: '00:00' ) );
+                            $step_datetime = trim( (string) ( $step['date'] ?? '' ) . 'T' . ( (string) ( $step['_timeline_time'] ?? $step['time'] ?? '' ) ?: '00:00' ) );
                             $step_time_label = ( '' !== $step_effective_end_date && $step_effective_end_date === $step_date && '' !== $step_end_time )
                                 ? $travel_app->format_time_range_label( (string) ( $step['time'] ?? '' ), $step_end_time )
                                 : (string) ( $step['time'] ?? '' );
@@ -800,7 +800,7 @@ if ( ! $is_static_download ) {
                                     <?php $timeline_kind = (string) ( $segment['_timeline_kind'] ?? 'start' ); ?>
                                     <?php $segment_anchor_suffix = in_array( $timeline_kind, [ 'checkout', 'return' ], true ) ? '-' . $timeline_kind : ''; ?>
                                     <?php $segment_anchor = 'segment-' . $index . $segment_anchor_suffix; ?>
-                                    <?php $segment_datetime = trim( (string) ( $segment['date'] ?? '' ) . 'T' . ( (string) ( $segment['time'] ?? '' ) ?: '00:00' ) ); ?>
+                                    <?php $segment_datetime = trim( (string) ( $segment['date'] ?? '' ) . 'T' . ( (string) ( $segment['_timeline_time'] ?? $segment['time'] ?? '' ) ?: '00:00' ) ); ?>
                                     <?php $segment_start_date = substr( trim( (string) ( $segment['date'] ?? '' ) ), 0, 10 ); ?>
                                     <?php $segment_end_date = substr( trim( (string) ( $segment['end_date'] ?? '' ) ), 0, 10 ); ?>
                                     <?php $is_end_timeline_entry = in_array( $timeline_kind, [ 'checkout', 'return' ], true ); ?>
@@ -829,7 +829,7 @@ if ( ! $is_static_download ) {
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
                                         <div class="timeline-item<?php echo $day < $today ? ' past' : ''; ?>" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-end-date="<?php echo esc_attr( (string) ( $segment['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $segment['end_time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>" data-generated="<?php echo $is_end_timeline_entry ? '1' : '0'; ?>">
                                             <div class="timeline-meta">
-                                                <time class="time" datetime="<?php echo esc_attr( $segment_datetime ); ?>"><?php echo esc_html( $segment['time'] ?: '—' ); ?></time>
+                                                <time class="time" datetime="<?php echo esc_attr( $segment_datetime ); ?>"><?php if ( 'lodging' === ( $segment['type'] ?? '' ) && ! $is_end_timeline_entry && ! empty( $segment['time'] ) ) : ?><?php esc_html_e( 'Check-in from', 'travel-app' ); ?> <?php endif; ?><?php echo esc_html( $segment['time'] ?: '—' ); ?></time>
                                                 <?php if ( ! $is_end_timeline_entry && ! empty( $segment['end_time'] ) && ( '' === $segment_end_date || $segment_end_date === $segment_start_date ) ) : ?>
                                                     <span class="time timeline-end-time"><span class="screen-reader-text"><?php esc_html_e( 'Ends at', 'travel-app' ); ?> </span>– <?php echo esc_html( $segment['end_time'] ); ?></span>
                                                 <?php endif; ?>

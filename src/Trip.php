@@ -201,6 +201,28 @@ class Trip {
         return $starts <= $today && ( '' === $ends || $ends >= $today );
     }
 
+    public static function matches_status( array $trip_data, string $status, string $today ): bool {
+        $starts = (string) ( $trip_data['starts_at'] ?? '' );
+        $ends = (string) ( $trip_data['ends_at'] ?? '' );
+        $current = self::is_active_data( $trip_data, $today );
+        $upcoming = '' !== $starts && $starts > $today;
+
+        switch ( $status ) {
+            case 'all':
+                return true;
+            case 'current':
+                return $current;
+            case 'upcoming':
+                return $upcoming;
+            case 'current-or-upcoming':
+                return $current || $upcoming;
+            case 'past':
+                return '' !== $ends && $ends < $today;
+        }
+
+        return false;
+    }
+
     public function is_active( ?string $today = null ): bool {
         return self::is_active_data( [
             'starts_at' => $this->starts_at,

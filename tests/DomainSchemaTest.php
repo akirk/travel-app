@@ -35,6 +35,29 @@ final class DomainSchemaTest extends TestCase {
         ], '2026-08-05' ) );
     }
 
+    public function test_trip_status_filters_use_inclusive_current_dates(): void {
+        $today = '2026-11-02';
+        $cases = [
+            [ '2026-11-01', '2026-11-01', 'past' ],
+            [ '2026-11-01', '2026-11-02', 'current' ],
+            [ '2026-11-02', '2026-11-02', 'current' ],
+            [ '2026-11-02', '2026-11-04', 'current' ],
+            [ '2026-11-03', '2026-11-04', 'upcoming' ],
+            [ '2026-11-03', '', 'upcoming' ],
+            [ '2026-11-01', '', 'current' ],
+            [ '', '', 'undated' ],
+            [ '', '2026-11-04', 'undated' ],
+        ];
+        foreach ( $cases as [ $starts, $ends, $expected ] ) {
+            $trip = [ 'starts_at' => $starts, 'ends_at' => $ends ];
+            foreach ( [ 'current', 'upcoming', 'past' ] as $status ) {
+                self::assertSame( $expected === $status, Trip::matches_status( $trip, $status, $today ) );
+            }
+            self::assertSame( in_array( $expected, [ 'current', 'upcoming' ], true ), Trip::matches_status( $trip, 'current-or-upcoming', $today ) );
+            self::assertTrue( Trip::matches_status( $trip, 'all', $today ) );
+        }
+    }
+
     public function test_itinerary_item_schema_matches_public_properties(): void {
         $schema = ItineraryItem::schema()['properties'];
         $schema_fields = array_keys( $schema );

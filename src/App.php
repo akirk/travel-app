@@ -1274,11 +1274,16 @@ class App extends BaseApp {
 
         wp_register_ability( 'travel-app/list-trips', [
             'label'               => __( 'List Travel Plans', 'travel-app' ),
-            'description'         => 'Returns the current user\'s saved travel plans with IDs, dates, and segment counts.',
+            'description'         => 'Returns the current user\'s saved travel plans with IDs, dates, and segment counts. Filter by status to find current or upcoming trips; upcoming results are ordered soonest first.',
             'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
                 'properties'           => [
+                    'status' => [
+                        'type'        => 'string',
+                        'enum'        => [ 'all', 'current', 'upcoming', 'current-or-upcoming', 'past' ],
+                        'description' => 'Filter relative to today in the site timezone. Current includes the first and last day; upcoming starts after today; current-or-upcoming includes both. Undated trips only appear with all. Defaults to all. Overrides active when supplied.',
+                    ],
                     'active' => [
                         'type'        => 'boolean',
                         'description' => 'When true, return only trips active today. When false, return only trips not active today.',
@@ -1311,7 +1316,7 @@ class App extends BaseApp {
             },
             'meta'                => [
                 'annotations' => [
-                    'instructions' => 'Present travel plans as a compact summary. Use returned IDs for follow-up detail calls.',
+                    'instructions' => 'Use status upcoming for the next trip, current for trips active today, and current-or-upcoming for ongoing and future trips. Upcoming results are ordered soonest first. Present travel plans as a compact summary. Use returned IDs for follow-up detail calls.',
                     'readonly'     => true,
                     'destructive'  => false,
                     'idempotent'   => true,
@@ -1801,7 +1806,18 @@ class App extends BaseApp {
             return $trip->to_summary_array();
         }, Trip::for_current_user() );
 
-        if ( null !== $active ) {
+        if ( is_array( $input ) && isset( $input['status'] ) ) {
+            $status = (string) $input['status'];
+            $today = current_time( 'Y-m-d' );
+            $trips = array_values( array_filter( $trips, static function( array $trip ) use ( $status, $today ): bool {
+                return Trip::matches_status( $trip, $status, $today );
+            } ) );
+            if ( in_array( $status, [ 'upcoming', 'current-or-upcoming' ], true ) ) {
+                usort( $trips, static function( array $a, array $b ): int {
+                    return strcmp( $a['starts_at'], $b['starts_at'] );
+                } );
+            }
+        } elseif ( null !== $active ) {
             $trips = array_values( array_filter( $trips, static function( array $trip ) use ( $active ): bool {
                 return (bool) ( $trip['is_active'] ?? false ) === $active;
             } ) );

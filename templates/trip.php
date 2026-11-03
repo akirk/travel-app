@@ -725,7 +725,9 @@ if ( ! $is_static_download ) {
                                     <div class="timeline-item-wrap" id="<?php echo esc_attr( $segment_anchor ); ?>">
                                         <div class="timeline-item" data-inline-edit-view data-date="<?php echo esc_attr( (string) ( $segment['date'] ?? '' ) ); ?>" data-time="<?php echo esc_attr( (string) ( $segment['time'] ?? '' ) ); ?>" data-end-date="<?php echo esc_attr( (string) ( $segment['end_date'] ?? '' ) ); ?>" data-end-time="<?php echo esc_attr( (string) ( $segment['end_time'] ?? '' ) ); ?>" data-datetime="<?php echo esc_attr( $segment_datetime ); ?>">
                                             <div class="timeline-meta">
-                                                <div class="time"><?php if ( 'lodging' === ( $segment['type'] ?? '' ) && ! $is_end_timeline_entry && ! empty( $segment['time'] ) ) : ?><?php esc_html_e( 'Check-in from', 'travel-app' ); ?> <?php endif; ?><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
+                                                <?php if ( ! $is_shared_timeline || 'lodging' !== ( $segment['type'] ?? '' ) || $is_end_timeline_entry ) : ?>
+                                                    <div class="time"><?php if ( 'lodging' === ( $segment['type'] ?? '' ) && ! $is_end_timeline_entry && ! empty( $segment['time'] ) ) : ?><?php esc_html_e( 'Check-in from', 'travel-app' ); ?> <?php endif; ?><?php echo esc_html( $segment['time'] ?: ' ' ); ?></div>
+                                                <?php endif; ?>
                                                 <div class="type"><?php echo esc_html( $type_label ); ?></div>
                                             </div>
                                             <div>

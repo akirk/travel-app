@@ -1274,7 +1274,7 @@ class App extends BaseApp {
 
         wp_register_ability( 'travel-app/list-trips', [
             'label'               => __( 'List Travel Plans', 'travel-app' ),
-            'description'         => 'Returns the current user\'s saved travel plans with IDs, dates, and segment counts. Filter by status to find current or upcoming trips; upcoming results are ordered soonest first.',
+            'description'         => 'Returns the current user\'s saved travel plans with IDs, dates, and segment counts. Defaults to current and upcoming trips, ordered soonest first. Filter by status to include past or all trips.',
             'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
@@ -1282,11 +1282,8 @@ class App extends BaseApp {
                     'status' => [
                         'type'        => 'string',
                         'enum'        => [ 'all', 'current', 'upcoming', 'current-or-upcoming', 'past' ],
-                        'description' => 'Filter relative to today in the site timezone. Current includes the first and last day; upcoming starts after today; current-or-upcoming includes both. Undated trips only appear with all. Defaults to all. Overrides active when supplied.',
-                    ],
-                    'active' => [
-                        'type'        => 'boolean',
-                        'description' => 'When true, return only trips active today. When false, return only trips not active today.',
+                        'default'     => 'current-or-upcoming',
+                        'description' => 'Filter relative to today in the site timezone. Current includes the first and last day; upcoming starts after today; current-or-upcoming includes both. Undated trips only appear with all. Defaults to current-or-upcoming.',
                     ],
                 ],
                 'additionalProperties' => false,
@@ -1801,26 +1798,19 @@ class App extends BaseApp {
     }
 
     public function list_ability_items( $input ): array {
-        $active = is_array( $input ) && array_key_exists( 'active', $input ) ? (bool) $input['active'] : null;
+        $status = is_array( $input ) && isset( $input['status'] ) ? (string) $input['status'] : 'current-or-upcoming';
+        $today = current_time( 'Y-m-d' );
         $trips = array_map( static function( Trip $trip ): array {
             return $trip->to_summary_array();
         }, Trip::for_current_user() );
 
-        if ( is_array( $input ) && isset( $input['status'] ) ) {
-            $status = (string) $input['status'];
-            $today = current_time( 'Y-m-d' );
-            $trips = array_values( array_filter( $trips, static function( array $trip ) use ( $status, $today ): bool {
-                return Trip::matches_status( $trip, $status, $today );
-            } ) );
-            if ( in_array( $status, [ 'upcoming', 'current-or-upcoming' ], true ) ) {
-                usort( $trips, static function( array $a, array $b ): int {
-                    return strcmp( $a['starts_at'], $b['starts_at'] );
-                } );
-            }
-        } elseif ( null !== $active ) {
-            $trips = array_values( array_filter( $trips, static function( array $trip ) use ( $active ): bool {
-                return (bool) ( $trip['is_active'] ?? false ) === $active;
-            } ) );
+        $trips = array_values( array_filter( $trips, static function( array $trip ) use ( $status, $today ): bool {
+            return Trip::matches_status( $trip, $status, $today );
+        } ) );
+        if ( in_array( $status, [ 'upcoming', 'current-or-upcoming' ], true ) ) {
+            usort( $trips, static function( array $a, array $b ): int {
+                return strcmp( $a['starts_at'], $b['starts_at'] );
+            } );
         }
 
         return [

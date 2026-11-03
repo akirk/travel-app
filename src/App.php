@@ -1274,7 +1274,7 @@ class App extends BaseApp {
 
         wp_register_ability( 'travel-app/list-trips', [
             'label'               => __( 'List Travel Plans', 'travel-app' ),
-            'description'         => 'Returns the current user\'s saved travel plans with IDs, dates, and segment counts. Defaults to current and upcoming trips, ordered soonest first. Filter by status to include past or all trips.',
+            'description'         => 'Lists your trips with IDs, dates, and segment counts. Defaults to current and upcoming, soonest first.',
             'category'            => 'travel-app',
             'input_schema'        => [
                 'type'                 => 'object',
@@ -1283,7 +1283,7 @@ class App extends BaseApp {
                         'type'        => 'string',
                         'enum'        => [ 'all', 'current', 'upcoming', 'current-or-upcoming', 'past' ],
                         'default'     => 'current-or-upcoming',
-                        'description' => 'Filter relative to today in the site timezone. Current includes the first and last day; upcoming starts after today; current-or-upcoming includes both. Undated trips only appear with all. Defaults to current-or-upcoming.',
+                        'description' => 'Relative to today (site timezone). Current includes both boundary days; upcoming starts later. All includes undated trips.',
                     ],
                 ],
                 'additionalProperties' => false,
@@ -1313,7 +1313,7 @@ class App extends BaseApp {
             },
             'meta'                => [
                 'annotations' => [
-                    'instructions' => 'Use status upcoming for the next trip, current for trips active today, and current-or-upcoming for ongoing and future trips. Upcoming results are ordered soonest first. Present travel plans as a compact summary. Use returned IDs for follow-up detail calls.',
+                    'instructions' => 'For next trip use upcoming; for trips today use current. Summarize briefly; use IDs for details.',
                     'readonly'     => true,
                     'destructive'  => false,
                     'idempotent'   => true,

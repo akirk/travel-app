@@ -4058,6 +4058,10 @@ class App extends BaseApp {
 
         if ( $end_date && $end_date < $today_date ) {
             $days = (int) $end_date->diff( $today_date )->format( '%a' );
+            if ( $days > 30 ) {
+                return '';
+            }
+
             if ( 1 === $days ) {
                 return __( 'Ended yesterday', 'travel-app' );
             }

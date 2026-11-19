@@ -64,8 +64,13 @@ if ( $demo_mode_enabled ) {
 $current_trips = [];
 $upcoming_trips = [];
 $past_trips = [];
+$imported_trip = null;
 
 foreach ( $trips as $trip_data ) {
+    if ( (int) $trip_data['id'] === $imported ) {
+        $imported_trip = $trip_data;
+    }
+
     $starts = (string) ( $trip_data['starts_at'] ?? '' );
     $ends   = (string) ( $trip_data['ends_at'] ?? '' );
 
@@ -189,7 +194,19 @@ $travel_app->enqueue_template_assets(
         </header>
 
         <?php if ( $imported ) : ?>
-            <div class="notice" role="status"><?php esc_html_e( 'Travel plan imported.', 'travel-app' ); ?></div>
+            <div class="notice" role="status">
+                <?php if ( $imported_trip ) : ?>
+                    <?php
+                    printf(
+                        /* translators: %s: Linked travel plan name. */
+                        esc_html__( 'Travel plan %s imported.', 'travel-app' ),
+                        '<a href="' . esc_url( $get_trip_url( $imported_trip ) ) . '"><span' . esc_attr( App::mask_attr( 'title', (string) $imported_trip['id'] ) ) . '>' . esc_html( $imported_trip['title'] ) . '</span></a>'
+                    );
+                    ?>
+                <?php else : ?>
+                    <?php esc_html_e( 'Travel plan imported.', 'travel-app' ); ?>
+                <?php endif; ?>
+            </div>
         <?php elseif ( $deleted ) : ?>
             <div class="notice" role="status"><?php esc_html_e( 'Travel plan deleted.', 'travel-app' ); ?></div>
         <?php elseif ( $travel_app->has_query_arg( 'settings_updated' ) ) : ?>

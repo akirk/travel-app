@@ -50,7 +50,7 @@ if ( $is_shared_timeline ) {
 }
 $trip_data = $trip->with_segments_user_id( $segments_user_id )->to_array();
 $segments  = $trip_data['segments'] ?? [];
-$traveller_label = $travel_app->get_trip_traveller_label( $trip_data );
+$traveller_label = ! $is_readonly_timeline ? $travel_app->get_trip_traveller_label( $trip_data ) : '';
 $editable_trip_data = [];
 if ( ! $is_readonly_timeline ) {
     $editable_trip_data = $trip_data;

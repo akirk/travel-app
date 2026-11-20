@@ -57,8 +57,8 @@ class App extends BaseApp {
 
         add_filter( 'wp_app_init_travel-app', [ $this, 'register_themes' ] );
         add_action( 'wp_app_masterbar_styles', [ $this, 'print_masterbar_contrast_styles' ] );
-        add_action( 'wp_app_load_theme_travel-app_default', [ $this, 'enqueue_assets' ] );
-        add_action( 'wp_app_load_theme_travel-app_command-ledger', [ $this, 'enqueue_command_ledger_assets' ] );
+        add_action( 'wp_app_load_theme_travel-app_default', [ $this, 'enqueue_command_ledger_assets' ] );
+        add_action( 'wp_app_load_theme_travel-app_classic', [ $this, 'enqueue_assets' ] );
         add_action( 'init', [ $this, 'register_post_types' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'admin_post_travel_app_import', [ $this, 'handle_import' ] );
@@ -101,9 +101,14 @@ class App extends BaseApp {
 
     public function register_themes( WpApp $app ): WpApp {
         $app->register_theme(
-            'command-ledger',
+            'default',
             __( 'Command Ledger', 'travel-app' ),
             TRAVEL_APP_PLUGIN_DIR . 'themes/command-ledger/templates'
+        );
+        $app->register_theme(
+            'classic',
+            __( 'Classic', 'travel-app' ),
+            $this->get_template_dir()
         );
 
         return $app;
@@ -333,7 +338,7 @@ class App extends BaseApp {
     }
 
     public function print_static_trip_styles(): void {
-        $asset_root = 'command-ledger' === $this->app->get_selected_theme() ? 'themes/command-ledger/assets' : 'assets';
+        $asset_root = 'classic' === $this->app->get_selected_theme() ? 'assets' : 'themes/command-ledger/assets';
         $css = $this->get_asset_contents( 'css/trip.css', $asset_root );
         if ( '' === $css ) {
             return;

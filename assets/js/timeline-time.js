@@ -132,6 +132,7 @@
         var value = input && input.value ? input.value : '';
         var dateValue = value ? value.slice(0, 10) : '';
         var currentTime = parseDateTime(value);
+        updateTripClock(value);
 
         document.querySelectorAll('[data-demo-target="' + id + '"]').forEach(function(target) {
             updateTimelineTarget(target, value, dateValue, currentTime);
@@ -835,9 +836,51 @@
     }
 
     function currentDateTimeValue(target) {
-        var seeded = getSeededCurrentDateTime(target);
+        var page = target.closest('[data-trip-clock]');
+        var timezone = page && page.getAttribute('data-timezone');
+        if (timezone) {
+            var now = new Date();
+            var offset = timezone.match(/^([+-])(\d{2}):(\d{2})$/);
+            if (offset) {
+                var minutes = (Number(offset[2]) * 60 + Number(offset[3])) * (offset[1] === '-' ? -1 : 1);
+                return new Date(now.getTime() + minutes * 60000).toISOString().slice(0, 16);
+            }
+            var parts = {};
+            new Intl.DateTimeFormat('en-GB', {
+                timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+            }).formatToParts(now).forEach(function(part) { parts[part.type] = part.value; });
+            return parts.year + '-' + parts.month + '-' + parts.day + 'T' + parts.hour + ':' + parts.minute;
+        }
+        return getSeededCurrentDateTime(target) || formatInputDate(new Date());
+    }
 
-        return seeded || formatInputDate(new Date());
+    function tripRelativeLabel(start, end, today, labels) {
+        if (!start) { return ''; }
+        var days = dateOffsetDays(start, today);
+        if (days > 0) {
+            return days === 1 ? labels.tomorrow : labels.startsMany.replace('%d', days);
+        }
+        var ended = dateOffsetDays(today, end);
+        if (end && ended > 0) {
+            return ended > 30 ? '' : (ended === 1 ? labels.yesterday : labels.endedMany.replace('%d', ended));
+        }
+        return labels.active;
+    }
+
+    function updateTripClock(value) {
+        document.querySelectorAll('[data-trip-clock]').forEach(function(page) {
+            var today = (value || currentDateTimeValue(page)).slice(0, 10);
+            var start = page.getAttribute('data-trip-start') || '';
+            var end = page.getAttribute('data-trip-end') || '';
+            page.querySelectorAll('[data-trip-relative]').forEach(function(label) {
+                label.textContent = tripRelativeLabel(start, end, today, JSON.parse(label.getAttribute('data-labels')));
+                label.hidden = !label.textContent;
+            });
+            page.querySelectorAll('[data-trip-now-next]').forEach(function(panel) {
+                panel.hidden = !start || today < start || (end && today > end);
+            });
+        });
     }
 
     function getSeededCurrentDateTime(target) {
@@ -873,6 +916,7 @@
     }
 
     function updateStandaloneTimelines() {
+        updateTripClock();
         var controlledIds = {};
         document.querySelectorAll('[data-demo-controls]').forEach(function(control) {
             controlledIds[control.getAttribute('data-demo-controls')] = true;
@@ -911,6 +955,13 @@
         } else {
             window.addEventListener('resize', refreshTimelineLayout);
         }
+        window.addEventListener('pageshow', refreshTimelineLayout);
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                refreshTimelineLayout();
+                updateStandalonePreviews();
+            }
+        });
         window.setInterval(function() {
             document.querySelectorAll('[data-demo-controls]').forEach(updateControl);
             updateStandaloneTimelines();

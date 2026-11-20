@@ -330,8 +330,8 @@ if ( ! $is_static_download ) {
             $demo_control_id = 'trip-' . (string) $trip_data['id'];
             $demo_control_value = $demo_start_time;
             ?>
-            <?php if ( $show_now_next_section && ( ! $is_static_download || $is_trip_active ) && ! empty( $timeline_segments ) ) : ?>
-                <section data-trip-now-next<?php echo ! $is_static_download ? ' hidden' : ''; ?> class="panel now-next-panel" aria-label="<?php esc_attr_e( 'Now and Next', 'travel-app' ); ?>">
+            <?php if ( $show_now_next_section && ! empty( $timeline_segments ) ) : ?>
+                <section data-trip-now-next hidden class="panel now-next-panel" aria-label="<?php esc_attr_e( 'Now and Next', 'travel-app' ); ?>">
                     <div class="mini-timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>" data-demo-preview data-current-time-value="<?php echo esc_attr( $timeline_current_time_value ); ?>" data-current-time-captured="<?php echo esc_attr( $timeline_current_time_captured ); ?>">
                         <?php foreach ( $timeline_segments as $step ) : ?>
                             <?php
@@ -396,11 +396,9 @@ if ( ! $is_static_download ) {
                                 <?php esc_html_e( 'Map', 'travel-app' ); ?>
                             </a>
                         <?php endif; ?>
-                        <?php if ( ! $is_static_download ) : ?>
-                            <button class="ghost-button timeline-now-button" type="button" data-timeline-now aria-controls="timeline" aria-label="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" title="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" disabled>
-                                <?php esc_html_e( 'Now', 'travel-app' ); ?>
-                            </button>
-                        <?php endif; ?>
+                        <button class="ghost-button timeline-now-button" type="button" data-timeline-now aria-controls="timeline" aria-label="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" title="<?php esc_attr_e( 'Jump to current time', 'travel-app' ); ?>" disabled>
+                            <?php esc_html_e( 'Now', 'travel-app' ); ?>
+                        </button>
                         <?php if ( ! $is_readonly_timeline ) : ?>
                             <button class="add-item-button" type="button" data-add-item-toggle aria-controls="add-item-form" aria-expanded="<?php echo ! empty( $quick_plan_segment ) ? 'true' : 'false'; ?>">
                                 <?php esc_html_e( '+ Add Item', 'travel-app' ); ?>
@@ -675,10 +673,8 @@ if ( ! $is_static_download ) {
                 <?php if ( empty( $segments_by_day ) ) : ?>
                     <p class="empty"><?php esc_html_e( 'No timeline items were found.', 'travel-app' ); ?></p>
                 <?php else : ?>
-                    <div class="timeline" id="timeline" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_readonly_timeline ? ' data-readonly-timeline="1"' : ''; ?><?php echo ! $is_static_download ? ' data-current-time="1"' : ''; ?>>
-                        <?php if ( ! $is_static_download ) : ?>
-                            <div class="time-marker"><span class="time-marker-label"></span></div>
-                        <?php endif; ?>
+                    <div class="timeline" id="timeline" data-current-time="1" data-demo-target="<?php echo esc_attr( $demo_control_id ); ?>"<?php echo $is_readonly_timeline ? ' data-readonly-timeline="1"' : ''; ?>>
+                        <div class="time-marker"><span class="time-marker-label"></span></div>
                         <?php foreach ( $segments_by_day as $day => $day_segments ) : ?>
                             <?php
                             $journal_entry = $journal_entries_by_day[ $day ] ?? [];
@@ -1121,7 +1117,9 @@ if ( ! $is_static_download ) {
             <?php endif; ?>
         <?php endif; ?>
     </main>
-    <?php if ( ! $is_static_download ) : ?>
+    <?php if ( $is_static_download ) : ?>
+        <?php $travel_app->print_static_trip_scripts(); ?>
+    <?php else : ?>
         <?php wp_app_body_close(); ?>
     <?php endif; ?>
 </body>

@@ -360,6 +360,14 @@ class App extends BaseApp {
         wp_print_styles( 'travel-app-static-trip' );
     }
 
+    public function print_static_trip_scripts(): void {
+        // Embed the same clock used by live timelines so downloads work offline.
+        $script = $this->get_asset_contents( 'js/timeline-time.js' );
+        if ( '' !== $script ) {
+            wp_print_inline_script_tag( $script );
+        }
+    }
+
     private function get_asset_contents( string $path, string $asset_root = 'assets' ): string {
         $file = TRAVEL_APP_PLUGIN_DIR . trim( $asset_root, '/' ) . '/' . ltrim( $path, '/' );
 

@@ -79,7 +79,8 @@ button {
     margin: 0;
     overflow-wrap: anywhere;
 }
-.trip-title-edit-button {
+.trip-title-edit-button,
+.trip-calendar-link {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -91,6 +92,9 @@ button {
     border: 0;
     background: transparent;
     color: var(--wp-app-color-link);
+}
+.trip-calendar-link {
+    flex-shrink: 0;
 }
 .trip-title-edit-button span[aria-hidden="true"] {
     display: inline-block;

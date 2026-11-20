@@ -78,6 +78,7 @@ $fellow_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (in
 $public_share_url = ! $is_shared_timeline ? $travel_app->get_trip_share_url( (int) $trip_data['id'], 'public' ) : '';
 $fellow_calendar_url = ! $is_shared_timeline ? $travel_app->get_trip_calendar_url( (int) $trip_data['id'], 'fellow' ) : '';
 $public_calendar_url = ! $is_shared_timeline ? $travel_app->get_trip_calendar_url( (int) $trip_data['id'], 'public' ) : '';
+$shared_calendar_url = $is_shared_timeline && ! $is_static_download && '' !== $share_mode ? $travel_app->get_trip_calendar_url( $trip_id, $share_mode ) : '';
 $segment_type_labels = [
     'flight'   => __( 'Flight', 'travel-app' ),
     'lodging'  => __( 'Lodging', 'travel-app' ),
@@ -268,6 +269,11 @@ if ( ! $is_static_download ) {
             <header>
                 <div class="trip-title-header">
                     <h1><span<?php echo esc_attr( App::mask_attr( 'title', (string) $trip_data['id'] ) ); ?>><?php echo esc_html( $trip_data['title'] ); ?></span></h1>
+                    <?php if ( '' !== $shared_calendar_url ) : ?>
+                        <a class="trip-calendar-link" href="<?php echo esc_url( $shared_calendar_url ); ?>" title="<?php esc_attr_e( 'Add to calendar (ICS)', 'travel-app' ); ?>" aria-label="<?php esc_attr_e( 'Add to calendar (ICS)', 'travel-app' ); ?>">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 11h18M8 15h2M14 15h2M8 18h2" /></svg>
+                        </a>
+                    <?php endif; ?>
                     <?php if ( ! $is_readonly_timeline ) : ?>
                         <button class="trip-title-edit-button" type="button" data-trip-title-edit aria-controls="trip-title-form" aria-expanded="false" title="<?php esc_attr_e( 'Edit travel plan title', 'travel-app' ); ?>">
                             <span aria-hidden="true">✎</span>

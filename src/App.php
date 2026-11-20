@@ -2375,6 +2375,12 @@ class App extends BaseApp {
             return;
         }
 
+        // Logged-in editors bypass the page cache. Visiting the shared page also
+        // expires its anonymous copies, including all tokens and theme variants.
+        if ( is_user_logged_in() && current_user_can( 'edit_travel_app_trip', $trip_id ) && '' !== $this->get_trip_share_mode_by_token( $trip_id, $token ) ) {
+            $this->clear_trip_share_cache( $trip_id );
+        }
+
         nocache_headers();
 
         // Shared routes render before the theme hooks and have no app asset scope.
@@ -2835,6 +2841,20 @@ class App extends BaseApp {
         return $clean;
     }
 
+    private function clear_trip_share_cache( int $trip_id ): void {
+        if ( $trip_id <= 0 || ! function_exists( 'get_supercache_dir' ) || ! function_exists( 'prune_super_cache' ) ) {
+            return;
+        }
+
+        // Query-string pages are stored together under the trip's share path.
+        // Purge this directory rather than flushing the site's entire cache.
+        $path = '/' . $this->get_url_path() . '/share/' . $trip_id . '/';
+        if ( function_exists( 'wpsc_normalize_uri_case' ) ) {
+            $path = wpsc_normalize_uri_case( $path );
+        }
+        prune_super_cache( untrailingslashit( get_supercache_dir() ) . $path, true );
+    }
+
     public function handle_clear_share_cache(): void {
         if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
             wp_send_json_error( [ 'message' => __( 'You must be logged in to refresh shared travel plans.', 'travel-app' ) ], 403 );
@@ -2846,6 +2866,8 @@ class App extends BaseApp {
         if ( ! current_user_can( 'read_travel_app_trip', $trip_id ) ) {
             wp_send_json_error( [ 'message' => __( 'This travel plan cannot be refreshed.', 'travel-app' ) ], 404 );
         }
+
+        $this->clear_trip_share_cache( $trip_id );
 
         wp_send_json_success( [
             'urls'    => [

@@ -337,43 +337,6 @@ class App extends BaseApp {
         return file_exists( $file ) ? (string) filemtime( $file ) : '1.1.0';
     }
 
-    public function print_static_trip_styles(): void {
-        $asset_root = 'classic' === $this->app->get_selected_theme() ? 'assets' : 'themes/command-ledger/assets';
-        $css = $this->get_asset_contents( 'css/trip.css', $asset_root );
-        if ( '' === $css ) {
-            return;
-        }
-
-        /*
-         * The live pages receive the WordPress admin color scheme through
-         * wp_app_head(); the static download needs it inlined so the
-         * --wp-app-color-* custom properties resolve there as well.
-         */
-        if ( 'assets' === $asset_root && function_exists( 'wp_app_get_admin_color_scheme_css' ) ) {
-            $css = wp_app_get_admin_color_scheme_css() . $css;
-        } elseif ( 'assets' !== $asset_root ) {
-            $css .= $this->get_command_ledger_palette_css();
-        }
-
-        wp_register_style( 'travel-app-static-trip', false, [], $this->get_asset_version_from( 'css/trip.css', $asset_root ) );
-        wp_add_inline_style( 'travel-app-static-trip', $css );
-        wp_print_styles( 'travel-app-static-trip' );
-    }
-
-    public function print_static_trip_scripts(): void {
-        // Embed the same clock used by live timelines so downloads work offline.
-        $script = $this->get_asset_contents( 'js/timeline-time.js' );
-        if ( '' !== $script ) {
-            wp_print_inline_script_tag( $script );
-        }
-    }
-
-    private function get_asset_contents( string $path, string $asset_root = 'assets' ): string {
-        $file = TRAVEL_APP_PLUGIN_DIR . trim( $asset_root, '/' ) . '/' . ltrim( $path, '/' );
-
-        return is_readable( $file ) ? (string) file_get_contents( $file ) : '';
-    }
-
     public function enqueue_template_assets( string $template, bool $script = false, string $data_object = '', array $data = [], string $scope = '' ): void {
         $this->enqueue_template_assets_from( $template, 'assets', 'travel-app', $script, $data_object, $data, $scope );
     }
@@ -2406,6 +2369,11 @@ class App extends BaseApp {
 
         nocache_headers();
 
+        $this->render_shared_trip( $trip_id, $token, $this->get_trip_share_mode_by_token( $trip_id, $token ) );
+        exit;
+    }
+
+    private function render_shared_trip( int $trip_id, string $token, string $mode ): void {
         // Shared routes render before the theme hooks and have no app asset scope.
         wp_app_enqueue_script(
             'travel-app-shared-timeline-time',
@@ -2422,11 +2390,9 @@ class App extends BaseApp {
                 'trip_id'             => $trip_id,
                 'share_token'         => $token,
                 'is_shared_timeline'  => true,
-                'is_static_download'  => false,
-                'static_share_mode'   => '',
+                'share_mode'          => $mode,
             ]
         );
-        exit;
     }
 
     public function maybe_render_shared_calendar(): void {
@@ -3611,20 +3577,45 @@ class App extends BaseApp {
     }
 
     private function render_static_trip_html( int $trip_id, string $mode = 'fellow' ): string {
+        $inline_style = function( string $tag, string $handle, string $url, string $media ): string {
+            return $this->inline_download_asset( $tag, $url, false, $handle, $media );
+        };
+        $inline_script = function( string $tag, string $handle, string $url ): string {
+            return $this->inline_download_asset( $tag, $url, true, $handle );
+        };
+        add_filter( 'style_loader_tag', $inline_style, 10, 4 );
+        add_filter( 'script_loader_tag', $inline_script, 10, 3 );
         ob_start();
-        $this->render_template(
-            'trip.php',
-            [
-                'trip_id'             => $trip_id,
-                'share_token'         => '',
-                'is_shared_timeline'  => false,
-                'is_static_download'  => true,
-                'static_share_mode'   => $this->normalize_share_mode( $mode ),
-            ]
-        );
-        $html = (string) ob_get_clean();
+        try {
+            // Use the shared view without creating or enabling a share token.
+            $this->render_shared_trip( $trip_id, '', $this->normalize_share_mode( $mode ) );
+            return (string) ob_get_contents();
+        } finally {
+            ob_end_clean();
+            remove_filter( 'style_loader_tag', $inline_style, 10 );
+            remove_filter( 'script_loader_tag', $inline_script, 10 );
+        }
+    }
 
-        return $html;
+    private function inline_download_asset( string $tag, string $url, bool $script, string $handle, string $media = 'all' ): string {
+        $path = (string) wp_parse_url( $url, PHP_URL_PATH );
+        $base = (string) wp_parse_url( TRAVEL_APP_PLUGIN_URL, PHP_URL_PATH );
+        if ( 0 !== strpos( $path, $base ) ) {
+            return $tag;
+        }
+        $root = realpath( TRAVEL_APP_PLUGIN_DIR );
+        $file = realpath( TRAVEL_APP_PLUGIN_DIR . substr( $path, strlen( $base ) ) );
+        if ( false === $root || false === $file || 0 !== strpos( $file, $root . DIRECTORY_SEPARATOR ) || ! is_readable( $file ) ) {
+            return $tag;
+        }
+        $contents = file_get_contents( $file );
+        if ( false === $contents ) {
+            return $tag;
+        }
+        if ( $script ) {
+            return wp_get_inline_script_tag( $contents, [ 'id' => $handle . '-js' ] );
+        }
+        return '<style id="' . esc_attr( $handle . '-css' ) . '" media="' . esc_attr( $media ) . '">' . $contents . '</style>';
     }
 
     private function render_trip_ics( int $trip_id, string $mode = 'fellow' ): string {

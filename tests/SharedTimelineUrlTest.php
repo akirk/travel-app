@@ -27,6 +27,18 @@ final class SharedTimelineUrlTest extends TestCase {
         $this->assertStringContainsString( "remove_action( 'wp_footer', 'wp_admin_bar_render', 1000 )", $template );
         $this->assertStringContainsString( "wp_dequeue_style( 'admin-bar' )", $template );
         $this->assertStringContainsString( "add_action( 'wp_head', static function(): void", $template );
-        $this->assertStringContainsString( '! $is_static_download && ! $is_shared_timeline', $template );
+        $this->assertStringContainsString( 'if ( ! $is_shared_timeline )', $template );
     }
+
+    public function test_download_uses_the_shared_renderer_without_a_separate_template_mode(): void {
+        $source = file_get_contents( dirname( __DIR__ ) . '/src/App.php' );
+        $this->assertStringContainsString( '$this->render_shared_trip( $trip_id, $token,', $source );
+        $this->assertStringContainsString( "\$this->render_shared_trip( \$trip_id, '', \$this->normalize_share_mode( \$mode ) );", $source );
+        foreach ( [ 'templates/trip.php', 'themes/command-ledger/templates/trip.php' ] as $path ) {
+            $template = file_get_contents( dirname( __DIR__ ) . '/' . $path );
+            $this->assertStringNotContainsString( 'is_static_download', $template );
+            $this->assertStringNotContainsString( 'static_share_mode', $template );
+        }
+    }
+
 }

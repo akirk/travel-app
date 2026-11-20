@@ -85,6 +85,17 @@ $travel_app->enqueue_template_assets( 'settings' );
                         ?></option>
                     </select>
                 </div>
+                <h2 id="sharing-settings-heading"><?php esc_html_e( 'Sharing', 'travel-app' ); ?></h2>
+                <label class="setting-option">
+                    <input type="checkbox" name="show_share_credit" value="1" <?php checked( $travel_app->user_shows_share_credit( get_current_user_id() ) ); ?>>
+                    <span>
+                        <strong><?php esc_html_e( 'Show a Travel App credit on my shared trip pages', 'travel-app' ); ?></strong>
+                        <span><?php
+                            /* translators: %s: Travel App link to the app website. */
+                            printf( esc_html__( 'Adds a “Created with %s” link alongside the trip details so visitors can learn about the app.', 'travel-app' ), '<a href="https://wpapps.kirk.at/apps/travel-app/">' . esc_html__( 'Travel App', 'travel-app' ) . '</a>' );
+                        ?></span>
+                    </span>
+                </label>
                 <h2 id="delegation-settings-heading"><?php esc_html_e( 'Delegation', 'travel-app' ); ?></h2>
                 <label class="setting-option">
                     <input type="checkbox" name="allow_delegated_trip_creation" value="1" <?php checked( $allow_delegated_trip_creation ); ?>>

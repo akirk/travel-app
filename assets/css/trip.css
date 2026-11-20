@@ -941,3 +941,14 @@ details.item summary::-webkit-details-marker { display: none; }
     .demo-controls label { min-width: 100%; }
     .offline-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.trip-share-credit {
+    margin-inline-start: auto;
+    font-size: 0.875rem;
+}
+
+.trip-share-credit a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}

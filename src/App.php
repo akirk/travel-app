@@ -851,6 +851,10 @@ class App extends BaseApp {
         $this->app->add_menu_item( 'settings', __( 'Settings', 'travel-app' ), home_url( '/' . $this->get_url_path() . '/settings/' ) );
     }
 
+    public function user_shows_share_credit( int $user_id ): bool {
+        return $user_id > 0 && '1' === get_user_meta( $user_id, '_travel_app_show_share_credit', true );
+    }
+
     public function get_menu_preferences(): array {
         $saved = get_user_meta( get_current_user_id(), '_travel_app_menu_preferences', true );
         return array_merge( [
@@ -2244,6 +2248,12 @@ class App extends BaseApp {
         }
 
         check_admin_referer( 'travel_app_update_user_settings' );
+
+        update_user_meta(
+            get_current_user_id(),
+            '_travel_app_show_share_credit',
+            isset( $_POST['show_share_credit'] ) && '1' === $_POST['show_share_credit'] ? '1' : '0'
+        );
 
         $menu_format = isset( $_POST['menu_title_format'] ) ? sanitize_key( wp_unslash( $_POST['menu_title_format'] ) ) : 'title_dates';
         update_user_meta( get_current_user_id(), '_travel_app_menu_preferences', [

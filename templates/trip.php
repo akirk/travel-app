@@ -311,6 +311,14 @@ if ( ! $is_static_download ) {
                             </button>
                         <?php endif; ?>
                     <?php endif; ?>
+                    <?php if ( $is_shared_timeline && ! $is_static_download && $travel_app->user_shows_share_credit( Trip::get_owner_id( $trip_id ) ) ) : ?>
+                        <span class="trip-share-credit">
+                            <?php
+                            /* translators: %s: Travel App link to the app website. */
+                            printf( esc_html__( 'Created with %s', 'travel-app' ), '<a href="https://wpapps.kirk.at/apps/travel-app/" rel="noreferrer">' . esc_html__( 'Travel App', 'travel-app' ) . '</a>' );
+                            ?>
+                        </span>
+                    <?php endif; ?>
                 </div>
             </header>
 

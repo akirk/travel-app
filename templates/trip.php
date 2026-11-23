@@ -168,6 +168,9 @@ $is_transport_segment = static function( array $segment ): bool {
 
 $route_locations = [];
 foreach ( $segments as $segment ) {
+    if ( ! $show_private_share_details && ! $is_transport_segment( $segment ) ) {
+        continue;
+    }
     foreach ( [ 'location', 'end_location' ] as $location_key ) {
         $location = trim( (string) ( $segment[ $location_key ] ?? '' ) );
 
@@ -181,11 +184,19 @@ foreach ( $segments as $segment ) {
     }
 }
 
-// The map page is only reachable with an account, so a shared or downloaded
-// timeline does not offer it.
 $trip_direct_map_url = '';
-if ( count( $route_locations ) >= 2 && ! $is_readonly_timeline ) {
-    $trip_direct_map_url = home_url( '/travel-app/trip/' . (int) $trip_data['id'] . '/map/' );
+$shared_map_url = '';
+if ( count( $route_locations ) >= 2 ) {
+    if ( $is_shared_timeline && '' !== $share_token ) {
+        $shared_map_url = add_query_arg( 'view', 'map', $travel_app->get_trip_share_url( $trip_id, $share_mode ) );
+    } elseif ( ! $is_readonly_timeline ) {
+        $trip_direct_map_url = home_url( '/travel-app/trip/' . (int) $trip_data['id'] . '/map/' );
+    }
+}
+
+$shared_map_html = '';
+if ( '' !== $shared_map_url ) {
+    $shared_map_html = $travel_app->get_route_map_html( $trip_data, true, $share_mode, $travel_app->get_trip_share_url( $trip_id, $share_mode ), true );
 }
 
 $travel_app->enqueue_template_assets(
@@ -377,6 +388,12 @@ $travel_app->enqueue_template_assets(
                 <div class="timeline-header">
                     <h2 id="timeline-heading"><?php esc_html_e( 'Timeline', 'travel-app' ); ?></h2>
                     <div class="timeline-header-actions">
+                        <?php if ( '' !== $shared_map_url ) : ?>
+                            <button type="button" class="timeline-map-link" data-shared-map-toggle aria-expanded="false" aria-controls="shared-route-map-panel">
+                                <span aria-hidden="true">&#x1F5FA;</span>
+                                <?php esc_html_e( 'Route map', 'travel-app' ); ?>
+                            </button>
+                        <?php endif; ?>
                         <?php if ( '' !== $trip_direct_map_url ) : ?>
                             <a class="timeline-map-link" href="<?php echo esc_url( $trip_direct_map_url ); ?>" title="<?php esc_attr_e( 'Route map on OpenStreetMap', 'travel-app' ); ?>">
                                 <span aria-hidden="true">&#x1F5FA;</span>
@@ -393,6 +410,9 @@ $travel_app->enqueue_template_assets(
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php if ( '' !== $shared_map_url ) : ?>
+                    <?php require TRAVEL_APP_PLUGIN_DIR . 'templates/partials/shared-map.php'; ?>
+                <?php endif; ?>
                 <?php
                 if ( $show_timeline_demo_controls ) {
                     require __DIR__ . '/partials/demo-controls.php';

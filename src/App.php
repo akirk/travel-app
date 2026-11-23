@@ -327,6 +327,13 @@ class App extends BaseApp {
         );
     }
 
+    public function get_route_map_html( array $trip_data, bool $is_shared_map, string $share_mode, string $back_url, bool $is_embedded_map = false ): string {
+        $travel_app = $this;
+        ob_start();
+        require TRAVEL_APP_PLUGIN_DIR . 'templates/partials/route-map.php';
+        return (string) ob_get_clean();
+    }
+
     public function get_asset_url( string $path ): string {
         return TRAVEL_APP_PLUGIN_URL . 'assets/' . ltrim( $path, '/' );
     }
@@ -2368,6 +2375,21 @@ class App extends BaseApp {
         }
 
         nocache_headers();
+
+        if ( 'map' === $this->get_query_arg_text( 'view' ) ) {
+            $mode = $this->get_trip_share_mode_by_token( $trip_id, $token );
+            if ( '' === $mode ) {
+                wp_die( esc_html__( 'This travel plan could not be found.', 'travel-app' ), '', [ 'response' => 404 ] );
+            }
+            $this->render_template( 'map.php', [
+                'trip_id' => $trip_id,
+                'share_token' => $token,
+                'share_mode' => $mode,
+                'is_shared_map' => true,
+                'is_embedded_map' => '1' === $this->get_query_arg_text( 'embed' ),
+            ] );
+            exit;
+        }
 
         $this->render_shared_trip( $trip_id, $token, $this->get_trip_share_mode_by_token( $trip_id, $token ) );
         exit;

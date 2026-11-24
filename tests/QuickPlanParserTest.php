@@ -4,120 +4,67 @@ use PHPUnit\Framework\TestCase;
 use TravelApp\Parser\QuickPlanParser;
 
 final class QuickPlanParserTest extends TestCase {
-    public function test_parses_compact_activity_with_trailing_city(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'hafenrundfahrt hamburg august 1, 2026 15:00' );
+    /** @dataProvider quick_plans */
+    public function test_parses_quick_plan( string $text, array $expected ): void {
+        $segment = ( new QuickPlanParser() )->parse( $text );
 
-        self::assertSame( 'activity', $segment['type'] );
-        self::assertSame( 'Hafenrundfahrt', $segment['title'] );
-        self::assertSame( 'Hamburg', $segment['location'] );
-        self::assertSame( '2026-08-01', $segment['date'] );
-        self::assertSame( '15:00', $segment['time'] );
-        self::assertSame( 'hafenrundfahrt hamburg august 1, 2026 15:00', $segment['details'] );
+        foreach ( $expected as $field => $value ) {
+            self::assertSame( $value, $segment[ $field ], $field );
+        }
     }
 
-    public function test_parses_natural_in_location_wording_and_12_hour_time(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'Miniatur Wunderland in Hamburg on Aug 2nd, 2026 at 3pm' );
-
-        self::assertSame( 'Miniatur Wunderland', $segment['title'] );
-        self::assertSame( 'Hamburg', $segment['location'] );
-        self::assertSame( '2026-08-02', $segment['date'] );
-        self::assertSame( '15:00', $segment['time'] );
-    }
-
-    public function test_parses_dash_separated_location_and_european_date(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'Dinner - Hamburg 01.08.2026 19.30' );
-
-        self::assertSame( 'Dinner', $segment['title'] );
-        self::assertSame( 'Hamburg', $segment['location'] );
-        self::assertSame( '2026-08-01', $segment['date'] );
-        self::assertSame( '19:30', $segment['time'] );
-    }
-
-    public function test_parses_dotted_day_month_date_with_current_year(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'Dinner Hamburg 31.3. 19:00' );
-
-        self::assertSame( 'Dinner', $segment['title'] );
-        self::assertSame( 'Hamburg', $segment['location'] );
-        self::assertSame( gmdate( 'Y' ) . '-03-31', $segment['date'] );
-        self::assertSame( '19:00', $segment['time'] );
-    }
-
-    public function test_parses_month_name_date_with_current_year(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'Dinner, August 21, 6pm' );
-
-        self::assertSame( 'Dinner', $segment['title'] );
-        self::assertSame( gmdate( 'Y' ) . '-08-21', $segment['date'] );
-        self::assertSame( '18:00', $segment['time'] );
-    }
-
-    public function test_parses_iso_dates(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'Flight LH123 at Frankfurt 2026-08-03 06:45' );
-
-        self::assertSame( 'flight', $segment['type'] );
-        self::assertSame( '2026-08-03', $segment['date'] );
-        self::assertSame( '06:45', $segment['time'] );
-    }
-
-    public function test_parses_compact_flight_route_with_time_range(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'os123 ber-vie 2026-10-10 15:00-17:00' );
-
-        self::assertSame( 'flight', $segment['type'] );
-        self::assertSame( 'OS123', $segment['title'] );
-        self::assertSame( 'BER', $segment['location'] );
-        self::assertSame( 'VIE', $segment['end_location'] );
-        self::assertSame( '2026-10-10', $segment['date'] );
-        self::assertSame( '2026-10-10', $segment['end_date'] );
-        self::assertSame( '15:00', $segment['time'] );
-        self::assertSame( '17:00', $segment['end_time'] );
-    }
-
-    public function test_parses_compact_flight_route_with_start_time_only(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'os123 ber-vie 2026-10-10 15:00' );
-
-        self::assertSame( 'flight', $segment['type'] );
-        self::assertSame( 'OS123', $segment['title'] );
-        self::assertSame( 'BER', $segment['location'] );
-        self::assertSame( 'VIE', $segment['end_location'] );
-        self::assertSame( '2026-10-10', $segment['date'] );
-        self::assertSame( '', $segment['end_date'] );
-        self::assertSame( '15:00', $segment['time'] );
-        self::assertSame( '', $segment['end_time'] );
-    }
-
-    public function test_parses_dot_separated_time_range(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'LH789 FRA-BER 2026-10-11 8.05-9.20' );
-
-        self::assertSame( 'flight', $segment['type'] );
-        self::assertSame( 'LH789', $segment['title'] );
-        self::assertSame( 'FRA', $segment['location'] );
-        self::assertSame( 'BER', $segment['end_location'] );
-        self::assertSame( '08:05', $segment['time'] );
-        self::assertSame( '09:20', $segment['end_time'] );
-    }
-
-    public function test_parses_slash_dates_as_month_day_year(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'Rental car Boston 8/4/26 9am' );
-
-        self::assertSame( 'car', $segment['type'] );
-        self::assertSame( '2026-08-04', $segment['date'] );
-        self::assertSame( '09:00', $segment['time'] );
-    }
-
-    public function test_parses_day_month_year_dates(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'Train to Berlin 5 Aug 2026 22:10' );
-
-        self::assertSame( 'train', $segment['type'] );
-        self::assertSame( '2026-08-05', $segment['date'] );
-        self::assertSame( '22:10', $segment['time'] );
-    }
-
-    public function test_parses_lodging_keywords(): void {
-        $segment = ( new QuickPlanParser() )->parse( 'Hotel check-in near Munich Aug 6, 2026 4pm' );
-
-        self::assertSame( 'lodging', $segment['type'] );
-        self::assertSame( 'Hotel check-in', $segment['title'] );
-        self::assertSame( 'Munich', $segment['location'] );
-        self::assertSame( '16:00', $segment['time'] );
+    // Each named case preserves a supported date/time or route notation.
+    public static function quick_plans(): array {
+        return [
+            'compact_activity_with_trailing_city' => [
+                'hafenrundfahrt hamburg august 1, 2026 15:00',
+                [ 'type' => 'activity', 'title' => 'Hafenrundfahrt', 'location' => 'Hamburg', 'date' => '2026-08-01', 'time' => '15:00', 'details' => 'hafenrundfahrt hamburg august 1, 2026 15:00' ],
+            ],
+            'natural_in_location_wording_and_12_hour_time' => [
+                'Miniatur Wunderland in Hamburg on Aug 2nd, 2026 at 3pm',
+                [ 'title' => 'Miniatur Wunderland', 'location' => 'Hamburg', 'date' => '2026-08-02', 'time' => '15:00' ],
+            ],
+            'dash_separated_location_and_european_date' => [
+                'Dinner - Hamburg 01.08.2026 19.30',
+                [ 'title' => 'Dinner', 'location' => 'Hamburg', 'date' => '2026-08-01', 'time' => '19:30' ],
+            ],
+            'dotted_day_month_date_with_current_year' => [
+                'Dinner Hamburg 31.3. 19:00',
+                [ 'title' => 'Dinner', 'location' => 'Hamburg', 'date' => gmdate( 'Y' ) . '-03-31', 'time' => '19:00' ],
+            ],
+            'month_name_date_with_current_year' => [
+                'Dinner, August 21, 6pm',
+                [ 'title' => 'Dinner', 'date' => gmdate( 'Y' ) . '-08-21', 'time' => '18:00' ],
+            ],
+            'iso_dates' => [
+                'Flight LH123 at Frankfurt 2026-08-03 06:45',
+                [ 'type' => 'flight', 'date' => '2026-08-03', 'time' => '06:45' ],
+            ],
+            'compact_flight_route_with_time_range' => [
+                'os123 ber-vie 2026-10-10 15:00-17:00',
+                [ 'type' => 'flight', 'title' => 'OS123', 'location' => 'BER', 'end_location' => 'VIE', 'date' => '2026-10-10', 'end_date' => '2026-10-10', 'time' => '15:00', 'end_time' => '17:00' ],
+            ],
+            'compact_flight_route_with_start_time_only' => [
+                'os123 ber-vie 2026-10-10 15:00',
+                [ 'type' => 'flight', 'title' => 'OS123', 'location' => 'BER', 'end_location' => 'VIE', 'date' => '2026-10-10', 'end_date' => '', 'time' => '15:00', 'end_time' => '' ],
+            ],
+            'dot_separated_time_range' => [
+                'LH789 FRA-BER 2026-10-11 8.05-9.20',
+                [ 'type' => 'flight', 'title' => 'LH789', 'location' => 'FRA', 'end_location' => 'BER', 'time' => '08:05', 'end_time' => '09:20' ],
+            ],
+            'slash_dates_as_month_day_year' => [
+                'Rental car Boston 8/4/26 9am',
+                [ 'type' => 'car', 'date' => '2026-08-04', 'time' => '09:00' ],
+            ],
+            'day_month_year_dates' => [
+                'Train to Berlin 5 Aug 2026 22:10',
+                [ 'type' => 'train', 'date' => '2026-08-05', 'time' => '22:10' ],
+            ],
+            'lodging_keywords' => [
+                'Hotel check-in near Munich Aug 6, 2026 4pm',
+                [ 'type' => 'lodging', 'title' => 'Hotel check-in', 'location' => 'Munich', 'time' => '16:00' ],
+            ],
+        ];
     }
 
     public function test_rejects_invalid_dates(): void {

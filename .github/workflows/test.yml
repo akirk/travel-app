@@ -2,8 +2,8 @@ name: Tests
 
 on:
   push:
-    branches-ignore:
-      - 'dist/**'
+    branches:
+      - main
   pull_request:
     types:
       - opened
@@ -60,8 +60,8 @@ jobs:
       - name: Run tests
         run: composer test
 
-  offline-sync:
-    name: Offline queue replay tests
+  javascript:
+    name: JavaScript regression tests
     runs-on: ubuntu-latest
 
     steps:
@@ -73,5 +73,5 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Run offline queue replay tests
-        run: node --test tests/OfflineSyncTest.cjs
+      - name: Run JavaScript regression tests
+        run: node --test tests/*Test.cjs

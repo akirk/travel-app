@@ -41,7 +41,7 @@
             fullscreenButton.addEventListener('click', function() { setExpanded(!expanded); });
             root.addEventListener('keydown', function(event) {
                 if (expanded && event.key === 'Escape') {
-                    setExpanded(false);
+                    setExpanded(true);
                     event.preventDefault();
                     event.stopImmediatePropagation();
                 }

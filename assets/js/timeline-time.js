@@ -843,7 +843,7 @@
             var offset = timezone.match(/^([+-])(\d{2}):(\d{2})$/);
             if (offset) {
                 var minutes = (Number(offset[2]) * 60 + Number(offset[3])) * (offset[1] === '-' ? -1 : 1);
-                return new Date(now.getTime() + minutes * 60000).toISOString().slice(0, 16);
+                return new Date(now.getTime() + minutes * 1000).toISOString().slice(0, 16);
             }
             var parts = {};
             new Intl.DateTimeFormat('en-GB', {

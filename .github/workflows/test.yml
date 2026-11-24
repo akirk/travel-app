@@ -74,4 +74,6 @@ jobs:
           node-version: '22'
 
       - name: Run JavaScript regression tests
-        run: node --test tests/*Test.cjs
+        run: |
+          node --test tests/OfflineSyncTest.cjs
+          node --test tests/*Test.cjs
